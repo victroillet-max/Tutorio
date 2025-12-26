@@ -75,7 +75,7 @@ export default async function DashboardPage() {
   const courseLastAccessed = new Map<string, string>();
   
   for (const progress of recentProgress || []) {
-    const activityData = progress.activity as (Activity & { module: Module & { course: Course } })[] | (Activity & { module: Module & { course: Course } }) | null;
+    const activityData = progress.activity as unknown as (Activity & { module: Module & { course: Course } })[] | (Activity & { module: Module & { course: Course } }) | null;
     const activity = Array.isArray(activityData) ? activityData[0] : activityData;
     if (activity?.module?.course) {
       const courseId = activity.module.course.id;
@@ -139,8 +139,8 @@ export default async function DashboardPage() {
 
     // Sort by module order_index, then activity order_index
     const sortedActivities = courseActivities.sort((a, b) => {
-      const moduleDataA = a.module as (Module & { course: Course })[] | (Module & { course: Course });
-      const moduleDataB = b.module as (Module & { course: Course })[] | (Module & { course: Course });
+      const moduleDataA = a.module as unknown as (Module & { course: Course })[] | (Module & { course: Course });
+      const moduleDataB = b.module as unknown as (Module & { course: Course })[] | (Module & { course: Course });
       const moduleA = Array.isArray(moduleDataA) ? moduleDataA[0] : moduleDataA;
       const moduleB = Array.isArray(moduleDataB) ? moduleDataB[0] : moduleDataB;
       if (moduleA.order_index !== moduleB.order_index) {
@@ -153,7 +153,7 @@ export default async function DashboardPage() {
     const nextActivity = sortedActivities.find(a => !completedIds.has(a.id));
     
     if (nextActivity) {
-      const moduleData = nextActivity.module as (Module & { course: Course })[] | (Module & { course: Course });
+      const moduleData = nextActivity.module as unknown as (Module & { course: Course })[] | (Module & { course: Course });
       const module = Array.isArray(moduleData) ? moduleData[0] : moduleData;
       continueLearningItems.push({
         course: module.course,

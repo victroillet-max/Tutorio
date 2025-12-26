@@ -83,7 +83,7 @@ export default async function ModulePage({ params }: ModulePageProps) {
       .single();
     
     if (subscription?.tier) {
-      const tier = subscription.tier as { slug: string }[] | { slug: string };
+      const tier = subscription.tier as unknown as { slug: string }[] | { slug: string };
       userPlan = (Array.isArray(tier) ? tier[0]?.slug : tier.slug) as PlanTier;
     }
   }
@@ -105,7 +105,7 @@ export default async function ModulePage({ params }: ModulePageProps) {
   }
 
   // Verify course slug matches
-  const courseData = module.course as { id: string; title: string; slug: string }[] | { id: string; title: string; slug: string };
+  const courseData = module.course as unknown as { id: string; title: string; slug: string }[] | { id: string; title: string; slug: string };
   const course = Array.isArray(courseData) ? courseData[0] : courseData;
   if (!course || course.slug !== courseSlug) {
     notFound();

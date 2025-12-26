@@ -61,7 +61,7 @@ export default async function CoursePage({ params }: CoursePageProps) {
       .single();
     
     if (subscription?.tier) {
-      const tier = subscription.tier as { slug: string }[] | { slug: string };
+      const tier = subscription.tier as unknown as { slug: string }[] | { slug: string };
       userPlan = (Array.isArray(tier) ? tier[0]?.slug : tier.slug) as PlanTier;
     }
   }
@@ -106,7 +106,7 @@ export default async function CoursePage({ params }: CoursePageProps) {
     if (progress) {
       // Count completed activities per module
       progress.forEach((p) => {
-        const activity = p.activity as { module_id: string }[] | { module_id: string };
+        const activity = p.activity as unknown as { module_id: string }[] | { module_id: string };
         const moduleId = Array.isArray(activity) ? activity[0]?.module_id : activity?.module_id;
         if (moduleId && p.completed) {
           if (!moduleProgress[moduleId]) {
@@ -151,7 +151,7 @@ export default async function CoursePage({ params }: CoursePageProps) {
               {course.category && (
                 <span className="inline-block px-3 py-1 rounded-full bg-white/20 text-sm font-medium mb-4">
                   {(() => {
-                    const cat = course.category as { name: string }[] | { name: string };
+                    const cat = course.category as unknown as { name: string }[] | { name: string };
                     return Array.isArray(cat) ? cat[0]?.name : cat.name;
                   })()}
                 </span>

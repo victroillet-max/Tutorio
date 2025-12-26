@@ -62,7 +62,7 @@ export default async function ActivityPage({ params }: ActivityPageProps) {
     .single();
   
   if (subscription?.tier) {
-    const tier = subscription.tier as { slug: string }[] | { slug: string };
+    const tier = subscription.tier as unknown as { slug: string }[] | { slug: string };
     userPlan = (Array.isArray(tier) ? tier[0]?.slug : tier.slug) as PlanTier;
   }
   
@@ -86,7 +86,7 @@ export default async function ActivityPage({ params }: ActivityPageProps) {
     notFound();
   }
 
-  const moduleData = activity.module as { 
+  const moduleData = activity.module as unknown as { 
     id: string; 
     title: string; 
     slug: string; 

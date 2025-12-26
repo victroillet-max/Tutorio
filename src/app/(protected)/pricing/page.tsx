@@ -66,7 +66,7 @@ export default async function PricingPage() {
       .single();
     
     if (subscription?.tier) {
-      const tier = subscription.tier as { slug: string }[] | { slug: string };
+      const tier = subscription.tier as unknown as { slug: string }[] | { slug: string };
       currentPlan = (Array.isArray(tier) ? tier[0]?.slug : tier.slug) as PlanTier;
     }
   }
