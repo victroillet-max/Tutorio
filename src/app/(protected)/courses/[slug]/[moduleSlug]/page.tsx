@@ -83,7 +83,8 @@ export default async function ModulePage({ params }: ModulePageProps) {
       .single();
     
     if (subscription?.tier) {
-      userPlan = (subscription.tier as { slug: string }).slug as PlanTier;
+      const tier = subscription.tier as { slug: string }[] | { slug: string };
+      userPlan = (Array.isArray(tier) ? tier[0]?.slug : tier.slug) as PlanTier;
     }
   }
   
