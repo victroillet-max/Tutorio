@@ -106,7 +106,8 @@ export default async function CoursePage({ params }: CoursePageProps) {
     if (progress) {
       // Count completed activities per module
       progress.forEach((p) => {
-        const moduleId = (p.activity as { module_id: string })?.module_id;
+        const activity = p.activity as { module_id: string }[] | { module_id: string };
+        const moduleId = Array.isArray(activity) ? activity[0]?.module_id : activity?.module_id;
         if (moduleId && p.completed) {
           if (!moduleProgress[moduleId]) {
             moduleProgress[moduleId] = { completed: 0, total: 0 };
@@ -149,7 +150,10 @@ export default async function CoursePage({ params }: CoursePageProps) {
             <div className="flex-1">
               {course.category && (
                 <span className="inline-block px-3 py-1 rounded-full bg-white/20 text-sm font-medium mb-4">
-                  {(course.category as { name: string }).name}
+                  {(() => {
+                    const cat = course.category as { name: string }[] | { name: string };
+                    return Array.isArray(cat) ? cat[0]?.name : cat.name;
+                  })()}
                 </span>
               )}
               

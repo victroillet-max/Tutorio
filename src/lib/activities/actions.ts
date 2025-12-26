@@ -117,9 +117,12 @@ export async function markActivityComplete(activityId: string, score?: number) {
   await checkAndAwardBadges(user.id);
 
   // Revalidate the course pages to show updated progress
-  const module = activity.module as { slug: string; course: { slug: string } };
-  revalidatePath(`/courses/${module.course.slug}`);
-  revalidatePath(`/courses/${module.course.slug}/${module.slug}`);
+  const moduleData = activity.module as { slug: string; course: { slug: string } }[] | { slug: string; course: { slug: string } };
+  const module = Array.isArray(moduleData) ? moduleData[0] : moduleData;
+  if (module) {
+    revalidatePath(`/courses/${module.course.slug}`);
+    revalidatePath(`/courses/${module.course.slug}/${module.slug}`);
+  }
 
   return { success: true, xpEarned: isFirstCompletion ? xpEarned : 0 };
 }
@@ -193,9 +196,11 @@ async function checkAndAwardBadges(userId: string) {
         break;
       
       case 'activity_type_complete':
-        const typeCount = progress.filter(p => 
-          (p.activity as { type: string })?.type === criteria.activityType
-        ).length;
+        const typeCount = progress.filter(p => {
+          const activity = p.activity as { type: string }[] | { type: string };
+          const type = Array.isArray(activity) ? activity[0]?.type : activity?.type;
+          return type === criteria.activityType;
+        }).length;
         earned = criteria.all 
           ? typeCount > 0 // Simplified: just check if any completed
           : typeCount >= (criteria.count as number);
@@ -204,7 +209,11 @@ async function checkAndAwardBadges(userId: string) {
       case 'modules_complete':
         const requiredModules = criteria.modules as string[];
         const completedModules = new Set(
-          progress.map(p => (p.activity as { module: { external_id: string } })?.module?.external_id)
+          progress.map(p => {
+            const activity = p.activity as { module: { external_id: string } }[] | { module: { external_id: string } };
+            const act = Array.isArray(activity) ? activity[0] : activity;
+            return act?.module?.external_id;
+          })
         );
         earned = requiredModules.every(m => completedModules.has(m));
         break;

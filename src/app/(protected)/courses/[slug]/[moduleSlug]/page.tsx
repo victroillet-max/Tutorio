@@ -105,8 +105,9 @@ export default async function ModulePage({ params }: ModulePageProps) {
   }
 
   // Verify course slug matches
-  const course = module.course as { id: string; title: string; slug: string };
-  if (course.slug !== courseSlug) {
+  const courseData = module.course as { id: string; title: string; slug: string }[] | { id: string; title: string; slug: string };
+  const course = Array.isArray(courseData) ? courseData[0] : courseData;
+  if (!course || course.slug !== courseSlug) {
     notFound();
   }
 

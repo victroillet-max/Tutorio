@@ -86,15 +86,21 @@ export default async function ActivityPage({ params }: ActivityPageProps) {
     notFound();
   }
 
-  const module = activity.module as { 
+  const moduleData = activity.module as { 
+    id: string; 
+    title: string; 
+    slug: string; 
+    course: { id: string; title: string; slug: string };
+  }[] | { 
     id: string; 
     title: string; 
     slug: string; 
     course: { id: string; title: string; slug: string };
   };
+  const module = Array.isArray(moduleData) ? moduleData[0] : moduleData;
   
   // Verify slugs match
-  if (module.slug !== moduleSlug || module.course.slug !== courseSlug) {
+  if (!module || module.slug !== moduleSlug || module.course.slug !== courseSlug) {
     notFound();
   }
 
