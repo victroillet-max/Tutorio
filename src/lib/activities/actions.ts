@@ -28,7 +28,7 @@ export async function markActivityComplete(activityId: string, score?: number) {
   // Check if already completed (to avoid duplicate XP)
   const { data: existingProgress } = await supabase
     .from("activity_progress")
-    .select("id, completed, xp_earned, attempts")
+    .select("id, completed, xp_earned, attempts, score, completed_at")
     .eq("user_id", user.id)
     .eq("activity_id", activityId)
     .single();
