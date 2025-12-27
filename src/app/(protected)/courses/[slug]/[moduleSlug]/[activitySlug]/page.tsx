@@ -6,14 +6,19 @@ import {
   ChevronRight,
   Clock,
   Zap,
-  Lock
+  Lock,
+  Sparkles
 } from "lucide-react";
-import type { Activity, PlanTier } from "@/lib/database.types";
-import { LessonViewer } from "@/components/activities/lesson-viewer";
-import { QuizViewer } from "@/components/activities/quiz-viewer";
-import { CodeEditor } from "@/components/activities/code-editor";
-import { InteractiveViewer } from "@/components/activities/interactive-viewer";
-import { CheckpointViewer } from "@/components/activities/checkpoint-viewer";
+import type { Activity } from "@/lib/database.types";
+import { 
+  LessonViewer, 
+  QuizViewer, 
+  CodeEditor, 
+  InteractiveViewer, 
+  CheckpointViewer,
+  ActivityPrerequisiteWarning,
+  ActivityChatContext 
+} from "@/components/activities";
 
 interface ActivityPageProps {
   params: Promise<{ slug: string; moduleSlug: string; activitySlug: string }>;
@@ -44,7 +49,7 @@ export default async function ActivityPage({ params }: ActivityPageProps) {
     redirect("/login");
   }
   
-  // Get user's profile (for admin check) and subscription tier
+  // Get user's profile (for admin check)
   const { data: profile } = await supabase
     .from("profiles")
     .select("role")
@@ -52,19 +57,6 @@ export default async function ActivityPage({ params }: ActivityPageProps) {
     .single();
   
   const isAdmin = profile?.role === 'admin';
-  
-  let userPlan: PlanTier = 'free';
-  const { data: subscription } = await supabase
-    .from("subscriptions")
-    .select("tier:subscription_tiers(slug)")
-    .eq("user_id", user.id)
-    .in("status", ["active", "trialing"])
-    .single();
-  
-  if (subscription?.tier) {
-    const tier = subscription.tier as unknown as { slug: string }[] | { slug: string };
-    userPlan = (Array.isArray(tier) ? tier[0]?.slug : tier.slug) as PlanTier;
-  }
   
   // Fetch activity with module and course info
   const { data: activity, error } = await supabase
@@ -75,7 +67,7 @@ export default async function ActivityPage({ params }: ActivityPageProps) {
         id,
         title,
         slug,
-        course:courses(id, title, slug)
+        course:courses(id, title, slug, demo_activity_count)
       )
     `)
     .eq("slug", activitySlug)
@@ -90,12 +82,12 @@ export default async function ActivityPage({ params }: ActivityPageProps) {
     id: string; 
     title: string; 
     slug: string; 
-    course: { id: string; title: string; slug: string };
+    course: { id: string; title: string; slug: string; demo_activity_count: number };
   }[] | { 
     id: string; 
     title: string; 
     slug: string; 
-    course: { id: string; title: string; slug: string };
+    course: { id: string; title: string; slug: string; demo_activity_count: number };
   };
   const module = Array.isArray(moduleData) ? moduleData[0] : moduleData;
   
@@ -104,8 +96,31 @@ export default async function ActivityPage({ params }: ActivityPageProps) {
     notFound();
   }
 
-  // Check access (admins have full access)
-  const hasAccess = isAdmin || checkAccess(activity.required_plan as PlanTier, userPlan);
+  // Check if user has subscription for this course
+  let subscriptionTier: string | null = null;
+  if (!isAdmin) {
+    const { data: subscription } = await supabase
+      .from("subscriptions")
+      .select("tier:subscription_tiers(slug)")
+      .eq("user_id", user.id)
+      .eq("course_id", module.course.id)
+      .in("status", ["active", "trialing"])
+      .single();
+    
+    if (subscription?.tier) {
+      const tier = subscription.tier as unknown as { slug: string }[] | { slug: string };
+      subscriptionTier = Array.isArray(tier) ? tier[0]?.slug : tier.slug;
+    }
+  }
+
+  // Check if this is a demo activity (first N activities of the course)
+  const { data: isDemo } = await supabase.rpc("is_demo_activity", {
+    p_activity_id: activity.id,
+  });
+
+  // User has access if: admin OR has subscription OR activity is demo
+  const hasSubscription = isAdmin || subscriptionTier !== null;
+  const hasAccess = hasSubscription || isDemo;
   
   if (!hasAccess) {
     return (
@@ -117,15 +132,34 @@ export default async function ActivityPage({ params }: ActivityPageProps) {
           <h1 className="text-2xl font-bold text-[var(--foreground)] mb-2">
             Premium Content
           </h1>
-          <p className="text-[var(--foreground-muted)] mb-6">
-            This activity requires a {activity.required_plan} plan to access.
+          <p className="text-[var(--foreground-muted)] mb-4">
+            This activity requires a subscription to access.
           </p>
+          <div className="bg-slate-50 rounded-xl p-4 mb-6 text-left">
+            <p className="text-sm text-[var(--foreground-muted)] mb-2">
+              Subscribe to unlock:
+            </p>
+            <ul className="text-sm space-y-1">
+              <li className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-[var(--primary)]" />
+                Full course access
+              </li>
+              <li className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-[var(--primary)]" />
+                AI tutor support
+              </li>
+              <li className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-[var(--primary)]" />
+                All challenges & exercises
+              </li>
+            </ul>
+          </div>
           <div className="space-y-3">
             <Link
-              href="/pricing"
+              href={`/pricing?course=${courseSlug}`}
               className="block w-full py-3 bg-[var(--primary)] text-white font-semibold rounded-xl hover:bg-[var(--primary-hover)] transition-colors"
             >
-              Upgrade to {activity.required_plan}
+              Subscribe Now
             </Link>
             <Link
               href={`/courses/${courseSlug}/${moduleSlug}`}
@@ -162,6 +196,9 @@ export default async function ActivityPage({ params }: ActivityPageProps) {
 
   return (
     <div className="min-h-screen bg-[var(--background-secondary)]">
+      {/* Set activity context for AI tutor */}
+      <ActivityChatContext activityId={activity.id} />
+      
       {/* Header */}
       <div className="sticky top-16 z-40 bg-white border-b border-[var(--border)]">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -209,6 +246,11 @@ export default async function ActivityPage({ params }: ActivityPageProps) {
 
       {/* Content */}
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Prerequisite Warning - shows only for code/quiz activities with unmet prerequisites */}
+        {(activity.type === 'code' || activity.type === 'quiz' || activity.type === 'challenge') && (
+          <ActivityPrerequisiteWarning activityId={activity.id} />
+        )}
+        
         <ActivityRenderer 
           activity={activity as Activity} 
           userId={user.id}
@@ -275,11 +317,6 @@ export default async function ActivityPage({ params }: ActivityPageProps) {
       </div>
     </div>
   );
-}
-
-function checkAccess(required: PlanTier, userPlan: PlanTier): boolean {
-  const tierOrder: Record<PlanTier, number> = { free: 0, basic: 1, advanced: 2 };
-  return tierOrder[userPlan] >= tierOrder[required];
 }
 
 interface ActivityRendererProps {

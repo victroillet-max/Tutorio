@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { CheckCircle2, XCircle, HelpCircle, ChevronRight } from "lucide-react";
 import type { Activity, QuizQuestion } from "@/lib/database.types";
 import { markActivityComplete, trackActivityView } from "@/lib/activities/actions";
+import { useChatContext } from "@/components/chat";
 
 interface QuizViewerProps {
   activity: Activity;
@@ -22,17 +23,32 @@ export function QuizViewer({ activity, userId, isCompleted }: QuizViewerProps) {
   const questions = content?.questions || [];
   const passingScore = content?.passing_score || activity.passing_score || 70;
 
+  // Chat context for struggling detection and current question tracking
+  const chatContext = useChatContext();
+
   // Track activity view when component mounts
   useEffect(() => {
     trackActivityView(activity.id).catch(console.error);
   }, [activity.id]);
   
   const [currentQuestion, setCurrentQuestion] = useState(0);
+  
+  // Update chat context with current question whenever it changes
+  useEffect(() => {
+    const question = questions[currentQuestion];
+    if (question?.question) {
+      chatContext.updateCurrentQuestion(question.question, currentQuestion + 1);
+    }
+  }, [currentQuestion, questions, chatContext]);
   const [answers, setAnswers] = useState<Record<string, number | boolean | string>>({});
   const [showResults, setShowResults] = useState(isCompleted);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [score, setScore] = useState<number | null>(null);
   const [showExplanation, setShowExplanation] = useState<string | null>(null);
+  
+  // Struggling detection state
+  const [wrongAnswerCount, setWrongAnswerCount] = useState(0);
+  const [hasShownHelpPopup, setHasShownHelpPopup] = useState(false);
 
   const question = questions[currentQuestion];
   const totalQuestions = questions.length;
@@ -41,6 +57,22 @@ export function QuizViewer({ activity, userId, isCompleted }: QuizViewerProps) {
   const handleAnswer = (questionId: string, answer: number | boolean | string) => {
     setAnswers(prev => ({ ...prev, [questionId]: answer }));
     setShowExplanation(questionId);
+    
+    // Check if answer is wrong and track for struggling detection
+    const currentQ = questions.find(q => q.id === questionId);
+    if (currentQ && answer !== currentQ.correct) {
+      const newWrongCount = wrongAnswerCount + 1;
+      setWrongAnswerCount(newWrongCount);
+      
+      // Trigger help popup after 2+ wrong answers
+      if (newWrongCount >= 2 && !hasShownHelpPopup && !chatContext.hasDismissedHelp) {
+        setHasShownHelpPopup(true);
+        chatContext.triggerPopup(
+          "Need help understanding this concept? I'm here for you!",
+          "help"
+        );
+      }
+    }
   };
 
   const calculateScore = (): number => {

@@ -9,9 +9,11 @@ import {
   Lock,
   CheckCircle2,
   PlayCircle,
-  Zap
+  Zap,
+  Sparkles,
+  Crown
 } from "lucide-react";
-import type { Module, PlanTier } from "@/lib/database.types";
+import type { Module, PlanTier, Activity } from "@/lib/database.types";
 
 interface CoursePageProps {
   params: Promise<{ slug: string }>;
@@ -37,12 +39,12 @@ export default async function CoursePage({ params }: CoursePageProps) {
   const { slug } = await params;
   const supabase = await createClient();
   
-  // Get current user and their subscription
+  // Get current user
   const { data: { user } } = await supabase.auth.getUser();
   
-  // Get user's profile (for admin check) and subscription tier
+  // Get user's profile (for admin check) and course subscription
   let isAdmin = false;
-  let userPlan: PlanTier = 'free';
+  let subscriptionTier: string | null = null;
   
   if (user) {
     const { data: profile } = await supabase
@@ -52,27 +54,18 @@ export default async function CoursePage({ params }: CoursePageProps) {
       .single();
     
     isAdmin = profile?.role === 'admin';
-    
-    const { data: subscription } = await supabase
-      .from("subscriptions")
-      .select("tier:subscription_tiers(slug)")
-      .eq("user_id", user.id)
-      .in("status", ["active", "trialing"])
-      .single();
-    
-    if (subscription?.tier) {
-      const tier = subscription.tier as unknown as { slug: string }[] | { slug: string };
-      userPlan = (Array.isArray(tier) ? tier[0]?.slug : tier.slug) as PlanTier;
-    }
   }
   
-  // Fetch course with modules
+  // Fetch course with modules and activities
   const { data: course, error } = await supabase
     .from("courses")
     .select(`
       *,
       category:categories(*),
-      modules(*)
+      modules(
+        *,
+        activities(id, order_index, is_published)
+      )
     `)
     .eq("slug", slug)
     .eq("is_published", true)
@@ -82,18 +75,65 @@ export default async function CoursePage({ params }: CoursePageProps) {
     notFound();
   }
 
+  // Get user's subscription for this course
+  if (user && !isAdmin) {
+    const { data: subscription } = await supabase
+      .from("subscriptions")
+      .select("tier:subscription_tiers(slug)")
+      .eq("user_id", user.id)
+      .eq("course_id", course.id)
+      .in("status", ["active", "trialing"])
+      .single();
+    
+    if (subscription?.tier) {
+      const tier = subscription.tier as unknown as { slug: string }[] | { slug: string };
+      subscriptionTier = Array.isArray(tier) ? tier[0]?.slug : tier.slug;
+    }
+  }
+
+  const hasSubscription = isAdmin || subscriptionTier !== null;
+  const demoActivityCount = course.demo_activity_count || 5;
+
   // Sort modules by order_index
-  const modules = ((course.modules as Module[]) || []).sort(
+  const modules = ((course.modules as (Module & { activities: Activity[] })[]) || []).sort(
     (a, b) => a.order_index - b.order_index
   );
+
+  // Calculate global activity indices for demo badge
+  let globalActivityIndex = 0;
+  const moduleWithDemoInfo = modules.map(module => {
+    const activities = (module.activities || [])
+      .filter(a => a.is_published)
+      .sort((a, b) => a.order_index - b.order_index);
+    
+    const activitiesWithDemoStatus = activities.map(activity => {
+      globalActivityIndex++;
+      return {
+        ...activity,
+        globalIndex: globalActivityIndex,
+        isDemo: globalActivityIndex <= demoActivityCount
+      };
+    });
+
+    return {
+      ...module,
+      activities: activitiesWithDemoStatus,
+      demoActivitiesCount: activitiesWithDemoStatus.filter(a => a.isDemo).length,
+      hasAnyDemoActivities: activitiesWithDemoStatus.some(a => a.isDemo),
+      allActivitiesArePremium: activitiesWithDemoStatus.every(a => !a.isDemo)
+    };
+  });
 
   // Calculate totals
   const totalXp = modules.reduce((sum, m) => sum + (m.total_xp || 0), 0);
   const totalMinutes = modules.reduce((sum, m) => sum + (m.estimated_minutes || 0), 0);
   const totalHours = Math.round(totalMinutes / 60);
+  const totalActivities = globalActivityIndex;
 
   // Get user progress for modules (if authenticated)
   let moduleProgress: Record<string, { completed: number; total: number }> = {};
+  let completedDemoActivities = 0;
+
   if (user) {
     const { data: progress } = await supabase
       .from("activity_progress")
@@ -131,6 +171,13 @@ export default async function CoursePage({ params }: CoursePageProps) {
         moduleProgress[a.module_id].total++;
       });
     }
+
+    // Count completed demo activities
+    completedDemoActivities = Object.values(moduleProgress).reduce(
+      (sum, p) => sum + p.completed, 0
+    );
+    // Cap at demo count for display purposes
+    completedDemoActivities = Math.min(completedDemoActivities, demoActivityCount);
   }
 
   return (
@@ -185,37 +232,83 @@ export default async function CoursePage({ params }: CoursePageProps) {
               </div>
             </div>
             
-            {/* CTA Card */}
+            {/* Subscription CTA Card */}
             <div className="bg-white rounded-2xl p-6 text-[var(--foreground)] shadow-xl w-full lg:w-80">
-              <div className="text-center mb-4">
-                <p className="text-sm text-[var(--foreground-muted)] mb-1">Your Plan</p>
-                <p className="text-2xl font-bold capitalize">{userPlan}</p>
-              </div>
-              
-              {userPlan === 'free' && !isAdmin && (
+              {hasSubscription ? (
+                // User has subscription or is admin
+                <div className="text-center">
+                  <div className="w-14 h-14 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-3">
+                    {isAdmin ? (
+                      <Crown className="w-7 h-7 text-emerald-600" />
+                    ) : (
+                      <CheckCircle2 className="w-7 h-7 text-emerald-600" />
+                    )}
+                  </div>
+                  <p className="text-xl font-bold text-emerald-600 mb-1">
+                    {isAdmin ? 'Admin Access' : `${subscriptionTier?.charAt(0).toUpperCase()}${subscriptionTier?.slice(1)} Plan`}
+                  </p>
+                  <p className="text-sm text-[var(--foreground-muted)] mb-4">
+                    You have full access to this course
+                  </p>
+                  <Link
+                    href={`/courses/${slug}/${modules[0]?.slug}`}
+                    className="block w-full py-3 px-4 bg-[var(--primary)] text-white text-center font-semibold rounded-xl hover:bg-[var(--primary-dark)] transition-colors"
+                  >
+                    Continue Learning
+                  </Link>
+                </div>
+              ) : (
+                // No subscription - show pricing
                 <>
-                  <div className="border-t border-[var(--border)] pt-4 mb-4">
-                    <p className="text-sm text-[var(--foreground-muted)] mb-2">
-                      Unlock all modules with Basic
-                    </p>
-                    <p className="text-3xl font-bold">
-                      CHF 9.90<span className="text-base font-normal text-[var(--foreground-muted)]">/month</span>
+                  <div className="text-center mb-4">
+                    <div className="inline-flex items-center gap-1 px-3 py-1 bg-emerald-100 text-emerald-700 text-sm font-medium rounded-full mb-3">
+                      <Zap className="w-4 h-4" />
+                      {demoActivityCount} Free Lessons
+                    </div>
+                    <p className="text-sm text-[var(--foreground-muted)]">
+                      {completedDemoActivities > 0 
+                        ? `${completedDemoActivities}/${demoActivityCount} demo lessons completed`
+                        : 'Try before you subscribe'
+                      }
                     </p>
                   </div>
+                  
+                  <div className="border-t border-[var(--border)] pt-4 mb-4">
+                    <p className="text-sm text-[var(--foreground-muted)] mb-2">
+                      Unlock full course access
+                    </p>
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <p className="font-semibold">Basic</p>
+                        <p className="text-sm text-[var(--foreground-muted)]">25 AI messages/day</p>
+                      </div>
+                      <p className="text-xl font-bold">CHF 10<span className="text-sm font-normal">/mo</span></p>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-semibold text-[var(--primary)]">Advanced</p>
+                        <p className="text-sm text-[var(--foreground-muted)]">Unlimited AI</p>
+                      </div>
+                      <p className="text-xl font-bold text-[var(--primary)]">CHF 20<span className="text-sm font-normal">/mo</span></p>
+                    </div>
+                  </div>
+                  
                   <Link
-                    href="/pricing"
-                    className="block w-full py-3 px-4 bg-[var(--primary)] text-white text-center font-semibold rounded-xl hover:bg-[var(--primary-hover)] transition-colors"
+                    href={`/pricing?course=${slug}`}
+                    className="block w-full py-3 px-4 bg-[var(--primary)] text-white text-center font-semibold rounded-xl hover:bg-[var(--primary-dark)] transition-colors mb-3"
                   >
-                    Upgrade to Basic
+                    Subscribe Now
                   </Link>
+                  
+                  {modules[0] && (
+                    <Link
+                      href={`/courses/${slug}/${modules[0].slug}`}
+                      className="block w-full py-3 px-4 bg-[var(--background-secondary)] text-[var(--foreground)] text-center font-medium rounded-xl hover:bg-[var(--background-tertiary)] transition-colors"
+                    >
+                      Start Free Demo
+                    </Link>
+                  )}
                 </>
-              )}
-              
-              {(userPlan !== 'free' || isAdmin) && (
-                <div className="flex items-center justify-center gap-2 text-emerald-600">
-                  <CheckCircle2 className="w-5 h-5" />
-                  <span className="font-medium">{isAdmin ? 'Admin Access' : 'Full Access'}</span>
-                </div>
               )}
             </div>
           </div>
@@ -232,13 +325,13 @@ export default async function CoursePage({ params }: CoursePageProps) {
         </h2>
         
         <div className="space-y-4">
-          {modules.map((module, index) => {
-            const isLocked = !isAdmin && !hasAccess(module.required_plan, userPlan);
+          {moduleWithDemoInfo.map((module, index) => {
             const progress = moduleProgress[module.id];
             const progressPercent = progress 
               ? Math.round((progress.completed / progress.total) * 100) 
               : 0;
             const isCompleted = progressPercent === 100;
+            const isLocked = !hasSubscription && module.allActivitiesArePremium;
             
             return (
               <ModuleCard
@@ -249,27 +342,50 @@ export default async function CoursePage({ params }: CoursePageProps) {
                 isLocked={isLocked}
                 isCompleted={isCompleted}
                 progressPercent={progressPercent}
+                hasSubscription={hasSubscription}
+                demoActivitiesCount={module.demoActivitiesCount}
+                totalActivities={module.activities.length}
               />
             );
           })}
         </div>
+
+        {/* Upgrade CTA for non-subscribers */}
+        {!hasSubscription && (
+          <div className="mt-12 bg-gradient-to-r from-[var(--primary)]/10 to-[var(--primary)]/5 rounded-2xl p-8 text-center">
+            <Sparkles className="w-10 h-10 text-[var(--primary)] mx-auto mb-4" />
+            <h3 className="text-xl font-bold mb-2">Ready to Continue?</h3>
+            <p className="text-[var(--foreground-muted)] mb-6 max-w-md mx-auto">
+              Subscribe to unlock all {totalActivities} activities and get access to our AI tutor.
+            </p>
+            <Link
+              href={`/pricing?course=${slug}`}
+              className="inline-flex items-center gap-2 px-6 py-3 bg-[var(--primary)] text-white font-semibold rounded-xl hover:bg-[var(--primary-dark)] transition-colors"
+            >
+              View Subscription Options
+              <ChevronRight className="w-4 h-4" />
+            </Link>
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-function hasAccess(required: PlanTier, userPlan: PlanTier): boolean {
-  const tierOrder: Record<PlanTier, number> = { free: 0, basic: 1, advanced: 2 };
-  return tierOrder[userPlan] >= tierOrder[required];
-}
-
 interface ModuleCardProps {
-  module: Module;
+  module: Module & { 
+    activities: { id: string; globalIndex: number; isDemo: boolean }[];
+    demoActivitiesCount: number;
+    hasAnyDemoActivities: boolean;
+  };
   index: number;
   courseSlug: string;
   isLocked: boolean;
   isCompleted: boolean;
   progressPercent: number;
+  hasSubscription: boolean;
+  demoActivitiesCount: number;
+  totalActivities: number;
 }
 
 function ModuleCard({ 
@@ -278,7 +394,10 @@ function ModuleCard({
   courseSlug, 
   isLocked, 
   isCompleted,
-  progressPercent 
+  progressPercent,
+  hasSubscription,
+  demoActivitiesCount,
+  totalActivities
 }: ModuleCardProps) {
   const hours = Math.floor((module.estimated_minutes || 0) / 60);
   const minutes = (module.estimated_minutes || 0) % 60;
@@ -323,17 +442,35 @@ function ModuleCard({
         
         {/* Content */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
             <h3 
               className="text-lg font-semibold text-[var(--foreground)] truncate"
               style={{ fontFamily: 'var(--font-heading)' }}
             >
               {module.title}
             </h3>
-            {module.required_plan !== 'free' && (
-              <span className="flex-shrink-0 px-2 py-0.5 text-xs font-medium bg-amber-100 text-amber-700 rounded-full">
-                {module.required_plan.toUpperCase()}
-              </span>
+            
+            {/* Demo/Premium Badge */}
+            {!hasSubscription && (
+              <>
+                {demoActivitiesCount > 0 && demoActivitiesCount < totalActivities && (
+                  <span className="flex-shrink-0 px-2 py-0.5 text-xs font-medium bg-emerald-100 text-emerald-700 rounded-full">
+                    {demoActivitiesCount} Free
+                  </span>
+                )}
+                {demoActivitiesCount === totalActivities && (
+                  <span className="flex-shrink-0 px-2 py-0.5 text-xs font-medium bg-emerald-100 text-emerald-700 rounded-full flex items-center gap-1">
+                    <Zap className="w-3 h-3" />
+                    Free
+                  </span>
+                )}
+                {demoActivitiesCount === 0 && (
+                  <span className="flex-shrink-0 px-2 py-0.5 text-xs font-medium bg-amber-100 text-amber-700 rounded-full flex items-center gap-1">
+                    <Lock className="w-3 h-3" />
+                    Premium
+                  </span>
+                )}
+              </>
             )}
           </div>
           
@@ -349,6 +486,10 @@ function ModuleCard({
             <span className="flex items-center gap-1">
               <Zap className="w-4 h-4" />
               {module.total_xp} XP
+            </span>
+            <span className="flex items-center gap-1">
+              <BookOpen className="w-4 h-4" />
+              {totalActivities} activities
             </span>
             {progressPercent > 0 && !isLocked && (
               <span className="flex items-center gap-1 text-emerald-600">
@@ -377,4 +518,3 @@ function ModuleCard({
     </Link>
   );
 }
-

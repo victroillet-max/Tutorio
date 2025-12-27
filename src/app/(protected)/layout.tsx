@@ -11,6 +11,7 @@ import {
   ChevronDown
 } from "lucide-react";
 import { signOut } from "@/lib/auth/actions";
+import { ChatWrapper } from "@/components/chat";
 
 /**
  * Protected layout - wraps all authenticated routes
@@ -68,7 +69,7 @@ export default async function ProtectedLayout({
               Dashboard
             </NavLink>
             <NavLink href="/courses" icon={GraduationCap}>
-              Courses
+              My Courses
             </NavLink>
           </div>
 
@@ -120,18 +121,19 @@ export default async function ProtectedLayout({
 
       {/* Mobile Bottom Navigation */}
       <nav className="fixed bottom-0 left-0 right-0 z-50 h-16 bg-white border-t border-[var(--border)] shadow-lg md:hidden">
-        <div className="h-full grid grid-cols-4 items-center">
+        <div className="h-full grid grid-cols-3 items-center">
           <MobileNavLink href="/dashboard" icon={Home} label="Home" />
           <MobileNavLink href="/courses" icon={GraduationCap} label="Courses" />
           <MobileNavLink href="/profile" icon={User} label="Profile" />
-          <MobileNavLink href="/settings" icon={Settings} label="Settings" />
         </div>
       </nav>
 
-      {/* Main Content */}
-      <main className="pt-16 pb-20 md:pb-0 min-h-screen">
-        {children}
-      </main>
+      {/* Main Content with Chat Context */}
+      <ChatWrapper>
+        <main className="pt-16 pb-20 md:pb-0 min-h-screen">
+          {children}
+        </main>
+      </ChatWrapper>
     </div>
   );
 }

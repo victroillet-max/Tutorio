@@ -2,234 +2,316 @@ import { createClient } from "@/utils/supabase/server";
 import Link from "next/link";
 import { 
   BookOpen, 
-  Clock, 
   ChevronRight,
-  Zap,
-  Lock,
-  Search,
-  Trophy
+  Target,
+  Sparkles,
+  Trophy,
+  Play,
+  GraduationCap
 } from "lucide-react";
-import type { Course, Category, Module } from "@/lib/database.types";
 
 export const metadata = {
-  title: "Courses | Tutorio",
-  description: "Browse all available courses",
+  title: "My Courses | Tutorio",
+  description: "Your enrolled courses and learning progress",
 };
+
+interface CourseWithProgress {
+  course_id: string;
+  course_slug: string;
+  course_title: string;
+  course_description: string;
+  course_short_description: string;
+  course_difficulty: string;
+  enrolled_at: string;
+  last_accessed_at: string;
+  foundations_total: number;
+  foundations_mastered: number;
+  skills_total: number;
+  skills_mastered: number;
+  overall_progress_percent: number;
+}
+
+interface AvailableCourse {
+  id: string;
+  slug: string;
+  title: string;
+  description: string;
+  short_description: string;
+  difficulty: string;
+  total_skills: number;
+}
 
 export default async function CoursesPage() {
   const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
   
-  // Fetch courses with their modules and categories
-  const { data: courses, error } = await supabase
+  // Get user's enrolled courses with progress
+  let enrolledCourses: CourseWithProgress[] = [];
+  if (user) {
+    const { data: coursesData } = await supabase
+      .rpc("get_user_enrolled_courses", { p_user_id: user.id });
+    enrolledCourses = coursesData || [];
+  }
+
+  // Get all available courses (that user hasn't enrolled in)
+  const enrolledIds = enrolledCourses.map(c => c.course_id);
+  
+  const { data: availableCoursesData } = await supabase
     .from("courses")
     .select(`
-      *,
-      category:categories(*),
-      modules(id, total_xp, estimated_minutes, required_plan)
+      id,
+      slug,
+      title,
+      description,
+      short_description,
+      difficulty
     `)
     .eq("is_published", true)
     .order("sort_order");
 
-  if (error) {
-    console.error("Failed to fetch courses:", error);
+  // Filter out already enrolled courses and count skills per course
+  const availableCourses: AvailableCourse[] = [];
+  
+  for (const course of (availableCoursesData || [])) {
+    if (!enrolledIds.includes(course.id)) {
+      // Count skills for this course
+      const { count } = await supabase
+        .from("skills")
+        .select("id", { count: "exact", head: true })
+        .eq("course_id", course.id)
+        .eq("is_active", true);
+      
+      availableCourses.push({
+        ...course,
+        total_skills: count || 0
+      });
+    }
   }
 
-  // Fetch categories for filters
-  const { data: categories } = await supabase
-    .from("categories")
-    .select("*")
-    .order("sort_order");
+  const hasEnrolledCourses = enrolledCourses.length > 0;
+  const hasAvailableCourses = availableCourses.length > 0;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Header */}
       <div className="mb-8">
         <h1 
-          className="text-3xl font-bold mb-2 text-[var(--foreground)]"
+          className="text-3xl font-bold text-[var(--foreground)] mb-2"
           style={{ fontFamily: 'var(--font-heading)' }}
         >
-          Course Library
+          My Courses
         </h1>
         <p className="text-[var(--foreground-muted)]">
-          Explore our comprehensive collection of courses designed for learning success.
+          Your learning journey across all enrolled courses
         </p>
       </div>
 
-      {/* Search and Filters */}
-      <div className="flex flex-col sm:flex-row gap-4 mb-8">
-        {/* Search */}
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--foreground-muted)]" />
-          <input
-            type="text"
-            placeholder="Search courses..."
-            className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-[var(--border)] bg-white text-[var(--foreground)] placeholder:text-[var(--foreground-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:border-transparent transition-all"
-          />
-        </div>
-      </div>
+      <div className="space-y-12">
+        {/* Enrolled Courses */}
+        {hasEnrolledCourses && (
+          <section>
+            <h2 
+              className="text-xl font-bold text-[var(--foreground)] mb-6"
+              style={{ fontFamily: 'var(--font-heading)' }}
+            >
+              Continue Learning
+            </h2>
 
-      {/* Category Filters */}
-      <div className="flex flex-wrap gap-2 mb-8">
-        <FilterButton active>All Courses</FilterButton>
-        {categories?.map((category) => (
-          <FilterButton key={category.id}>{category.name}</FilterButton>
-        ))}
-      </div>
+            <div className="grid gap-6">
+              {enrolledCourses.map((course) => (
+                <EnrolledCourseCard key={course.course_id} course={course} />
+              ))}
+            </div>
+          </section>
+        )}
 
-      {/* Course Grid */}
-      {courses && courses.length > 0 ? (
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {courses.map((course) => (
-            <CourseCard 
-              key={course.id} 
-              course={course as Course & { category: Category | null; modules: Module[] }} 
-            />
-          ))}
-        </div>
-      ) : (
-        <div className="text-center py-16">
-          <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <BookOpen className="w-8 h-8 text-slate-400" />
+        {/* Available Courses */}
+        {hasAvailableCourses && (
+          <section>
+            <h2 
+              className="text-xl font-bold text-[var(--foreground)] mb-6"
+              style={{ fontFamily: 'var(--font-heading)' }}
+            >
+              {hasEnrolledCourses ? 'Explore More Courses' : 'Available Courses'}
+            </h2>
+
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {availableCourses.map((course) => (
+                <AvailableCourseCard key={course.id} course={course} />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* Empty State */}
+        {!hasEnrolledCourses && !hasAvailableCourses && (
+          <div className="text-center py-16">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-slate-100 flex items-center justify-center">
+              <BookOpen className="w-8 h-8 text-slate-400" />
+            </div>
+            <h3 className="text-lg font-semibold text-[var(--foreground)] mb-2">No Courses Available</h3>
+            <p className="text-[var(--foreground-muted)]">
+              Check back soon for new learning opportunities.
+            </p>
           </div>
-          <h3 className="text-lg font-semibold text-[var(--foreground)] mb-2">
-            No courses available
-          </h3>
-          <p className="text-[var(--foreground-muted)]">
-            Check back soon for new courses.
-          </p>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
 
-function FilterButton({ 
-  children, 
-  active = false 
-}: { 
-  children: React.ReactNode; 
-  active?: boolean;
-}) {
+function EnrolledCourseCard({ course }: { course: CourseWithProgress }) {
   return (
-    <button
-      className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
-        active
-          ? "bg-[var(--primary)] text-white shadow-md shadow-[var(--primary)]/25"
-          : "bg-white border border-[var(--border)] text-[var(--foreground-muted)] hover:text-[var(--primary)] hover:border-[var(--primary)]"
-      }`}
+    <Link
+      href={`/courses/${course.course_slug}/learn`}
+      className="group block card-elevated p-6 hover:shadow-lg transition-all"
     >
-      {children}
-    </button>
+      <div className="flex flex-col lg:flex-row lg:items-center gap-6">
+        {/* Course Icon */}
+        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[var(--primary)]/10 to-blue-500/10 flex items-center justify-center flex-shrink-0">
+          <GraduationCap className="w-8 h-8 text-[var(--primary)]" />
+        </div>
+
+        {/* Course Info */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-2">
+            <span className={`px-2 py-0.5 text-xs font-medium rounded-full capitalize
+              ${course.course_difficulty === 'beginner' ? 'bg-emerald-100 text-emerald-700' :
+                course.course_difficulty === 'intermediate' ? 'bg-amber-100 text-amber-700' :
+                'bg-rose-100 text-rose-700'
+              }
+            `}>
+              {course.course_difficulty}
+            </span>
+            <span className="text-xs text-[var(--foreground-muted)]">
+              Last accessed {formatTimeAgo(course.last_accessed_at)}
+            </span>
+          </div>
+          
+          <h3 
+            className="text-xl font-bold text-[var(--foreground)] mb-2 group-hover:text-[var(--primary)] transition-colors"
+            style={{ fontFamily: 'var(--font-heading)' }}
+          >
+            {course.course_title}
+          </h3>
+          
+          <p className="text-sm text-[var(--foreground-muted)] line-clamp-2">
+            {course.course_short_description || course.course_description}
+          </p>
+        </div>
+
+        {/* Progress Section */}
+        <div className="flex flex-col sm:flex-row lg:flex-col gap-4 lg:w-64">
+          {/* Overall Progress */}
+          <div className="flex-1 bg-[var(--background-secondary)] rounded-xl p-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-[var(--foreground)]">Progress</span>
+              <span className="text-lg font-bold text-[var(--primary)]">
+                {course.overall_progress_percent}%
+              </span>
+            </div>
+            <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
+              <div 
+                className="h-full rounded-full bg-gradient-to-r from-[var(--primary)] to-blue-500 transition-all"
+                style={{ width: `${course.overall_progress_percent}%` }}
+              />
+            </div>
+          </div>
+
+          {/* Skills Breakdown */}
+          <div className="flex gap-3">
+            <div className="flex-1 bg-amber-50 rounded-xl p-3 text-center">
+              <Sparkles className="w-4 h-4 text-amber-600 mx-auto mb-1" />
+              <p className="text-lg font-bold text-[var(--foreground)]">
+                {course.foundations_mastered}/{course.foundations_total}
+              </p>
+              <p className="text-xs text-[var(--foreground-muted)]">Foundations</p>
+            </div>
+            <div className="flex-1 bg-blue-50 rounded-xl p-3 text-center">
+              <Target className="w-4 h-4 text-blue-600 mx-auto mb-1" />
+              <p className="text-lg font-bold text-[var(--foreground)]">
+                {course.skills_mastered}/{course.skills_total}
+              </p>
+              <p className="text-xs text-[var(--foreground-muted)]">Skills</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Action */}
+        <div className="flex-shrink-0">
+          <div className="flex items-center gap-2 px-4 py-2 bg-[var(--primary)] text-white rounded-lg group-hover:bg-[var(--primary-hover)] transition-colors">
+            <Play className="w-4 h-4" />
+            <span className="font-medium">Continue</span>
+            <ChevronRight className="w-4 h-4" />
+          </div>
+        </div>
+      </div>
+
+      {/* Completion Status */}
+      {course.overall_progress_percent === 100 && (
+        <div className="mt-4 pt-4 border-t border-[var(--border)] flex items-center gap-2 text-emerald-600">
+          <Trophy className="w-4 h-4" />
+          <span className="text-sm font-medium">Course Completed!</span>
+        </div>
+      )}
+    </Link>
   );
 }
 
-const colorClasses: Record<string, { bg: string; text: string }> = {
-  blue: { bg: "bg-blue-50", text: "text-blue-600" },
-  purple: { bg: "bg-purple-50", text: "text-purple-600" },
-  green: { bg: "bg-emerald-50", text: "text-emerald-600" },
-  orange: { bg: "bg-orange-50", text: "text-orange-600" },
-  rose: { bg: "bg-rose-50", text: "text-rose-600" },
-  cyan: { bg: "bg-cyan-50", text: "text-cyan-600" },
-};
-
-const difficultyConfig: Record<string, { label: string; color: string }> = {
-  beginner: { label: "Beginner", color: "text-emerald-600 bg-emerald-50" },
-  intermediate: { label: "Intermediate", color: "text-amber-600 bg-amber-50" },
-  advanced: { label: "Advanced", color: "text-rose-600 bg-rose-50" },
-};
-
-interface CourseCardProps {
-  course: Course & { 
-    category: Category | null; 
-    modules: Pick<Module, 'id' | 'total_xp' | 'estimated_minutes' | 'required_plan'>[];
-  };
-}
-
-function CourseCard({ course }: CourseCardProps) {
-  const category = course.category;
-  const colors = colorClasses[category?.color || 'blue'] || colorClasses.blue;
-  const difficulty = difficultyConfig[course.difficulty] || difficultyConfig.beginner;
-  
-  // Calculate totals from modules
-  const totalXp = course.modules.reduce((sum, m) => sum + (m.total_xp || 0), 0);
-  const totalMinutes = course.modules.reduce((sum, m) => sum + (m.estimated_minutes || 0), 0);
-  const totalHours = Math.round(totalMinutes / 60);
-  const modulesCount = course.modules.length;
-  
-  // Check if course has free content
-  const hasFreeContent = course.modules.some(m => m.required_plan === 'free');
-
+function AvailableCourseCard({ course }: { course: AvailableCourse }) {
   return (
     <Link
-      href={`/courses/${course.slug}`}
-      className="group card-elevated p-6 hover:scale-[1.02] transition-all duration-300 flex flex-col"
+      href={`/courses/${course.slug}/learn`}
+      className="group block card-elevated p-6 hover:shadow-lg transition-all"
     >
-      {/* Header: Badges */}
-      <div className="flex items-center justify-between mb-4">
-        <span className={`px-2.5 py-1 text-xs font-medium rounded-full ${difficulty.color}`}>
-          {difficulty.label}
+      <div className="flex items-center gap-2 mb-3">
+        <span className={`px-2 py-0.5 text-xs font-medium rounded-full capitalize
+          ${course.difficulty === 'beginner' ? 'bg-emerald-100 text-emerald-700' :
+            course.difficulty === 'intermediate' ? 'bg-amber-100 text-amber-700' :
+            'bg-rose-100 text-rose-700'
+          }
+        `}>
+          {course.difficulty}
         </span>
-        {hasFreeContent ? (
-          <span className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-full bg-emerald-50 text-emerald-600">
-            <Zap className="w-3 h-3" />
-            Free Preview
-          </span>
-        ) : (
-          <span className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-full bg-slate-100 text-slate-600">
-            <Lock className="w-3 h-3" />
-            Premium
-          </span>
-        )}
       </div>
 
-      {/* Category Icon */}
-      <div className={`w-12 h-12 rounded-xl ${colors.bg} flex items-center justify-center mb-4`}>
-        <BookOpen className={`w-5 h-5 ${colors.text}`} />
+      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[var(--primary)]/10 to-blue-500/10 flex items-center justify-center mb-4">
+        <GraduationCap className="w-6 h-6 text-[var(--primary)]" />
       </div>
 
-      {/* Category Label */}
-      {category && (
-        <p className="text-xs text-[var(--primary)] font-semibold uppercase tracking-wider mb-2">
-          {category.name}
-        </p>
-      )}
-
-      {/* Title */}
       <h3 
-        className="text-lg font-semibold mb-2 text-[var(--foreground)] group-hover:text-[var(--primary)] transition-colors line-clamp-2"
+        className="text-lg font-bold text-[var(--foreground)] mb-2 group-hover:text-[var(--primary)] transition-colors"
         style={{ fontFamily: 'var(--font-heading)' }}
       >
         {course.title}
       </h3>
-
-      {/* Description */}
-      <p className="text-sm text-[var(--foreground-muted)] mb-4 line-clamp-2 flex-1">
+      
+      <p className="text-sm text-[var(--foreground-muted)] mb-4 line-clamp-2">
         {course.short_description || course.description}
       </p>
 
-      {/* Stats */}
-      <div className="flex items-center gap-4 text-sm text-[var(--foreground-muted)] mb-4">
+      <div className="flex items-center justify-between text-sm text-[var(--foreground-muted)]">
         <span className="flex items-center gap-1">
-          <Clock className="w-4 h-4" />
-          {totalHours}h
+          <Target className="w-4 h-4" />
+          {course.total_skills} skills
         </span>
-        <span className="flex items-center gap-1">
-          <BookOpen className="w-4 h-4" />
-          {modulesCount} modules
-        </span>
-        <span className="flex items-center gap-1">
-          <Trophy className="w-4 h-4" />
-          {totalXp.toLocaleString()} XP
-        </span>
-      </div>
-
-      {/* Footer */}
-      <div className="flex items-center justify-between pt-4 border-t border-[var(--border)]">
-        <span className="text-sm font-medium text-[var(--primary)]">
+        <span className="flex items-center gap-1 text-[var(--primary)] group-hover:translate-x-1 transition-transform">
           Start Learning
+          <ChevronRight className="w-4 h-4" />
         </span>
-        <ChevronRight className="w-5 h-5 text-[var(--foreground-muted)] group-hover:text-[var(--primary)] group-hover:translate-x-1 transition-all" />
       </div>
     </Link>
   );
+}
+
+function formatTimeAgo(dateString: string): string {
+  const date = new Date(dateString);
+  const now = new Date();
+  const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+  
+  if (seconds < 60) return "just now";
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+  if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
+  return date.toLocaleDateString();
 }

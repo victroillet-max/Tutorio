@@ -287,8 +287,35 @@ export default async function ModulePage({ params }: ModulePageProps) {
           {activities.map((activity, index) => {
             const progress = activityProgress[activity.id];
             const isCompleted = progress?.completed ?? false;
-            const activityLocked = !isAdmin && !hasAccess(activity.required_plan as PlanTier, userPlan);
             const Icon = activityIcons[activity.type];
+            
+            // Completed activities are always accessible
+            if (isCompleted) {
+              return (
+                <ActivityCard
+                  key={activity.id}
+                  activity={activity}
+                  index={index + 1}
+                  courseSlug={courseSlug}
+                  moduleSlug={moduleSlug}
+                  isCompleted={isCompleted}
+                  isLocked={false}
+                  score={progress?.score}
+                  Icon={Icon}
+                />
+              );
+            }
+            
+            const planLocked = !isAdmin && !hasAccess(activity.required_plan as PlanTier, userPlan);
+            
+            // Sequential unlock: previous activity must be completed (unless it's the first)
+            const previousActivity = index > 0 ? activities[index - 1] : null;
+            const previousCompleted = previousActivity 
+              ? activityProgress[previousActivity.id]?.completed ?? false 
+              : true;
+            const sequenceLocked = !isAdmin && !previousCompleted;
+            
+            const activityLocked = planLocked || sequenceLocked;
             
             return (
               <ActivityCard

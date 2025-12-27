@@ -19,6 +19,10 @@ export type ActivityType = 'lesson' | 'quiz' | 'code' | 'challenge' | 'interacti
 
 export type PlanTier = 'free' | 'basic' | 'advanced';
 
+export type SkillCategory = 'ct_foundations' | 'python_basics' | 'control_flow' | 'data_structures' | 'functions' | 'advanced_topics';
+
+export type ChatRole = 'user' | 'assistant' | 'system';
+
 // ============================================
 // Database Tables
 // ============================================
@@ -50,6 +54,7 @@ export interface SubscriptionTier {
 export interface Subscription {
   id: string;
   user_id: string;
+  course_id: string;  // Per-course subscription model
   tier_id: string;
   status: SubscriptionStatus;
   current_period_start: string;
@@ -86,6 +91,7 @@ export interface Course {
   thumbnail_url: string | null;
   difficulty: DifficultyLevel;
   duration_hours: number | null;
+  demo_activity_count: number;  // Number of free demo activities
   is_published: boolean;
   is_featured: boolean;
   sort_order: number;
@@ -190,6 +196,172 @@ export interface UserBadge {
   earned_at: string;
 }
 
+// ============================================
+// Skills Tables
+// ============================================
+
+export interface Skill {
+  id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  category: SkillCategory;
+  category_label: string | null;
+  course_id: string | null;
+  difficulty_level: number;
+  estimated_minutes: number;
+  icon: string | null;
+  color: string | null;
+  sort_order: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserCourseEnrollment {
+  id: string;
+  user_id: string;
+  course_id: string;
+  enrolled_at: string;
+  last_accessed_at: string | null;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface CourseWithSkillProgress extends Course {
+  foundations_total: number;
+  foundations_mastered: number;
+  skills_total: number;
+  skills_mastered: number;
+  overall_progress_percent: number;
+  enrolled_at?: string;
+  last_accessed_at?: string;
+}
+
+export interface SkillPrerequisite {
+  id: string;
+  skill_id: string;
+  prerequisite_skill_id: string;
+  is_required: boolean;
+  created_at: string;
+}
+
+export interface ActivitySkill {
+  id: string;
+  activity_id: string;
+  skill_id: string;
+  is_primary: boolean;
+  teaches: boolean;
+  weight: number;
+  created_at: string;
+}
+
+export interface QuestionSkill {
+  id: string;
+  activity_id: string;
+  question_id: string;
+  skill_id: string;
+  weight: number;
+  created_at: string;
+}
+
+export interface UserSkillProgress {
+  id: string;
+  user_id: string;
+  skill_id: string;
+  mastery_level: number;
+  times_practiced: number;
+  correct_answers: number;
+  total_answers: number;
+  last_practiced_at: string | null;
+  first_practiced_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DiagnosticResult {
+  id: string;
+  user_id: string;
+  skill_cluster: string;
+  total_questions: number;
+  correct_answers: number;
+  score: number;
+  gaps_identified: string[];
+  recommendations: Record<string, unknown> | null;
+  completed_at: string;
+  created_at: string;
+}
+
+// ============================================
+// AI Chat Tables
+// ============================================
+
+export interface ChatConversation {
+  id: string;
+  user_id: string;
+  activity_id: string | null;
+  skill_id: string | null;
+  title: string | null;
+  is_active: boolean;
+  message_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  conversation_id: string;
+  role: ChatRole;
+  content: string;
+  metadata: Record<string, unknown>;
+  tokens_used: number;
+  created_at: string;
+}
+
+export interface AIUsage {
+  id: string;
+  user_id: string;
+  date: string;
+  messages_count: number;
+  tokens_used: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AIRateLimit {
+  tier: PlanTier;
+  messages_per_day: number;
+  messages_per_hour: number;
+  max_context_messages: number;
+  features: Record<string, boolean>;
+}
+
+// ============================================
+// Extended Types with Relations
+// ============================================
+
+export interface SkillWithProgress extends Skill {
+  progress: UserSkillProgress | null;
+  prerequisites?: SkillPrerequisite[];
+}
+
+export interface SkillWithPrerequisites extends Skill {
+  prerequisites: (SkillPrerequisite & { prerequisite: Skill })[];
+}
+
+export interface ChatConversationWithMessages extends ChatConversation {
+  messages: ChatMessage[];
+}
+
+export interface UserRateLimit {
+  tier: PlanTier;
+  messages_per_day: number;
+  messages_per_hour: number;
+  messages_used_today: number;
+  messages_remaining_today: number;
+  features: Record<string, boolean>;
+}
+
 // Legacy types (kept for backwards compatibility)
 export interface Lesson {
   id: string;
@@ -268,6 +440,57 @@ export interface LessonWithProgress extends Lesson {
 
 export interface SubscriptionWithTier extends Subscription {
   tier: SubscriptionTier;
+}
+
+export interface SubscriptionWithCourse extends Subscription {
+  tier: SubscriptionTier;
+  course: Course;
+}
+
+// Per-course subscription access types
+export interface CourseSubscriptionInfo {
+  subscription_id: string;
+  tier_name: string;
+  tier_slug: string;
+  status: SubscriptionStatus;
+  current_period_start: string;
+  current_period_end: string;
+  cancel_at_period_end: boolean;
+  stripe_subscription_id: string | null;
+}
+
+export interface UserCourseSubscription {
+  subscription_id: string;
+  course_id: string;
+  course_title: string;
+  course_slug: string;
+  tier_name: string;
+  tier_slug: string;
+  price_monthly: number;
+  status: SubscriptionStatus;
+  current_period_start: string;
+  current_period_end: string;
+  cancel_at_period_end: boolean;
+  stripe_subscription_id: string | null;
+}
+
+export interface ActivityAccess {
+  has_access: boolean;
+  is_demo: boolean;
+  subscription_tier: string | null;
+  course_id: string;
+  demo_activities_used: number;
+  demo_activities_total: number;
+}
+
+export interface CourseAccessInfo {
+  course_id: string;
+  course_title: string;
+  course_slug: string;
+  demo_activity_count: number;
+  subscription_tier: string | null;
+  has_full_access: boolean;
+  total_activities: number;
 }
 
 export interface ProfileWithSubscription extends Profile {
@@ -456,6 +679,64 @@ export interface Database {
         Insert: Omit<CourseEnrollment, 'id'>;
         Update: Partial<Omit<CourseEnrollment, 'id' | 'user_id' | 'course_id'>>;
       };
+      // Skills tables
+      skills: {
+        Row: Skill;
+        Insert: Omit<Skill, 'id' | 'created_at' | 'updated_at'>;
+        Update: Partial<Omit<Skill, 'id' | 'created_at' | 'updated_at'>>;
+      };
+      skill_prerequisites: {
+        Row: SkillPrerequisite;
+        Insert: Omit<SkillPrerequisite, 'id' | 'created_at'>;
+        Update: Partial<Omit<SkillPrerequisite, 'id' | 'created_at'>>;
+      };
+      activity_skills: {
+        Row: ActivitySkill;
+        Insert: Omit<ActivitySkill, 'id' | 'created_at'>;
+        Update: Partial<Omit<ActivitySkill, 'id' | 'created_at'>>;
+      };
+      question_skills: {
+        Row: QuestionSkill;
+        Insert: Omit<QuestionSkill, 'id' | 'created_at'>;
+        Update: Partial<Omit<QuestionSkill, 'id' | 'created_at'>>;
+      };
+      user_skill_progress: {
+        Row: UserSkillProgress;
+        Insert: Omit<UserSkillProgress, 'id' | 'created_at' | 'updated_at'>;
+        Update: Partial<Omit<UserSkillProgress, 'id' | 'user_id' | 'skill_id' | 'created_at' | 'updated_at'>>;
+      };
+      diagnostic_results: {
+        Row: DiagnosticResult;
+        Insert: Omit<DiagnosticResult, 'id' | 'created_at'>;
+        Update: never;
+      };
+      // User course enrollment
+      user_course_enrollment: {
+        Row: UserCourseEnrollment;
+        Insert: Omit<UserCourseEnrollment, 'id' | 'created_at'>;
+        Update: Partial<Omit<UserCourseEnrollment, 'id' | 'user_id' | 'course_id' | 'created_at'>>;
+      };
+      // AI Chat tables
+      chat_conversations: {
+        Row: ChatConversation;
+        Insert: Omit<ChatConversation, 'id' | 'created_at' | 'updated_at'>;
+        Update: Partial<Omit<ChatConversation, 'id' | 'user_id' | 'created_at' | 'updated_at'>>;
+      };
+      chat_messages: {
+        Row: ChatMessage;
+        Insert: Omit<ChatMessage, 'id' | 'created_at'>;
+        Update: never;
+      };
+      ai_usage: {
+        Row: AIUsage;
+        Insert: Omit<AIUsage, 'id' | 'created_at' | 'updated_at'>;
+        Update: Partial<Omit<AIUsage, 'id' | 'user_id' | 'date' | 'created_at' | 'updated_at'>>;
+      };
+      ai_rate_limits: {
+        Row: AIRateLimit;
+        Insert: AIRateLimit;
+        Update: Partial<Omit<AIRateLimit, 'tier'>>;
+      };
     };
     Enums: {
       user_role: UserRole;
@@ -464,6 +745,7 @@ export interface Database {
       difficulty_level: DifficultyLevel;
       activity_type: ActivityType;
       plan_tier: PlanTier;
+      skill_category: SkillCategory;
     };
     Functions: {
       is_admin: {
@@ -497,6 +779,31 @@ export interface Database {
       mark_lesson_complete: {
         Args: { p_lesson_id: string };
         Returns: LessonProgress;
+      };
+      // Per-course subscription functions
+      has_course_subscription: {
+        Args: { p_course_id: string; required_tier?: string };
+        Returns: boolean;
+      };
+      get_course_subscription_tier: {
+        Args: { p_course_id: string };
+        Returns: string | null;
+      };
+      is_demo_activity: {
+        Args: { p_activity_id: string };
+        Returns: boolean;
+      };
+      get_activity_access: {
+        Args: { p_activity_id: string };
+        Returns: ActivityAccess[];
+      };
+      get_user_course_subscription: {
+        Args: { p_user_id: string; p_course_id: string };
+        Returns: CourseSubscriptionInfo[];
+      };
+      get_user_subscriptions: {
+        Args: { p_user_id: string };
+        Returns: UserCourseSubscription[];
       };
     };
   };

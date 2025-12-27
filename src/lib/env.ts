@@ -15,8 +15,17 @@ const envSchema = z.object({
   // Supabase Service Role (server-only - never expose to client)
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
   
-  // OpenAI API Key (server-only - for AI code validation)
+  // OpenAI API Key (server-only - for AI code validation and chat)
   OPENAI_API_KEY: z.string().min(1).optional(),
+  
+  // OpenAI Model (server-only - defaults to gpt-4o-mini)
+  OPENAI_MODEL: z.string().default("gpt-4o-mini").optional(),
+  
+  // Stripe (server-only - for payment processing)
+  STRIPE_SECRET_KEY: z.string().min(1).optional(),
+  STRIPE_WEBHOOK_SECRET: z.string().min(1).optional(),
+  STRIPE_BASIC_PRICE_ID: z.string().min(1).optional(),
+  STRIPE_ADVANCED_PRICE_ID: z.string().min(1).optional(),
 });
 
 /**

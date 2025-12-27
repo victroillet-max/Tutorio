@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { CheckCircle2, XCircle, Flag, Clock, AlertTriangle, ChevronRight } from "lucide-react";
 import type { Activity, QuizQuestion } from "@/lib/database.types";
 import { markActivityComplete, trackActivityView } from "@/lib/activities/actions";
+import { useChatContext } from "@/components/chat";
 
 interface CheckpointViewerProps {
   activity: Activity;
@@ -22,6 +23,9 @@ export function CheckpointViewer({ activity, userId, isCompleted }: CheckpointVi
   const passingScore = content?.passing_score || activity.passing_score || 70;
   const timeLimit = activity.time_limit; // In minutes
 
+  // Chat context for struggling detection and current question tracking
+  const chatContext = useChatContext();
+
   // Track activity view when component mounts
   useEffect(() => {
     trackActivityView(activity.id).catch(console.error);
@@ -29,12 +33,24 @@ export function CheckpointViewer({ activity, userId, isCompleted }: CheckpointVi
   
   const [started, setStarted] = useState(false);
   const [currentQuestion, setCurrentQuestion] = useState(0);
+  
+  // Update chat context with current question whenever it changes
+  useEffect(() => {
+    if (!started) return; // Only track when exam has started
+    const question = questions[currentQuestion];
+    if (question?.question) {
+      chatContext.updateCurrentQuestion(question.question, currentQuestion + 1);
+    }
+  }, [currentQuestion, questions, chatContext, started]);
   const [answers, setAnswers] = useState<Record<string, number | boolean | string>>({});
   const [showResults, setShowResults] = useState(isCompleted);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [score, setScore] = useState<number | null>(null);
   const [timeRemaining, setTimeRemaining] = useState(timeLimit ? timeLimit * 60 : null);
   const [timerStarted, setTimerStarted] = useState(false);
+  
+  // Struggling detection - track questions answered (will check on submit)
+  const [hasShownHelpPopup, setHasShownHelpPopup] = useState(false);
 
   const question = questions[currentQuestion];
   const totalQuestions = questions.length;
@@ -68,6 +84,29 @@ export function CheckpointViewer({ activity, userId, isCompleted }: CheckpointVi
     setStarted(true);
     if (timeLimit) {
       setTimerStarted(true);
+    }
+  };
+
+  // Track question navigation for struggling detection
+  const [questionVisits, setQuestionVisits] = useState<Record<number, number>>({});
+  
+  const handleQuestionChange = (newQuestion: number) => {
+    setCurrentQuestion(newQuestion);
+    
+    // Track visits to each question
+    setQuestionVisits(prev => ({
+      ...prev,
+      [newQuestion]: (prev[newQuestion] || 0) + 1
+    }));
+    
+    // Check if user is revisiting questions multiple times (sign of uncertainty)
+    const totalRevisits = Object.values(questionVisits).filter(v => v > 1).length;
+    if (totalRevisits >= 2 && !hasShownHelpPopup && !chatContext.hasDismissedHelp) {
+      setHasShownHelpPopup(true);
+      chatContext.triggerPopup(
+        "Need help understanding this concept? I'm here for you!",
+        "help"
+      );
     }
   };
 
@@ -360,7 +399,7 @@ export function CheckpointViewer({ activity, userId, isCompleted }: CheckpointVi
             {questions.map((q, index) => (
               <button
                 key={q.id}
-                onClick={() => setCurrentQuestion(index)}
+                onClick={() => handleQuestionChange(index)}
                 className={`w-2.5 h-2.5 rounded-full transition-all ${
                   index === currentQuestion 
                     ? 'bg-amber-500 scale-125' 
@@ -375,7 +414,7 @@ export function CheckpointViewer({ activity, userId, isCompleted }: CheckpointVi
           {/* Single action button */}
           {currentQuestion < totalQuestions - 1 ? (
             <button
-              onClick={() => setCurrentQuestion(prev => prev + 1)}
+              onClick={() => handleQuestionChange(currentQuestion + 1)}
               className="flex items-center gap-2 px-6 py-3 bg-amber-600 text-white font-semibold rounded-xl hover:bg-amber-700 transition-colors"
             >
               Next Question

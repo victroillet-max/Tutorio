@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { 
   Play, 
   CheckCircle2, 
@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import type { Activity } from "@/lib/database.types";
 import { markActivityComplete, trackActivityView } from "@/lib/activities/actions";
+import { useChatContext } from "@/components/chat";
 
 interface CodeEditorProps {
   activity: Activity;
@@ -124,14 +125,62 @@ export function CodeEditor({ activity, userId, isCompleted }: CodeEditorProps) {
   const [showCelebration, setShowCelebration] = useState(false);
   const [isAIValidating, setIsAIValidating] = useState(false);
   
+  // Struggling detection state
+  const [consecutiveFailures, setConsecutiveFailures] = useState(0);
+  const [hasShownHelpPopup, setHasShownHelpPopup] = useState(false);
+  const activityStartTime = useRef<number>(Date.now());
+  
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const pyodideRef = useRef<any>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  
+  // Chat context for AI tutor integration
+  const chatContext = useChatContext();
+
+  // Update chat context with current code (debounced to avoid too many updates)
+  const updateChatCodeContext = useCallback((newCode: string) => {
+    chatContext.updateStudentCode(newCode);
+  }, [chatContext]);
+  
+  // Update code and sync with chat context
+  const handleCodeChange = useCallback((newCode: string) => {
+    setCode(newCode);
+    // Debounce the chat context update
+    const timeoutId = setTimeout(() => {
+      updateChatCodeContext(newCode);
+    }, 1000);
+    return () => clearTimeout(timeoutId);
+  }, [updateChatCodeContext]);
 
   // Track activity view when component mounts
   useEffect(() => {
     trackActivityView(activity.id).catch(console.error);
+    // Reset activity start time
+    activityStartTime.current = Date.now();
   }, [activity.id]);
+
+  // Time-based struggling detection (3+ minutes without success)
+  useEffect(() => {
+    if (completed || hasShownHelpPopup) return;
+    
+    const checkTimeSpent = () => {
+      const timeSpent = Date.now() - activityStartTime.current;
+      const threeMinutes = 3 * 60 * 1000;
+      
+      if (timeSpent >= threeMinutes && !hasShownHelpPopup && !chatContext.hasDismissedHelp) {
+        setHasShownHelpPopup(true);
+        chatContext.triggerPopup(
+          "Stuck? I can give you a hint without spoiling the answer.",
+          "help"
+        );
+      }
+    };
+
+    // Check every 30 seconds
+    const interval = setInterval(checkTimeSpent, 30000);
+    
+    return () => clearInterval(interval);
+  }, [completed, hasShownHelpPopup, chatContext]);
 
   // Load Pyodide
   useEffect(() => {
@@ -390,6 +439,9 @@ sys.stdout = StringIO()
         const errorMessage = error instanceof Error ? error.message : String(error);
         setOutput(`Error: ${errorMessage}`);
         
+        // Update chat context with the error for AI tutor
+        chatContext.updateErrorMessage(errorMessage);
+        
         // Create initial error result with loading state
         const errorResult: TestResult = {
           passed: false,
@@ -575,6 +627,27 @@ sys.stdout = StringIO()
         
         // Check if all tests passed (after AI validation)
         const allPassed = results.every(r => r.passed);
+        
+        // Clear error from chat context if all tests passed
+        if (allPassed) {
+          chatContext.updateErrorMessage(undefined);
+          // Reset struggling detection on success
+          setConsecutiveFailures(0);
+        } else {
+          // Track consecutive failures for struggling detection
+          const newFailureCount = consecutiveFailures + 1;
+          setConsecutiveFailures(newFailureCount);
+          
+          // Trigger help popup after 2+ consecutive failures
+          if (newFailureCount >= 2 && !hasShownHelpPopup && !chatContext.hasDismissedHelp) {
+            setHasShownHelpPopup(true);
+            chatContext.triggerPopup(
+              "Having trouble with your code? I can help you debug!",
+              "help"
+            );
+          }
+        }
+        
         if (allPassed && !completed) {
           try {
             await markActivityComplete(activity.id, 100);
@@ -712,7 +785,7 @@ sys.stdout = StringIO()
           <textarea
             ref={textareaRef}
             value={code}
-            onChange={(e) => setCode(e.target.value)}
+            onChange={(e) => handleCodeChange(e.target.value)}
             onKeyDown={handleKeyDown}
             spellCheck={false}
             className="flex-1 min-h-[450px] p-5 font-mono text-sm bg-slate-900 text-slate-100 resize-none focus:outline-none leading-relaxed"

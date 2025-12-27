@@ -1,7 +1,9 @@
 import { createClient } from "@/utils/supabase/server";
-import { Bell, Shield, CreditCard, User } from "lucide-react";
+import Link from "next/link";
+import { Bell, Shield, CreditCard, User, BookOpen, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import type { UserCourseSubscription } from "@/lib/database.types";
 
 export const metadata = {
   title: "Settings | Tutorio",
@@ -76,22 +78,10 @@ export default async function SettingsPage() {
         {/* Subscription Section */}
         <SettingsSection
           icon={CreditCard}
-          title="Subscription"
-          description="Manage your subscription and billing"
+          title="Subscriptions"
+          description="Manage your course subscriptions and billing"
         >
-          <div className="p-4 rounded-xl bg-[var(--background-secondary)] border border-[var(--border)]">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-medium text-[var(--foreground)]">Free Plan</p>
-                <p className="text-sm text-[var(--foreground-muted)]">
-                  Access to free preview lessons only
-                </p>
-              </div>
-              <Button>
-                Upgrade
-              </Button>
-            </div>
-          </div>
+          <SubscriptionSummary userId={user!.id} />
         </SettingsSection>
 
         <Separator className="bg-[var(--border)]" />
@@ -247,6 +237,84 @@ function ToggleSetting({
           }`}
         />
       </button>
+    </div>
+  );
+}
+
+async function SubscriptionSummary({ userId }: { userId: string }) {
+  const supabase = await createClient();
+  
+  const { data: subscriptions } = await supabase
+    .rpc("get_user_subscriptions", { p_user_id: userId });
+
+  const activeCount = subscriptions?.filter(
+    (s: UserCourseSubscription) => s.status === 'active' || s.status === 'trialing'
+  ).length || 0;
+
+  if (activeCount === 0) {
+    return (
+      <div className="p-4 rounded-xl bg-[var(--background-secondary)] border border-[var(--border)]">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="font-medium text-[var(--foreground)]">No Active Subscriptions</p>
+            <p className="text-sm text-[var(--foreground-muted)]">
+              Subscribe to courses to unlock full access
+            </p>
+          </div>
+          <Link href="/courses">
+            <Button>
+              Browse Courses
+            </Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {/* Summary Card */}
+      <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center">
+              <BookOpen className="w-5 h-5 text-emerald-600" />
+            </div>
+            <div>
+              <p className="font-medium text-emerald-900">
+                {activeCount} Active Subscription{activeCount !== 1 ? 's' : ''}
+              </p>
+              <p className="text-sm text-emerald-700">
+                {subscriptions?.slice(0, 2).map((s: UserCourseSubscription) => s.course_title).join(', ')}
+                {activeCount > 2 ? `, +${activeCount - 2} more` : ''}
+              </p>
+            </div>
+          </div>
+          <Link 
+            href="/subscriptions"
+            className="flex items-center gap-1 text-emerald-700 hover:text-emerald-800 font-medium text-sm"
+          >
+            Manage
+            <ArrowRight className="w-4 h-4" />
+          </Link>
+        </div>
+      </div>
+
+      {/* Quick Actions */}
+      <div className="flex gap-3">
+        <Link
+          href="/subscriptions"
+          className="flex-1 p-3 rounded-lg border border-[var(--border)] hover:border-[var(--primary)] transition-colors text-center"
+        >
+          <p className="text-sm font-medium text-[var(--foreground)]">View All Subscriptions</p>
+        </Link>
+        <Link
+          href="/api/stripe/portal"
+          className="flex-1 p-3 rounded-lg border border-[var(--border)] hover:border-[var(--primary)] transition-colors text-center"
+        >
+          <p className="text-sm font-medium text-[var(--foreground)]">Billing Portal</p>
+        </Link>
+      </div>
     </div>
   );
 }

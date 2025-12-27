@@ -3,4 +3,6 @@ export { QuizViewer } from './quiz-viewer';
 export { CodeEditor } from './code-editor';
 export { InteractiveViewer } from './interactive-viewer';
 export { CheckpointViewer } from './checkpoint-viewer';
+export { ActivityPrerequisiteWarning } from './prerequisite-warning';
+export { ActivityChatContext } from './activity-chat-context';
 

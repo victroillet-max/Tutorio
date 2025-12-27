@@ -116,13 +116,20 @@ export async function markActivityComplete(activityId: string, score?: number) {
   // Check and award badges
   await checkAndAwardBadges(user.id);
 
-  // Revalidate the course pages to show updated progress
+  // Update skill mastery for all skills associated with this activity
+  await updateSkillMasteryForActivity(user.id, activityId);
+
+  // Revalidate the course pages, skill pages and profile to show updated progress
   const moduleData = activity.module as unknown as { slug: string; course: { slug: string } }[] | { slug: string; course: { slug: string } };
   const module = Array.isArray(moduleData) ? moduleData[0] : moduleData;
   if (module) {
     revalidatePath(`/courses/${module.course.slug}`);
     revalidatePath(`/courses/${module.course.slug}/${module.slug}`);
   }
+  revalidatePath("/profile");
+  revalidatePath("/skills");
+  revalidatePath("/foundations");
+  revalidatePath("/dashboard");
 
   return { success: true, xpEarned: isFirstCompletion ? xpEarned : 0 };
 }
@@ -298,8 +305,9 @@ export async function trackActivityView(activityId: string) {
       .eq("activity_id", activityId);
   }
 
-  // Revalidate dashboard to show updated continue learning
+  // Revalidate dashboard and profile to show updated continue learning
   revalidatePath("/dashboard");
+  revalidatePath("/profile");
 
   return { success: true };
 }
@@ -328,5 +336,68 @@ export async function enrollInCourse(courseId: string) {
   }
 
   return { success: true };
+}
+
+/**
+ * Update skill mastery for all skills associated with an activity
+ */
+async function updateSkillMasteryForActivity(userId: string, activityId: string) {
+  const supabase = await createClient();
+
+  // Get all skills associated with this activity
+  const { data: activitySkills } = await supabase
+    .from("activity_skills")
+    .select("skill_id, weight, teaches")
+    .eq("activity_id", activityId);
+
+  if (!activitySkills || activitySkills.length === 0) return;
+
+  // Calculate and update mastery for each skill
+  for (const activitySkill of activitySkills) {
+    try {
+      // Use the database function to calculate mastery
+      await supabase.rpc("calculate_skill_mastery", {
+        p_user_id: userId,
+        p_skill_id: activitySkill.skill_id,
+      });
+    } catch (error) {
+      console.error(`Failed to update mastery for skill ${activitySkill.skill_id}:`, error);
+      // Continue with other skills even if one fails
+    }
+  }
+}
+
+/**
+ * Recalculate all skill mastery for the current user
+ * This is useful after database migrations or to fix inconsistent data
+ */
+export async function recalculateAllSkillMastery() {
+  const supabase = await createClient();
+  
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    throw new Error("Not authenticated");
+  }
+
+  try {
+    const { error } = await supabase.rpc("recalculate_all_skill_mastery", {
+      p_user_id: user.id,
+    });
+    
+    if (error) {
+      console.error("Failed to recalculate skill mastery:", error);
+      throw new Error("Failed to recalculate skill mastery");
+    }
+    
+    // Revalidate skill-related pages
+    revalidatePath("/skills");
+    revalidatePath("/foundations");
+    revalidatePath("/dashboard");
+    
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to recalculate skill mastery:", error);
+    throw new Error("Failed to recalculate skill mastery");
+  }
 }
 
