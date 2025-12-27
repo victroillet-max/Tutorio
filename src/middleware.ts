@@ -17,13 +17,23 @@ const protectedRoutes = ["/dashboard", "/courses/learn", "/profile", "/settings"
 const authRoutes = ["/login", "/signup", "/forgot-password"];
 
 export async function middleware(request: NextRequest) {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  // If Supabase is not configured, allow the request through
+  // The page-level components will handle the error appropriately
+  if (!supabaseUrl || !supabaseAnonKey) {
+    console.error("Middleware: Supabase environment variables not configured");
+    return NextResponse.next({ request });
+  }
+
   let supabaseResponse = NextResponse.next({
     request,
   });
 
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabaseUrl,
+    supabaseAnonKey,
     {
       cookies: {
         getAll() {
@@ -47,9 +57,15 @@ export async function middleware(request: NextRequest) {
   // IMPORTANT: Do not add any logic between createServerClient and getUser()
   // This can cause session management issues
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  let user = null;
+  try {
+    const { data } = await supabase.auth.getUser();
+    user = data.user;
+  } catch (err) {
+    // If getUser fails (e.g., invalid configuration), log and continue
+    console.error("Middleware: Failed to get user:", err);
+    return NextResponse.next({ request });
+  }
 
   const { pathname } = request.nextUrl;
 

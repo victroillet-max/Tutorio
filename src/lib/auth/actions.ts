@@ -57,8 +57,6 @@ export async function signUp(formData: FormData): Promise<AuthActionResult> {
  * Sign in an existing user with email and password
  */
 export async function signIn(formData: FormData): Promise<AuthActionResult> {
-  const supabase = await createClient();
-
   const email = formData.get("email") as string;
   const password = formData.get("password") as string;
 
@@ -66,14 +64,36 @@ export async function signIn(formData: FormData): Promise<AuthActionResult> {
     return { error: "Email and password are required" };
   }
 
-  const { error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
+  let supabase;
+  try {
+    supabase = await createClient();
+  } catch (err) {
+    console.error("Failed to create Supabase client:", err);
+    return { error: "Authentication service is unavailable. Please try again later." };
+  }
 
-  if (error) {
-    console.error("Login error:", error.message);
-    return { error: error.message };
+  try {
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      console.error("Login error:", error.message);
+      return { error: error.message };
+    }
+  } catch (err) {
+    console.error("Sign in exception:", err);
+    // Check for common configuration errors
+    if (err instanceof Error) {
+      if (err.message.includes("Unexpected end of JSON input")) {
+        return { 
+          error: "Authentication service configuration error. Please check Supabase environment variables." 
+        };
+      }
+      return { error: err.message };
+    }
+    return { error: "An unexpected error occurred during sign in" };
   }
 
   revalidatePath("/", "layout");
