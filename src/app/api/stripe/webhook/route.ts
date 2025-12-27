@@ -1,15 +1,18 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 
 // Initialize Stripe
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-const stripe = stripeSecretKey ? new Stripe(stripeSecretKey, { apiVersion: "2024-12-18.acacia" }) : null;
+const stripe = stripeSecretKey ? new Stripe(stripeSecretKey, { apiVersion: "2025-12-15.clover" }) : null;
 
 // Use service role for webhook processing (bypasses RLS)
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type SupabaseServiceClient = SupabaseClient<any, "public", any>;
 
 /**
  * POST /api/stripe/webhook
@@ -66,7 +69,7 @@ export async function POST(request: NextRequest) {
       }
 
       case "customer.subscription.updated": {
-        const subscription = event.data.object as Stripe.Subscription;
+        const subscription = event.data.object as Stripe.Subscription & { current_period_start: number; current_period_end: number };
         await handleSubscriptionUpdated(supabase, subscription);
         break;
       }
@@ -78,13 +81,13 @@ export async function POST(request: NextRequest) {
       }
 
       case "invoice.payment_succeeded": {
-        const invoice = event.data.object as Stripe.Invoice;
+        const invoice = event.data.object as Stripe.Invoice & { subscription?: string | Stripe.Subscription | null };
         await handlePaymentSucceeded(supabase, invoice);
         break;
       }
 
       case "invoice.payment_failed": {
-        const invoice = event.data.object as Stripe.Invoice;
+        const invoice = event.data.object as Stripe.Invoice & { subscription?: string | Stripe.Subscription | null };
         await handlePaymentFailed(supabase, invoice);
         break;
       }
@@ -109,7 +112,7 @@ export async function POST(request: NextRequest) {
  * Creates or updates the subscription in our database
  */
 async function handleCheckoutCompleted(
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseServiceClient,
   session: Stripe.Checkout.Session
 ) {
   const { supabase_user_id, course_id, tier } = session.metadata || {};
@@ -126,7 +129,10 @@ async function handleCheckoutCompleted(
     return;
   }
 
-  const stripeSubscription = await stripe!.subscriptions.retrieve(stripeSubscriptionId);
+  const stripeSubscription = await stripe!.subscriptions.retrieve(stripeSubscriptionId) as unknown as Stripe.Subscription & {
+    current_period_start: number;
+    current_period_end: number;
+  };
 
   // Get the tier ID from our database
   const { data: tierData, error: tierError } = await supabase
@@ -169,10 +175,10 @@ async function handleCheckoutCompleted(
  * Handle subscription updates (e.g., plan changes, cancellations)
  */
 async function handleSubscriptionUpdated(
-  supabase: ReturnType<typeof createClient>,
-  subscription: Stripe.Subscription
+  supabase: SupabaseServiceClient,
+  subscription: Stripe.Subscription & { current_period_start: number; current_period_end: number }
 ) {
-  const { supabase_user_id, course_id, tier } = subscription.metadata || {};
+  const { supabase_user_id, course_id } = subscription.metadata || {};
 
   if (!supabase_user_id || !course_id) {
     // Try to find by stripe_subscription_id
@@ -223,7 +229,7 @@ async function handleSubscriptionUpdated(
  * Handle subscription deletion/cancellation
  */
 async function handleSubscriptionDeleted(
-  supabase: ReturnType<typeof createClient>,
+  supabase: SupabaseServiceClient,
   subscription: Stripe.Subscription
 ) {
   const { error } = await supabase
@@ -244,14 +250,19 @@ async function handleSubscriptionDeleted(
  * Handle successful payment - extend subscription
  */
 async function handlePaymentSucceeded(
-  supabase: ReturnType<typeof createClient>,
-  invoice: Stripe.Invoice
+  supabase: SupabaseServiceClient,
+  invoice: Stripe.Invoice & { subscription?: string | Stripe.Subscription | null }
 ) {
-  const subscriptionId = invoice.subscription as string;
+  const subscriptionId = (typeof invoice.subscription === 'string' 
+    ? invoice.subscription 
+    : invoice.subscription?.id) as string | undefined;
   if (!subscriptionId) return;
 
   // Get the updated subscription from Stripe
-  const subscription = await stripe!.subscriptions.retrieve(subscriptionId);
+  const subscription = await stripe!.subscriptions.retrieve(subscriptionId) as unknown as Stripe.Subscription & {
+    current_period_start: number;
+    current_period_end: number;
+  };
 
   // Update the subscription period
   const { error } = await supabase
@@ -273,10 +284,12 @@ async function handlePaymentSucceeded(
  * Handle failed payment
  */
 async function handlePaymentFailed(
-  supabase: ReturnType<typeof createClient>,
-  invoice: Stripe.Invoice
+  supabase: SupabaseServiceClient,
+  invoice: Stripe.Invoice & { subscription?: string | Stripe.Subscription | null }
 ) {
-  const subscriptionId = invoice.subscription as string;
+  const subscriptionId = (typeof invoice.subscription === 'string' 
+    ? invoice.subscription 
+    : invoice.subscription?.id) as string | undefined;
   if (!subscriptionId) return;
 
   // Mark subscription as past_due

@@ -5,7 +5,7 @@ import { getSiteUrl } from "@/lib/env";
 
 // Initialize Stripe
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
-const stripe = stripeSecretKey ? new Stripe(stripeSecretKey, { apiVersion: "2024-12-18.acacia" }) : null;
+const stripe = stripeSecretKey ? new Stripe(stripeSecretKey, { apiVersion: "2025-12-15.clover" }) : null;
 
 /**
  * GET /api/stripe/portal

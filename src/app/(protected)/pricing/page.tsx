@@ -129,7 +129,7 @@ export default async function PricingPage({
             </h2>
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
               {courses.map((course) => {
-                const existingSub = subscriptions?.find(s => s.course_id === course.id);
+                const existingSub = subscriptions?.find((s: { course_id: string; tier_name: string }) => s.course_id === course.id);
                 return (
                   <Link
                     key={course.id}
@@ -171,10 +171,10 @@ export default async function PricingPage({
         {selectedCourse && tiers && (
           <>
             {/* Check if already subscribed */}
-            {subscriptions?.find(s => s.course_id === selectedCourse.id) && (
+            {subscriptions?.find((s: { course_id: string; tier_name: string }) => s.course_id === selectedCourse.id) && (
               <div className="mb-8 p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-center">
                 <p className="text-emerald-800 font-medium">
-                  You're already subscribed to this course ({subscriptions.find(s => s.course_id === selectedCourse.id)?.tier_name})
+                  You're already subscribed to this course ({subscriptions.find((s: { course_id: string; tier_name: string }) => s.course_id === selectedCourse.id)?.tier_name})
                 </p>
                 <Link 
                   href="/subscriptions" 
@@ -191,7 +191,7 @@ export default async function PricingPage({
                   key={tier.id} 
                   tier={tier as SubscriptionTier} 
                   course={selectedCourse}
-                  existingSubscription={subscriptions?.find(s => s.course_id === selectedCourse.id)}
+                  existingSubscription={subscriptions?.find((s: { course_id: string; tier_slug: string; tier_name: string }) => s.course_id === selectedCourse.id)}
                 />
               ))}
             </div>
