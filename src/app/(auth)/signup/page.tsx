@@ -1,8 +1,6 @@
 import Link from "next/link";
 import { signUp } from "@/lib/auth/actions";
 import { AuthForm, EmailInput, PasswordInput, FullNameInput } from "@/components/auth/auth-form";
-import { GoogleButton } from "@/components/auth/oauth-buttons";
-import { Separator } from "@/components/ui/separator";
 import { CheckCircle2 } from "lucide-react";
 
 export const metadata = {
@@ -61,18 +59,6 @@ export default function SignupPage() {
             showStrengthIndicator
           />
         </AuthForm>
-
-        <div className="relative my-8">
-          <Separator className="bg-[var(--border)]" />
-          <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-white px-4 text-sm text-[var(--foreground-muted)]">
-            or
-          </span>
-        </div>
-
-        {/* Social Signup */}
-        <div className="space-y-3">
-          <GoogleButton />
-        </div>
 
         {/* Terms */}
         <p className="mt-6 text-xs text-center text-[var(--foreground-muted)]">

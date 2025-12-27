@@ -1,8 +1,6 @@
 import Link from "next/link";
 import { signIn } from "@/lib/auth/actions";
 import { AuthForm, EmailInput, PasswordInput } from "@/components/auth/auth-form";
-import { GoogleButton } from "@/components/auth/oauth-buttons";
-import { Separator } from "@/components/ui/separator";
 
 export const metadata = {
   title: "Sign In | Tutorio",
@@ -48,18 +46,6 @@ export default function LoginPage({
             </Link>
           </div>
         </AuthForm>
-
-        <div className="relative my-8">
-          <Separator className="bg-[var(--border)]" />
-          <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-white px-4 text-sm text-[var(--foreground-muted)]">
-            or
-          </span>
-        </div>
-
-        {/* Social Login */}
-        <div className="space-y-3">
-          <GoogleButton />
-        </div>
       </div>
 
       {/* Footer */}
