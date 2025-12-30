@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { CheckCircle2, XCircle, HelpCircle, ChevronRight } from "lucide-react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { CheckCircle2, XCircle, HelpCircle, ChevronRight, BookOpen, Lightbulb, MessageCircle } from "lucide-react";
 import type { Activity, QuizQuestion } from "@/lib/database.types";
-import { markActivityComplete, trackActivityView } from "@/lib/activities/actions";
+import { markActivityComplete, trackActivityView, updateActivityProgress } from "@/lib/activities/actions";
 import { useChatContext } from "@/components/chat";
 
 interface QuizViewerProps {
@@ -24,7 +24,41 @@ export function QuizViewer({ activity, userId, isCompleted }: QuizViewerProps) {
   const passingScore = content?.passing_score || activity.passing_score || 70;
 
   // Chat context for struggling detection and current question tracking
-  const chatContext = useChatContext();
+  // Extract specific methods to avoid dependency on entire context object (prevents infinite re-renders)
+  const { updateCurrentQuestion, triggerPopup, hasDismissedHelp } = useChatContext();
+  
+  // B8: Track time spent on activity for "Hours Learned" stat
+  const lastSavedRef = useRef<number>(Date.now());
+  
+  // Only saves NEW time since last save (server accumulates)
+  const saveTimeSpent = useCallback(async () => {
+    const now = Date.now();
+    const timeSpent = Math.floor((now - lastSavedRef.current) / 1000);
+    if (timeSpent > 0) {
+      try {
+        await updateActivityProgress(activity.id, { timeSpentSeconds: timeSpent });
+        lastSavedRef.current = now; // Reset after successful save
+      } catch (error) {
+        console.error("Failed to save time spent:", error);
+      }
+    }
+  }, [activity.id]);
+  
+  // Save time on visibility change and unmount
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        saveTimeSpent();
+      }
+    };
+    
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      saveTimeSpent();
+    };
+  }, [saveTimeSpent]);
 
   // Track activity view when component mounts
   useEffect(() => {
@@ -37,9 +71,10 @@ export function QuizViewer({ activity, userId, isCompleted }: QuizViewerProps) {
   useEffect(() => {
     const question = questions[currentQuestion];
     if (question?.question) {
-      chatContext.updateCurrentQuestion(question.question, currentQuestion + 1);
+      updateCurrentQuestion(question.question, currentQuestion + 1);
     }
-  }, [currentQuestion, questions, chatContext]);
+  }, [currentQuestion, questions, updateCurrentQuestion]);
+  
   const [answers, setAnswers] = useState<Record<string, number | boolean | string>>({});
   const [showResults, setShowResults] = useState(isCompleted);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -54,26 +89,28 @@ export function QuizViewer({ activity, userId, isCompleted }: QuizViewerProps) {
   const totalQuestions = questions.length;
   const answeredCount = Object.keys(answers).length;
 
-  const handleAnswer = (questionId: string, answer: number | boolean | string) => {
+  const handleAnswer = useCallback((questionId: string, answer: number | boolean | string) => {
     setAnswers(prev => ({ ...prev, [questionId]: answer }));
     setShowExplanation(questionId);
     
     // Check if answer is wrong and track for struggling detection
     const currentQ = questions.find(q => q.id === questionId);
     if (currentQ && answer !== currentQ.correct) {
-      const newWrongCount = wrongAnswerCount + 1;
-      setWrongAnswerCount(newWrongCount);
-      
-      // Trigger help popup after 2+ wrong answers
-      if (newWrongCount >= 2 && !hasShownHelpPopup && !chatContext.hasDismissedHelp) {
-        setHasShownHelpPopup(true);
-        chatContext.triggerPopup(
-          "Need help understanding this concept? I'm here for you!",
-          "help"
-        );
-      }
+      setWrongAnswerCount(prev => {
+        const newWrongCount = prev + 1;
+        
+        // Trigger help popup after 2+ wrong answers
+        if (newWrongCount >= 2 && !hasShownHelpPopup && !hasDismissedHelp) {
+          setHasShownHelpPopup(true);
+          triggerPopup(
+            "Need help understanding this concept? I'm here for you!",
+            "help"
+          );
+        }
+        return newWrongCount;
+      });
     }
-  };
+  }, [questions, hasShownHelpPopup, hasDismissedHelp, triggerPopup]);
 
   const calculateScore = (): number => {
     let correct = 0;
@@ -93,6 +130,8 @@ export function QuizViewer({ activity, userId, isCompleted }: QuizViewerProps) {
     setShowResults(true);
     
     try {
+      // B8: Save time spent before marking complete
+      await saveTimeSpent();
       await markActivityComplete(activity.id, finalScore);
     } catch (error) {
       console.error("Failed to save quiz result:", error);
@@ -219,7 +258,8 @@ export function QuizViewer({ activity, userId, isCompleted }: QuizViewerProps) {
       
       {/* Question */}
       <div className="p-6 sm:p-8">
-        <h2 className="text-lg font-medium mb-6">{question.question}</h2>
+        {/* Question text with whitespace preserved for code */}
+        <h2 className="text-lg font-medium mb-6 whitespace-pre-wrap">{question.question}</h2>
         
         {/* Answer Options */}
         <div className="space-y-3">
@@ -227,6 +267,13 @@ export function QuizViewer({ activity, userId, isCompleted }: QuizViewerProps) {
             const isSelected = answers[question.id] === index;
             const isCorrect = showExplanation === question.id && question.correct === index;
             const isWrong = showExplanation === question.id && isSelected && question.correct !== index;
+            
+            // Format option text to properly display escape sequences like \n
+            // B5: Quiz options with "Hello\nWorld" were showing identically to "Hello World"
+            const formatOptionText = (text: string) => {
+              // Replace escaped newlines with actual visual representation
+              return text.replace(/\\n/g, '\n');
+            };
             
             return (
               <button
@@ -260,7 +307,8 @@ export function QuizViewer({ activity, userId, isCompleted }: QuizViewerProps) {
                   `}>
                     {String.fromCharCode(65 + index)}
                   </span>
-                  <span className="flex-1">{option}</span>
+                  {/* Use whitespace-pre-wrap to preserve newlines in options (B5 fix) */}
+                  <span className="flex-1 whitespace-pre-wrap">{formatOptionText(option)}</span>
                   {isCorrect && <CheckCircle2 className="w-5 h-5 text-emerald-600" />}
                   {isWrong && <XCircle className="w-5 h-5 text-red-600" />}
                 </div>
@@ -324,6 +372,48 @@ export function QuizViewer({ activity, userId, isCompleted }: QuizViewerProps) {
             <p className="text-sm text-blue-800">
               <strong>Explanation:</strong> {question.explanation}
             </p>
+          </div>
+        )}
+        
+        {/* P3: Struggling? Help button - shows when user gets a question wrong */}
+        {showExplanation === question.id && answers[question.id] !== question.correct && !hasDismissedHelp && (
+          <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0 w-10 h-10 bg-amber-100 rounded-lg flex items-center justify-center">
+                <Lightbulb className="w-5 h-5 text-amber-600" />
+              </div>
+              <div className="flex-1">
+                <p className="font-medium text-amber-900 mb-1">Need more help?</p>
+                <p className="text-sm text-amber-700 mb-3">
+                  Don&apos;t worry! Here are some options to help you understand better:
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => triggerPopup(
+                      `I got this question wrong and need help understanding: "${question.question}"`,
+                      'struggling'
+                    )}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-600 text-white text-sm font-medium rounded-lg hover:bg-amber-700 transition-colors"
+                  >
+                    <MessageCircle className="w-4 h-4" />
+                    Ask AI Tutor
+                  </button>
+                  <button
+                    onClick={() => {
+                      // Find previous lesson in this module (simplified approach)
+                      const relatedLessonLink = document.querySelector('a[href*="lesson"]');
+                      if (relatedLessonLink) {
+                        (relatedLessonLink as HTMLAnchorElement).click();
+                      }
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white text-amber-700 text-sm font-medium rounded-lg border border-amber-300 hover:bg-amber-50 transition-colors"
+                  >
+                    <BookOpen className="w-4 h-4" />
+                    Review Related Lesson
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>

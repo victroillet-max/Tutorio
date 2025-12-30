@@ -26,6 +26,11 @@ const envSchema = z.object({
   STRIPE_WEBHOOK_SECRET: z.string().min(1).optional(),
   STRIPE_BASIC_PRICE_ID: z.string().min(1).optional(),
   STRIPE_ADVANCED_PRICE_ID: z.string().min(1).optional(),
+  
+  // Google Sheets API (server-only - for sheet integration)
+  GOOGLE_SERVICE_ACCOUNT_EMAIL: z.string().email().optional(),
+  GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY: z.string().min(1).optional(),
+  GOOGLE_SHEETS_FOLDER_ID: z.string().min(1).optional(), // Folder to store user sheet copies
 });
 
 /**

@@ -17,11 +17,14 @@ import {
   Unlock,
   Clock,
   Edit,
-  BarChart3
+  BarChart3,
+  CreditCard,
+  AlertCircle
 } from "lucide-react";
 import Link from "next/link";
 import { getCourseDetail } from "@/lib/admin/actions";
 import { notFound } from "next/navigation";
+import { StripePriceConfig } from "./stripe-price-config";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -119,6 +122,14 @@ export default async function CourseDetailPage({ params }: PageProps) {
           <p className="text-[var(--foreground-muted)]">{course.description}</p>
         </div>
       )}
+
+      {/* Stripe Configuration */}
+      <StripePriceConfig 
+        courseId={course.id}
+        courseName={course.title}
+        basicPriceId={course.stripe_basic_price_id || ""}
+        advancedPriceId={course.stripe_advanced_price_id || ""}
+      />
 
       {/* Modules & Activities */}
       <div className="space-y-4">

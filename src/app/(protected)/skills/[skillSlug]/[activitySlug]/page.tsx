@@ -173,6 +173,13 @@ export default async function SkillActivityPage({ params }: SkillActivityPagePro
   };
 
   const primaryColor = categoryColors[skill.category] || 'bg-blue-500';
+  
+  // Check if this is a spreadsheet/wide layout activity
+  const isWideLayout = activity.type === 'interactive' && 
+    ['google-sheets', 'spreadsheet', 'cfs-builder', 'statement-builder'].includes(activity.interactive_type || '');
+  
+  // Use much wider max-width for spreadsheet exercises (7xl = 80rem = 1280px)
+  const containerClass = isWideLayout ? 'max-w-7xl' : 'max-w-4xl';
 
   return (
     <div className="min-h-screen bg-[var(--background-secondary)]">
@@ -181,7 +188,7 @@ export default async function SkillActivityPage({ params }: SkillActivityPagePro
       
       {/* Header */}
       <div className="sticky top-16 z-40 bg-white border-b border-[var(--border)]">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className={`${containerClass} mx-auto px-4 sm:px-6 lg:px-8`}>
           <div className="flex items-center justify-between py-3">
             {/* Back Link */}
             <Link
@@ -229,7 +236,7 @@ export default async function SkillActivityPage({ params }: SkillActivityPagePro
       </div>
 
       {/* Content */}
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className={`${containerClass} mx-auto px-4 sm:px-6 lg:px-8 py-8`}>
         {/* Prerequisite Warning - shows only for code/quiz activities with unmet prerequisites */}
         {(activity.type === 'code' || activity.type === 'quiz' || activity.type === 'challenge') && (
           <ActivityPrerequisiteWarning activityId={activity.id} />
@@ -244,7 +251,7 @@ export default async function SkillActivityPage({ params }: SkillActivityPagePro
 
       {/* Navigation Footer */}
       <div className="sticky bottom-0 bg-white/95 backdrop-blur-sm border-t border-[var(--border)] py-3">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className={`${containerClass} mx-auto px-4 sm:px-6 lg:px-8`}>
           <div className="flex items-center justify-between">
             {prevActivity ? (
               <Link

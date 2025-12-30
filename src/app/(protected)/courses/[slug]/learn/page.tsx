@@ -1,6 +1,7 @@
 import { createClient } from "@/utils/supabase/server";
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { Suspense } from "react";
 import { 
   ChevronLeft, 
   ChevronRight,
@@ -16,6 +17,7 @@ import {
   Zap
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { CheckoutResult } from "@/components/stripe";
 
 interface CourseLearnPageProps {
   params: Promise<{ slug: string }>;
@@ -134,6 +136,11 @@ export default async function CourseLearnPage({ params, searchParams }: CourseLe
 
   return (
     <div className="min-h-screen bg-[var(--background-secondary)]">
+      {/* Checkout Result Handler */}
+      <Suspense fallback={null}>
+        <CheckoutResult courseTitle={course.title} />
+      </Suspense>
+
       {/* Header */}
       <div className="bg-gradient-to-br from-[var(--primary)] to-[#1a4d7c] text-white">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

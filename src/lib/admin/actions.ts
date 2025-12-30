@@ -359,6 +359,8 @@ export interface AdminCourseDetail {
     short_description: string | null;
     thumbnail_url: string | null;
     duration_hours: number | null;
+    stripe_basic_price_id: string | null;
+    stripe_advanced_price_id: string | null;
   };
   modules: Array<{
     id: string;
@@ -444,6 +446,8 @@ export async function getCourseDetail(slug: string): Promise<AdminCourseDetail |
       activities_count: activityIds.length,
       enrollments_count: enrollments || 0,
       total_xp: course.modules?.reduce((sum: number, m: { total_xp: number }) => sum + (m.total_xp || 0), 0) || 0,
+      stripe_basic_price_id: course.stripe_basic_price_id || null,
+      stripe_advanced_price_id: course.stripe_advanced_price_id || null,
     },
     modules: (course.modules || [])
       .sort((a: { order_index: number }, b: { order_index: number }) => a.order_index - b.order_index)

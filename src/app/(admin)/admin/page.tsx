@@ -11,7 +11,10 @@ import {
   Clock,
   UserPlus,
   ShoppingCart,
-  BookOpen
+  BookOpen,
+  CheckCircle2,
+  AlertTriangle,
+  XCircle
 } from "lucide-react";
 import Link from "next/link";
 import { getDashboardStats, getRecentActivity, type RecentActivity } from "@/lib/admin/actions";
@@ -101,6 +104,9 @@ export default async function AdminDashboardPage() {
           value={stats.subscriptionsLastMonth}
         />
       </div>
+
+      {/* Stripe Configuration Status */}
+      <StripeConfigStatus />
 
       {/* Quick Actions & Recent Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -347,4 +353,64 @@ function getTimeAgo(date: Date): string {
   if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
   if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
   return date.toLocaleDateString();
+}
+
+function StripeConfigStatus() {
+  const isConfigured = !!process.env.STRIPE_SECRET_KEY;
+  const hasPrices = !!(process.env.STRIPE_BASIC_PRICE_ID && process.env.STRIPE_ADVANCED_PRICE_ID);
+  const hasWebhook = !!process.env.STRIPE_WEBHOOK_SECRET;
+  const allConfigured = isConfigured && hasPrices && hasWebhook;
+
+  return (
+    <div className={`rounded-xl border p-4 ${
+      allConfigured 
+        ? 'bg-emerald-50 border-emerald-200' 
+        : 'bg-amber-50 border-amber-200'
+    }`}>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          {allConfigured ? (
+            <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center">
+              <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+            </div>
+          ) : (
+            <div className="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center">
+              <AlertTriangle className="w-5 h-5 text-amber-600" />
+            </div>
+          )}
+          <div>
+            <h3 className="font-semibold text-[var(--foreground)]">
+              Stripe Integration
+            </h3>
+            <p className="text-sm text-[var(--foreground-muted)]">
+              {allConfigured
+                ? "Ready to accept payments"
+                : "Configuration incomplete - payments disabled"}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-4">
+          <ConfigBadge label="API Key" configured={isConfigured} />
+          <ConfigBadge label="Prices" configured={hasPrices} />
+          <ConfigBadge label="Webhook" configured={hasWebhook} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ConfigBadge({ label, configured }: { label: string; configured: boolean }) {
+  return (
+    <div className="flex items-center gap-1.5">
+      {configured ? (
+        <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+      ) : (
+        <XCircle className="w-4 h-4 text-red-400" />
+      )}
+      <span className={`text-xs font-medium ${configured ? 'text-emerald-700' : 'text-red-600'}`}>
+        {label}
+      </span>
+    </div>
+  );
 }

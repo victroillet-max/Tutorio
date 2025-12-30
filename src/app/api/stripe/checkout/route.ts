@@ -7,11 +7,25 @@ import { getSiteUrl } from "@/lib/env";
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 const stripe = stripeSecretKey ? new Stripe(stripeSecretKey, { apiVersion: "2025-12-15.clover" }) : null;
 
-// Price IDs from environment
-const PRICE_IDS: Record<string, string | undefined> = {
+// Fallback price IDs from environment (used if course doesn't have specific prices)
+const FALLBACK_PRICE_IDS: Record<string, string | undefined> = {
   basic: process.env.STRIPE_BASIC_PRICE_ID,
   advanced: process.env.STRIPE_ADVANCED_PRICE_ID,
 };
+
+/**
+ * Get price ID for a course and tier
+ * First checks course-specific prices, then falls back to global prices
+ */
+function getPriceId(
+  course: { stripe_basic_price_id: string | null; stripe_advanced_price_id: string | null },
+  tier: 'basic' | 'advanced'
+): string | null {
+  if (tier === 'basic') {
+    return course.stripe_basic_price_id || FALLBACK_PRICE_IDS.basic || null;
+  }
+  return course.stripe_advanced_price_id || FALLBACK_PRICE_IDS.advanced || null;
+}
 
 /**
  * POST /api/stripe/checkout
@@ -59,10 +73,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get course details
+    // Get course details including Stripe price IDs
     const { data: course, error: courseError } = await supabase
       .from("courses")
-      .select("id, title, slug")
+      .select("id, title, slug, stripe_basic_price_id, stripe_advanced_price_id")
       .eq("id", courseId)
       .single();
 
@@ -70,6 +84,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: "Course not found" },
         { status: 404 }
+      );
+    }
+
+    // Get the price ID for this course and tier
+    const priceId = getPriceId(course, tier as 'basic' | 'advanced');
+    if (!priceId) {
+      return NextResponse.json(
+        { 
+          error: "Pricing not configured",
+          message: `Pricing for ${tier} tier is not configured for this course. Please set up Stripe prices in the admin panel.`
+        },
+        { status: 501 }
       );
     }
 
@@ -82,14 +108,70 @@ export async function POST(request: NextRequest) {
       .in("status", ["active", "trialing"])
       .single();
 
-    // If upgrading, handle differently
+    // If upgrading, handle subscription update via Stripe
     if (upgrade && existingSubscription?.stripe_subscription_id) {
-      // TODO: Implement subscription upgrade via Stripe
-      // For now, redirect to billing portal
-      return NextResponse.json({
-        redirectUrl: "/api/stripe/portal",
-        message: "Please use the billing portal to upgrade your subscription"
-      });
+      try {
+        // Get the current subscription to find the subscription item
+        const stripeSubscription = await stripe.subscriptions.retrieve(
+          existingSubscription.stripe_subscription_id
+        );
+
+        if (!stripeSubscription.items.data.length) {
+          return NextResponse.json(
+            { error: "Invalid subscription state" },
+            { status: 400 }
+          );
+        }
+
+        // Update the subscription with the new price (proration by default)
+        await stripe.subscriptions.update(
+          existingSubscription.stripe_subscription_id,
+          {
+            items: [
+              {
+                id: stripeSubscription.items.data[0].id,
+                price: priceId,
+              },
+            ],
+            proration_behavior: "create_prorations",
+            metadata: {
+              ...stripeSubscription.metadata,
+              tier: tier,
+            },
+          }
+        );
+
+        // Update our database immediately
+        const { data: tierData } = await supabase
+          .from("subscription_tiers")
+          .select("id")
+          .eq("slug", tier)
+          .single();
+
+        if (tierData) {
+          await supabase
+            .from("subscriptions")
+            .update({
+              tier_id: tierData.id,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", existingSubscription.id);
+        }
+
+        const siteUrl = getSiteUrl();
+        return NextResponse.json({
+          success: true,
+          message: "Subscription upgraded successfully",
+          redirectUrl: `${siteUrl}/courses/${course.slug}?checkout=success`,
+        });
+      } catch (upgradeError) {
+        console.error("Subscription upgrade error:", upgradeError);
+        // Fall back to billing portal if upgrade fails
+        return NextResponse.json({
+          redirectUrl: "/api/stripe/portal",
+          message: "Please use the billing portal to upgrade your subscription"
+        });
+      }
     }
 
     // If already subscribed to same or higher tier, return error
@@ -103,18 +185,6 @@ export async function POST(request: NextRequest) {
           { status: 400 }
         );
       }
-    }
-
-    // Get price ID for the tier
-    const priceId = PRICE_IDS[tier];
-    if (!priceId) {
-      return NextResponse.json(
-        { 
-          error: "Price not configured",
-          message: `Please configure STRIPE_${tier.toUpperCase()}_PRICE_ID in environment variables`
-        },
-        { status: 501 }
-      );
     }
 
     // Get or create Stripe customer

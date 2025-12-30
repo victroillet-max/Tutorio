@@ -1,6 +1,7 @@
 import { createClient } from "@/utils/supabase/server";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { Suspense } from "react";
 import { 
   Check, 
   X,
@@ -9,9 +10,12 @@ import {
   ChevronLeft,
   Sparkles,
   BookOpen,
-  ArrowRight
+  ArrowRight,
+  AlertCircle
 } from "lucide-react";
 import type { SubscriptionTier, Course } from "@/lib/database.types";
+import { PricingError } from "@/components/stripe";
+import { SubscribeButton } from "@/components/stripe";
 
 export const metadata = {
   title: "Pricing | Tutorio",
@@ -58,12 +62,12 @@ export default async function PricingPage({
     redirect("/login?redirect=/pricing");
   }
   
-  // Get course if specified
-  let selectedCourse: Course | null = null;
+  // Get course if specified (including Stripe price IDs)
+  let selectedCourse: (Course & { stripe_basic_price_id: string | null; stripe_advanced_price_id: string | null }) | null = null;
   if (params.course) {
     const { data: course } = await supabase
       .from("courses")
-      .select("*")
+      .select("*, stripe_basic_price_id, stripe_advanced_price_id")
       .eq("slug", params.course)
       .eq("is_published", true)
       .single();
@@ -88,8 +92,34 @@ export default async function PricingPage({
   const { data: subscriptions } = await supabase
     .rpc("get_user_subscriptions", { p_user_id: user.id });
 
+  // Check if Stripe is configured
+  const stripeConfigured = !!process.env.STRIPE_SECRET_KEY;
+  // Check for course-specific prices first, then fall back to global prices
+  const hasCourseSpecificPrices = !!(selectedCourse?.stripe_basic_price_id && selectedCourse?.stripe_advanced_price_id);
+  const hasGlobalPriceIds = !!(process.env.STRIPE_BASIC_PRICE_ID && process.env.STRIPE_ADVANCED_PRICE_ID);
+  const hasPriceIds = hasCourseSpecificPrices || hasGlobalPriceIds;
+
   return (
     <div className="min-h-screen bg-[var(--background-secondary)]">
+      {/* Error Handler */}
+      <Suspense fallback={null}>
+        <PricingError />
+      </Suspense>
+
+      {/* Stripe Not Configured Banner */}
+      {!stripeConfigured && (
+        <div className="bg-amber-50 border-b border-amber-200">
+          <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+            <div className="flex items-center gap-2 text-amber-800">
+              <AlertCircle className="w-4 h-4" />
+              <p className="text-sm">
+                <strong>Demo Mode:</strong> Payment processing is not configured. Subscriptions are currently unavailable.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="bg-white border-b border-[var(--border)]">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -192,6 +222,7 @@ export default async function PricingPage({
                   tier={tier as SubscriptionTier} 
                   course={selectedCourse}
                   existingSubscription={subscriptions?.find((s: { course_id: string; tier_slug: string; tier_name: string }) => s.course_id === selectedCourse.id)}
+                  stripeEnabled={stripeConfigured && hasPriceIds}
                 />
               ))}
             </div>
@@ -271,9 +302,10 @@ interface PricingCardProps {
     tier_slug: string;
     tier_name: string;
   };
+  stripeEnabled: boolean;
 }
 
-function PricingCard({ tier, course, existingSubscription }: PricingCardProps) {
+function PricingCard({ tier, course, existingSubscription, stripeEnabled }: PricingCardProps) {
   const isAdvanced = tier.slug === 'advanced';
   const isCurrentPlan = existingSubscription?.tier_slug === tier.slug;
   const canUpgrade = existingSubscription?.tier_slug === 'basic' && tier.slug === 'advanced';
@@ -343,24 +375,35 @@ function PricingCard({ tier, course, existingSubscription }: PricingCardProps) {
         >
           Current Plan
         </button>
+      ) : !stripeEnabled ? (
+        <button
+          disabled
+          className="w-full py-3 px-4 bg-slate-100 text-slate-400 font-semibold rounded-xl cursor-not-allowed"
+        >
+          Coming Soon
+        </button>
       ) : canUpgrade ? (
-        <Link
-          href={`/api/stripe/checkout?course=${course.id}&tier=${tier.slug}&upgrade=true`}
-          className="block w-full py-3 px-4 bg-[var(--primary)] text-white text-center font-semibold rounded-xl hover:bg-[var(--primary-dark)] transition-colors"
+        <SubscribeButton
+          courseId={course.id}
+          tier={tier.slug as "basic" | "advanced"}
+          upgrade
+          className="w-full py-3 px-4 bg-[var(--primary)] text-white font-semibold rounded-xl hover:bg-[var(--primary-dark)] transition-colors"
         >
           Upgrade to {tier.name}
-        </Link>
+        </SubscribeButton>
       ) : (
-        <Link
-          href={`/api/stripe/checkout?course=${course.id}&tier=${tier.slug}`}
-          className={`block w-full py-3 px-4 text-center font-semibold rounded-xl transition-colors ${
+        <SubscribeButton
+          courseId={course.id}
+          tier={tier.slug as "basic" | "advanced"}
+          className={`w-full py-3 px-4 font-semibold rounded-xl transition-colors ${
             isAdvanced 
               ? 'bg-[var(--primary)] text-white hover:bg-[var(--primary-dark)]'
               : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
           }`}
+          variant={isAdvanced ? "default" : "secondary"}
         >
           Subscribe to {tier.name}
-        </Link>
+        </SubscribeButton>
       )}
     </div>
   );

@@ -15,6 +15,74 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 type SupabaseServiceClient = SupabaseClient<any, "public", any>;
 
 /**
+ * Retry wrapper for Stripe API calls
+ * Implements exponential backoff for transient failures
+ */
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  maxRetries = 3,
+  baseDelayMs = 1000
+): Promise<T> {
+  let lastError: Error | undefined;
+  
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      
+      // Don't retry on non-retryable errors
+      if (error instanceof Stripe.errors.StripeError) {
+        // Only retry on rate limits or temporary server errors
+        if (!['rate_limit', 'api_connection_error'].includes(error.type)) {
+          throw error;
+        }
+      }
+      
+      // Wait with exponential backoff before retrying
+      if (attempt < maxRetries - 1) {
+        const delay = baseDelayMs * Math.pow(2, attempt);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+  
+  throw lastError;
+}
+
+/**
+ * Check if a webhook event has already been processed (idempotency)
+ * Returns true if the event was already processed
+ */
+async function isEventProcessed(
+  supabase: SupabaseServiceClient,
+  eventId: string
+): Promise<boolean> {
+  const { data } = await supabase
+    .from("stripe_webhook_events")
+    .select("id")
+    .eq("id", eventId)
+    .single();
+  
+  return !!data;
+}
+
+/**
+ * Mark a webhook event as processed
+ */
+async function markEventProcessed(
+  supabase: SupabaseServiceClient,
+  eventId: string,
+  eventType: string
+): Promise<void> {
+  await supabase
+    .from("stripe_webhook_events")
+    .insert({ id: eventId, type: eventType })
+    .onConflict("id")
+    .ignore();
+}
+
+/**
  * POST /api/stripe/webhook
  * Handles Stripe webhook events for subscription management
  */
@@ -60,6 +128,13 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Idempotency check: Skip if event was already processed
+  const alreadyProcessed = await isEventProcessed(supabase, event.id);
+  if (alreadyProcessed) {
+    console.log(`Event ${event.id} already processed, skipping`);
+    return NextResponse.json({ received: true, skipped: true });
+  }
+
   try {
     switch (event.type) {
       case "checkout.session.completed": {
@@ -81,13 +156,13 @@ export async function POST(request: NextRequest) {
       }
 
       case "invoice.payment_succeeded": {
-        const invoice = event.data.object as Stripe.Invoice & { subscription?: string | Stripe.Subscription | null };
+        const invoice = event.data.object as Stripe.Invoice;
         await handlePaymentSucceeded(supabase, invoice);
         break;
       }
 
       case "invoice.payment_failed": {
-        const invoice = event.data.object as Stripe.Invoice & { subscription?: string | Stripe.Subscription | null };
+        const invoice = event.data.object as Stripe.Invoice;
         await handlePaymentFailed(supabase, invoice);
         break;
       }
@@ -96,10 +171,14 @@ export async function POST(request: NextRequest) {
         console.log(`Unhandled event type: ${event.type}`);
     }
 
+    // Mark event as processed after successful handling
+    await markEventProcessed(supabase, event.id, event.type);
+
     return NextResponse.json({ received: true });
 
   } catch (error) {
     console.error("Webhook handler error:", error);
+    // Don't mark as processed on error - Stripe will retry
     return NextResponse.json(
       { error: "Webhook handler failed" },
       { status: 500 }
@@ -129,7 +208,9 @@ async function handleCheckoutCompleted(
     return;
   }
 
-  const stripeSubscription = await stripe!.subscriptions.retrieve(stripeSubscriptionId) as unknown as Stripe.Subscription & {
+  const stripeSubscription = await withRetry(() => 
+    stripe!.subscriptions.retrieve(stripeSubscriptionId)
+  ) as unknown as Stripe.Subscription & {
     current_period_start: number;
     current_period_end: number;
   };
@@ -178,20 +259,16 @@ async function handleSubscriptionUpdated(
   supabase: SupabaseServiceClient,
   subscription: Stripe.Subscription & { current_period_start: number; current_period_end: number }
 ) {
-  const { supabase_user_id, course_id } = subscription.metadata || {};
+  // Verify subscription exists in our database before updating
+  const { data: existingSub } = await supabase
+    .from("subscriptions")
+    .select("id")
+    .eq("stripe_subscription_id", subscription.id)
+    .single();
 
-  if (!supabase_user_id || !course_id) {
-    // Try to find by stripe_subscription_id
-    const { data: existingSub } = await supabase
-      .from("subscriptions")
-      .select("user_id, course_id")
-      .eq("stripe_subscription_id", subscription.id)
-      .single();
-
-    if (!existingSub) {
-      console.error("Could not find subscription:", subscription.id);
-      return;
-    }
+  if (!existingSub) {
+    console.error("Could not find subscription to update:", subscription.id);
+    return;
   }
 
   // Map Stripe status to our status
@@ -251,15 +328,17 @@ async function handleSubscriptionDeleted(
  */
 async function handlePaymentSucceeded(
   supabase: SupabaseServiceClient,
-  invoice: Stripe.Invoice & { subscription?: string | Stripe.Subscription | null }
+  invoice: Stripe.Invoice
 ) {
-  const subscriptionId = (typeof invoice.subscription === 'string' 
+  const subscriptionId = typeof invoice.subscription === 'string' 
     ? invoice.subscription 
-    : invoice.subscription?.id) as string | undefined;
+    : invoice.subscription?.id;
   if (!subscriptionId) return;
 
-  // Get the updated subscription from Stripe
-  const subscription = await stripe!.subscriptions.retrieve(subscriptionId) as unknown as Stripe.Subscription & {
+  // Get the updated subscription from Stripe with retry logic
+  const subscription = await withRetry(() => 
+    stripe!.subscriptions.retrieve(subscriptionId)
+  ) as unknown as Stripe.Subscription & {
     current_period_start: number;
     current_period_end: number;
   };
@@ -285,11 +364,11 @@ async function handlePaymentSucceeded(
  */
 async function handlePaymentFailed(
   supabase: SupabaseServiceClient,
-  invoice: Stripe.Invoice & { subscription?: string | Stripe.Subscription | null }
+  invoice: Stripe.Invoice
 ) {
-  const subscriptionId = (typeof invoice.subscription === 'string' 
+  const subscriptionId = typeof invoice.subscription === 'string' 
     ? invoice.subscription 
-    : invoice.subscription?.id) as string | undefined;
+    : invoice.subscription?.id;
   if (!subscriptionId) return;
 
   // Mark subscription as past_due

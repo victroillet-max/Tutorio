@@ -20,6 +20,8 @@ INSERT INTO activities (id, module_id, external_id, order_index, title, slug, ty
   40,
   'basic',
   '{
+
+  
     "instructions": "Arrange these algorithm steps in the correct order to solve the given problem!",
     "type": "sequence-ordering",
     "scenarios": [

@@ -22,7 +22,7 @@ import {
   MessageSquare
 } from "lucide-react";
 import type { Activity } from "@/lib/database.types";
-import { markActivityComplete, trackActivityView } from "@/lib/activities/actions";
+import { markActivityComplete, trackActivityView, updateActivityProgress } from "@/lib/activities/actions";
 import { useChatContext } from "@/components/chat";
 
 interface CodeEditorProps {
@@ -129,6 +129,8 @@ export function CodeEditor({ activity, userId, isCompleted }: CodeEditorProps) {
   const [consecutiveFailures, setConsecutiveFailures] = useState(0);
   const [hasShownHelpPopup, setHasShownHelpPopup] = useState(false);
   const activityStartTime = useRef<number>(Date.now());
+  // B8: Track time for "Hours Learned" - saves incrementally when page is hidden
+  const lastSavedTimeRef = useRef<number>(Date.now());
   
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const pyodideRef = useRef<any>(null);
@@ -151,13 +153,42 @@ export function CodeEditor({ activity, userId, isCompleted }: CodeEditorProps) {
     }, 1000);
     return () => clearTimeout(timeoutId);
   }, [updateChatCodeContext]);
-
-  // Track activity view when component mounts
+  
+  // B8: Save time spent incrementally (server accumulates)
+  const saveTimeSpent = useCallback(async () => {
+    const now = Date.now();
+    const timeSpent = Math.floor((now - lastSavedTimeRef.current) / 1000);
+    if (timeSpent > 0) {
+      try {
+        await updateActivityProgress(activity.id, { timeSpentSeconds: timeSpent });
+        lastSavedTimeRef.current = now;
+      } catch (error) {
+        console.error("Failed to save time spent:", error);
+      }
+    }
+  }, [activity.id]);
+  
+  // Track activity view and set up visibility change handler
   useEffect(() => {
     trackActivityView(activity.id).catch(console.error);
     // Reset activity start time
     activityStartTime.current = Date.now();
-  }, [activity.id]);
+    lastSavedTimeRef.current = Date.now();
+    
+    // Save time when page is hidden
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        saveTimeSpent();
+      }
+    };
+    
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      saveTimeSpent();
+    };
+  }, [activity.id, saveTimeSpent]);
 
   // Time-based struggling detection (3+ minutes without success)
   useEffect(() => {
@@ -650,6 +681,9 @@ sys.stdout = StringIO()
         
         if (allPassed && !completed) {
           try {
+            // B8: Save time spent before marking complete
+            await saveTimeSpent();
+            
             await markActivityComplete(activity.id, 100);
             setCompleted(true);
             setShowCelebration(true);
@@ -900,6 +934,34 @@ sys.stdout = StringIO()
                         />
                       </div>
                     </div>
+                    
+                    {/* P3: Failed Requirements Summary - quick overview of what's failing */}
+                    {!allTestsPassed && (
+                      <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                        <p className="text-xs font-medium text-red-800 mb-2 flex items-center gap-1.5">
+                          <XCircle className="w-3.5 h-3.5" />
+                          Requirements Not Met:
+                        </p>
+                        <ul className="text-xs text-red-700 space-y-1">
+                          {testResults
+                            .filter(r => !r.passed)
+                            .slice(0, 3) // Show max 3 failed tests
+                            .map((r, idx) => (
+                              <li key={idx} className="flex items-start gap-2">
+                                <span className="text-red-400 mt-0.5">-</span>
+                                <span>{r.message}</span>
+                              </li>
+                            ))
+                          }
+                          {testResults.filter(r => !r.passed).length > 3 && (
+                            <li className="text-red-500 italic">
+                              + {testResults.filter(r => !r.passed).length - 3} more issues
+                            </li>
+                          )}
+                        </ul>
+                        <p className="text-xs text-red-600 mt-2">Click on each test below for detailed explanations</p>
+                      </div>
+                    )}
                     
                     {/* Individual Tests */}
                 <div className="space-y-2">
@@ -1188,24 +1250,40 @@ sys.stdout = StringIO()
               <p className="text-sm text-amber-800">
                 <strong>Hint {currentHint + 1}:</strong> {hints[currentHint]}
               </p>
-              {hints.length > 1 && (
-                <div className="mt-2 flex gap-2">
+              <div className="mt-2 flex items-center justify-between">
+                {hints.length > 1 && (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setCurrentHint(prev => Math.max(0, prev - 1))}
+                      disabled={currentHint === 0}
+                      className="text-xs text-amber-600 hover:text-amber-700 disabled:opacity-50"
+                    >
+                      Previous
+                    </button>
+                    <button
+                      onClick={() => setCurrentHint(prev => Math.min(hints.length - 1, prev + 1))}
+                      disabled={currentHint >= hints.length - 1}
+                      className="text-xs text-amber-600 hover:text-amber-700 disabled:opacity-50"
+                    >
+                      Next Hint
+                    </button>
+                  </div>
+                )}
+                
+                {/* P3: Progressive hints - Ask Bob for more help after exhausting built-in hints */}
+                {currentHint >= hints.length - 1 && (
                   <button
-                    onClick={() => setCurrentHint(prev => Math.max(0, prev - 1))}
-                    disabled={currentHint === 0}
-                    className="text-xs text-amber-600 hover:text-amber-700 disabled:opacity-50"
+                    onClick={() => chatContext.triggerPopup(
+                      "I can help explain this concept in more detail. Want to chat?",
+                      "help"
+                    )}
+                    className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-violet-100 text-violet-700 rounded-full hover:bg-violet-200 transition-colors"
                   >
-                    Previous
+                    <Bot className="w-3.5 h-3.5" />
+                    Still stuck? Ask Bob
                   </button>
-                  <button
-                    onClick={() => setCurrentHint(prev => Math.min(hints.length - 1, prev + 1))}
-                    disabled={currentHint >= hints.length - 1}
-                    className="text-xs text-amber-600 hover:text-amber-700 disabled:opacity-50"
-                  >
-                    Next Hint
-                  </button>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           )}
         </div>

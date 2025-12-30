@@ -4,6 +4,44 @@ import { createClient } from "@/utils/supabase/server";
 import { revalidatePath } from "next/cache";
 
 /**
+ * Retry wrapper for async operations with exponential backoff
+ * Helps handle transient network errors (B4: Failed Server Actions)
+ */
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  options: { maxRetries?: number; initialDelayMs?: number } = {}
+): Promise<T> {
+  const { maxRetries = 3, initialDelayMs = 500 } = options;
+  let lastError: Error | unknown;
+  
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+      
+      // Don't retry on authentication errors or validation errors
+      if (error instanceof Error) {
+        const message = error.message.toLowerCase();
+        if (message.includes('not authenticated') || 
+            message.includes('not found') || 
+            message.includes('validation')) {
+          throw error;
+        }
+      }
+      
+      // Exponential backoff with jitter
+      if (attempt < maxRetries - 1) {
+        const delay = initialDelayMs * Math.pow(2, attempt) + Math.random() * 100;
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+  
+  throw lastError;
+}
+
+/**
  * Mark an activity as complete and award XP
  */
 export async function markActivityComplete(activityId: string, score?: number) {
@@ -43,31 +81,35 @@ export async function markActivityComplete(activityId: string, score?: number) {
     xpEarned = Math.round(xpEarned * 1.5);
   }
 
-  // Upsert activity progress
-  const { error: progressError } = await supabase
-    .from("activity_progress")
-    .upsert({
-      user_id: user.id,
-      activity_id: activityId,
-      completed: true,
-      score: score ?? existingProgress?.score ?? null,
-      xp_earned: isFirstCompletion ? xpEarned : (existingProgress?.xp_earned || 0),
-      attempts,
-      first_try_bonus: firstTryBonus,
-      completed_at: isFirstCompletion ? new Date().toISOString() : existingProgress?.completed_at,
-      last_accessed_at: new Date().toISOString(),
-    }, {
-      onConflict: "user_id,activity_id",
-    });
+  // Upsert activity progress with retry for transient errors
+  await withRetry(async () => {
+    const { error: progressError } = await supabase
+      .from("activity_progress")
+      .upsert({
+        user_id: user.id,
+        activity_id: activityId,
+        completed: true,
+        score: score ?? existingProgress?.score ?? null,
+        xp_earned: isFirstCompletion ? xpEarned : (existingProgress?.xp_earned || 0),
+        attempts,
+        first_try_bonus: firstTryBonus,
+        completed_at: isFirstCompletion ? new Date().toISOString() : existingProgress?.completed_at,
+        last_accessed_at: new Date().toISOString(),
+      }, {
+        onConflict: "user_id,activity_id",
+      });
 
-  if (progressError) {
-    console.error("Failed to save progress:", progressError);
-    throw new Error("Failed to save progress");
-  }
+    if (progressError) {
+      console.error("Failed to save progress:", progressError);
+      throw new Error("Failed to save progress");
+    }
+  });
 
   // Update user streaks and total XP (only on first completion)
   if (isFirstCompletion) {
-    const today = new Date().toISOString().split('T')[0];
+    // Use local date for streak tracking (more intuitive for users)
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     
     // Get current streak data
     const { data: streak } = await supabase
@@ -79,16 +121,22 @@ export async function markActivityComplete(activityId: string, score?: number) {
     if (streak) {
       const yesterday = new Date();
       yesterday.setDate(yesterday.getDate() - 1);
-      const yesterdayStr = yesterday.toISOString().split('T')[0];
+      const yesterdayStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
+      
+      // Normalize the database date to YYYY-MM-DD format (handles both DATE and TIMESTAMPTZ)
+      const lastActivityDate = streak.last_activity_date 
+        ? streak.last_activity_date.split('T')[0] 
+        : null;
       
       let newStreak = 1;
-      if (streak.last_activity_date === today) {
+      if (lastActivityDate === today) {
         // Already active today, keep current streak
-        newStreak = streak.current_streak;
-      } else if (streak.last_activity_date === yesterdayStr) {
+        newStreak = streak.current_streak || 1;
+      } else if (lastActivityDate === yesterdayStr) {
         // Consecutive day, increment streak
         newStreak = (streak.current_streak || 0) + 1;
       }
+      // else: Gap of 2+ days, reset to 1
       
       await supabase
         .from("user_streaks")
@@ -136,6 +184,7 @@ export async function markActivityComplete(activityId: string, score?: number) {
 
 /**
  * Update activity progress (for partial progress like scroll position)
+ * For time tracking: timeSpentSeconds should be the NEW time to ADD (not total)
  */
 export async function updateActivityProgress(
   activityId: string, 
@@ -151,13 +200,27 @@ export async function updateActivityProgress(
     throw new Error("Not authenticated");
   }
 
+  // Fetch existing progress to accumulate time spent
+  const { data: existingProgress } = await supabase
+    .from("activity_progress")
+    .select("time_spent_seconds")
+    .eq("user_id", user.id)
+    .eq("activity_id", activityId)
+    .single();
+
+  // Accumulate time spent instead of replacing it
+  const existingTimeSpent = existingProgress?.time_spent_seconds || 0;
+  const newTimeSpent = data.timeSpentSeconds 
+    ? existingTimeSpent + data.timeSpentSeconds 
+    : existingTimeSpent;
+
   const { error } = await supabase
     .from("activity_progress")
     .upsert({
       user_id: user.id,
       activity_id: activityId,
       last_position_seconds: data.lastPositionSeconds,
-      time_spent_seconds: data.timeSpentSeconds,
+      time_spent_seconds: newTimeSpent,
       last_accessed_at: new Date().toISOString(),
     }, {
       onConflict: "user_id,activity_id",

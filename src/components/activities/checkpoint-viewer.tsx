@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { CheckCircle2, XCircle, Flag, Clock, AlertTriangle, ChevronRight } from "lucide-react";
 import type { Activity, QuizQuestion } from "@/lib/database.types";
-import { markActivityComplete, trackActivityView } from "@/lib/activities/actions";
+import { markActivityComplete, trackActivityView, updateActivityProgress } from "@/lib/activities/actions";
 import { useChatContext } from "@/components/chat";
 
 interface CheckpointViewerProps {
@@ -24,12 +24,28 @@ export function CheckpointViewer({ activity, userId, isCompleted }: CheckpointVi
   const timeLimit = activity.time_limit; // In minutes
 
   // Chat context for struggling detection and current question tracking
-  const chatContext = useChatContext();
+  // Extract specific methods to avoid dependency on entire context object (prevents infinite re-renders)
+  const { updateCurrentQuestion, triggerPopup, hasDismissedHelp } = useChatContext();
 
-  // Track activity view when component mounts
+  // Track activity view and set up time tracking
   useEffect(() => {
     trackActivityView(activity.id).catch(console.error);
-  }, [activity.id]);
+    lastSavedTimeRef.current = Date.now();
+    
+    // Save time when page is hidden
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        saveTimeSpent();
+      }
+    };
+    
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      saveTimeSpent();
+    };
+  }, [activity.id, saveTimeSpent]);
   
   const [started, setStarted] = useState(false);
   const [currentQuestion, setCurrentQuestion] = useState(0);
@@ -39,9 +55,10 @@ export function CheckpointViewer({ activity, userId, isCompleted }: CheckpointVi
     if (!started) return; // Only track when exam has started
     const question = questions[currentQuestion];
     if (question?.question) {
-      chatContext.updateCurrentQuestion(question.question, currentQuestion + 1);
+      updateCurrentQuestion(question.question, currentQuestion + 1);
     }
-  }, [currentQuestion, questions, chatContext, started]);
+  }, [currentQuestion, questions, updateCurrentQuestion, started]);
+  
   const [answers, setAnswers] = useState<Record<string, number | boolean | string>>({});
   const [showResults, setShowResults] = useState(isCompleted);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -51,20 +68,44 @@ export function CheckpointViewer({ activity, userId, isCompleted }: CheckpointVi
   
   // Struggling detection - track questions answered (will check on submit)
   const [hasShownHelpPopup, setHasShownHelpPopup] = useState(false);
+  
+  // B8: Track time spent on activity for "Hours Learned" stat
+  const lastSavedTimeRef = useRef<number>(Date.now());
+  
+  // B8: Save time spent incrementally (server accumulates)
+  const saveTimeSpent = useCallback(async () => {
+    const now = Date.now();
+    const timeSpent = Math.floor((now - lastSavedTimeRef.current) / 1000);
+    if (timeSpent > 0) {
+      try {
+        await updateActivityProgress(activity.id, { timeSpentSeconds: timeSpent });
+        lastSavedTimeRef.current = now;
+      } catch (error) {
+        console.error("Failed to save time spent:", error);
+      }
+    }
+  }, [activity.id]);
 
   const question = questions[currentQuestion];
   const totalQuestions = questions.length;
   const answeredCount = Object.keys(answers).length;
+  
+  // Ref for submit handler to avoid stale closure in timer
+  const handleSubmitRef = useRef<() => Promise<void>>();
 
-  // Timer effect
-  useState(() => {
-    if (!timerStarted || !timeRemaining) return;
+  // Timer effect - Fixed: was incorrectly using useState instead of useEffect
+  useEffect(() => {
+    if (!timerStarted || timeRemaining === null) return;
+    
+    if (timeRemaining <= 0) {
+      handleSubmitRef.current?.();
+      return;
+    }
     
     const interval = setInterval(() => {
       setTimeRemaining(prev => {
-        if (prev === null || prev <= 0) {
+        if (prev === null || prev <= 1) {
           clearInterval(interval);
-          handleSubmit();
           return 0;
         }
         return prev - 1;
@@ -72,7 +113,7 @@ export function CheckpointViewer({ activity, userId, isCompleted }: CheckpointVi
     }, 1000);
     
     return () => clearInterval(interval);
-  });
+  }, [timerStarted, timeRemaining]);
 
   const formatTime = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
@@ -90,31 +131,35 @@ export function CheckpointViewer({ activity, userId, isCompleted }: CheckpointVi
   // Track question navigation for struggling detection
   const [questionVisits, setQuestionVisits] = useState<Record<number, number>>({});
   
-  const handleQuestionChange = (newQuestion: number) => {
+  const handleQuestionChange = useCallback((newQuestion: number) => {
     setCurrentQuestion(newQuestion);
     
     // Track visits to each question
-    setQuestionVisits(prev => ({
-      ...prev,
-      [newQuestion]: (prev[newQuestion] || 0) + 1
-    }));
-    
-    // Check if user is revisiting questions multiple times (sign of uncertainty)
-    const totalRevisits = Object.values(questionVisits).filter(v => v > 1).length;
-    if (totalRevisits >= 2 && !hasShownHelpPopup && !chatContext.hasDismissedHelp) {
-      setHasShownHelpPopup(true);
-      chatContext.triggerPopup(
-        "Need help understanding this concept? I'm here for you!",
-        "help"
-      );
-    }
-  };
+    setQuestionVisits(prev => {
+      const newVisits = {
+        ...prev,
+        [newQuestion]: (prev[newQuestion] || 0) + 1
+      };
+      
+      // Check if user is revisiting questions multiple times (sign of uncertainty)
+      const totalRevisits = Object.values(newVisits).filter(v => v > 1).length;
+      if (totalRevisits >= 2 && !hasShownHelpPopup && !hasDismissedHelp) {
+        setHasShownHelpPopup(true);
+        triggerPopup(
+          "Need help understanding this concept? I'm here for you!",
+          "help"
+        );
+      }
+      
+      return newVisits;
+    });
+  }, [hasShownHelpPopup, hasDismissedHelp, triggerPopup]);
 
-  const handleAnswer = (questionId: string, answer: number | boolean | string) => {
+  const handleAnswer = useCallback((questionId: string, answer: number | boolean | string) => {
     setAnswers(prev => ({ ...prev, [questionId]: answer }));
-  };
+  }, []);
 
-  const calculateScore = (): number => {
+  const calculateScore = useCallback((): number => {
     let correct = 0;
     questions.forEach(q => {
       const userAnswer = answers[q.id];
@@ -123,22 +168,30 @@ export function CheckpointViewer({ activity, userId, isCompleted }: CheckpointVi
       }
     });
     return Math.round((correct / questions.length) * 100);
-  };
+  }, [questions, answers]);
 
-  const handleSubmit = async () => {
+  const handleSubmit = useCallback(async () => {
     setIsSubmitting(true);
     const finalScore = calculateScore();
     setScore(finalScore);
     setShowResults(true);
     
     try {
+      // B8: Save time spent before marking complete
+      await saveTimeSpent();
+      
       await markActivityComplete(activity.id, finalScore);
     } catch (error) {
       console.error("Failed to save checkpoint result:", error);
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [activity.id, calculateScore, saveTimeSpent]);
+  
+  // Update ref for timer to access
+  useEffect(() => {
+    handleSubmitRef.current = handleSubmit;
+  }, [handleSubmit]);
 
   const handleRetry = () => {
     setAnswers({});

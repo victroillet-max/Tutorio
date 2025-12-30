@@ -95,6 +95,8 @@ export interface Course {
   is_published: boolean;
   is_featured: boolean;
   sort_order: number;
+  stripe_basic_price_id: string | null;  // Stripe Price ID for Basic tier
+  stripe_advanced_price_id: string | null;  // Stripe Price ID for Advanced tier
   created_at: string;
   updated_at: string;
   published_at: string | null;
@@ -334,6 +336,42 @@ export interface AIRateLimit {
   messages_per_hour: number;
   max_context_messages: number;
   features: Record<string, boolean>;
+}
+
+// ============================================
+// Google Sheets Integration Tables
+// ============================================
+
+export interface UserSheet {
+  id: string;
+  user_id: string;
+  activity_id: string;
+  template_sheet_id: string;
+  user_sheet_id: string;
+  user_sheet_url: string;
+  sheet_title: string | null;
+  last_synced_at: string | null;
+  is_completed: boolean;
+  completion_data: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SheetGradingCriteria {
+  id: string;
+  activity_id: string;
+  cell_reference: string;
+  cell_name: string | null;
+  expected_value: string;
+  expected_type: 'number' | 'text' | 'formula' | 'boolean';
+  tolerance: number;
+  is_required: boolean;
+  points: number;
+  partial_credit: boolean;
+  sort_order: number;
+  hint_on_error: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 // ============================================
@@ -736,6 +774,17 @@ export interface Database {
         Row: AIRateLimit;
         Insert: AIRateLimit;
         Update: Partial<Omit<AIRateLimit, 'tier'>>;
+      };
+      // Google Sheets integration tables
+      user_sheets: {
+        Row: UserSheet;
+        Insert: Omit<UserSheet, 'id' | 'created_at' | 'updated_at'>;
+        Update: Partial<Omit<UserSheet, 'id' | 'user_id' | 'activity_id' | 'created_at' | 'updated_at'>>;
+      };
+      sheet_grading_criteria: {
+        Row: SheetGradingCriteria;
+        Insert: Omit<SheetGradingCriteria, 'id' | 'created_at' | 'updated_at'>;
+        Update: Partial<Omit<SheetGradingCriteria, 'id' | 'activity_id' | 'created_at' | 'updated_at'>>;
       };
     };
     Enums: {
