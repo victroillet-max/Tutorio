@@ -21,7 +21,7 @@ export interface SheetCellValue {
 export interface SheetGradingResult {
   cell: string;
   cellName: string;
-  userValue: string | number | null;
+  userValue: string | number | boolean | null;
   expectedValue: string | number;
   isCorrect: boolean;
   points: number;
@@ -402,7 +402,7 @@ export class GoogleSheetsService {
         return String(userValue).toLowerCase().trim() === String(expectedValue).toLowerCase().trim();
 
       case 'boolean':
-        return Boolean(userValue) === (expectedValue === 'true' || expectedValue === true);
+        return Boolean(userValue) === (expectedValue === 'true' || expectedValue === 1);
 
       case 'formula':
         // For formulas, we check the result matches

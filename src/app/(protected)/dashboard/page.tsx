@@ -11,9 +11,12 @@ import {
   Zap,
   Sparkles,
   GraduationCap,
-  Trophy
+  Trophy,
+  CheckCircle2,
+  Flame
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { QuickStartButton } from "@/components/dashboard/quick-start-button";
 
 export const metadata = {
   title: "Dashboard | Tutorio",
@@ -61,6 +64,10 @@ export default async function DashboardPage() {
 
   const displayName = profile?.full_name || user?.email?.split("@")[0] || "there";
   const firstName = displayName.split(" ")[0];
+
+  // Get time-based greeting
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
 
   // Get user's enrolled courses with progress
   const { data: enrolledCoursesData } = await supabase
@@ -153,12 +160,12 @@ export default async function DashboardPage() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {/* Welcome Section */}
-      <div className="mb-8">
+      <div className="mb-8" data-tour="dashboard-welcome">
         <h1 
           className="text-3xl font-bold mb-2 text-[var(--foreground)]"
-          style={{ fontFamily: 'var(--font-heading)' }}
+          style={{ fontFamily: 'var(--font-heading)', letterSpacing: '-0.02em' }}
         >
-          Welcome back, {firstName}
+          {greeting}, {firstName}
         </h1>
         <p className="text-[var(--foreground-muted)]">
           Continue your learning journey where you left off.
@@ -171,13 +178,13 @@ export default async function DashboardPage() {
           icon={Target}
           label="Skills Mastered"
           value={stats.skillsMastered}
-          color="blue"
+          color="navy"
         />
         <StatCard
           icon={BookOpen}
           label="Activities Done"
           value={stats.lessonsCompleted}
-          color="green"
+          color="teal"
         />
         <StatCard
           icon={Clock}
@@ -186,10 +193,10 @@ export default async function DashboardPage() {
           color="purple"
         />
         <StatCard
-          icon={Award}
+          icon={Flame}
           label="Day Streak"
           value={stats.currentStreak}
-          color="orange"
+          color="coral"
         />
       </div>
 
@@ -202,14 +209,14 @@ export default async function DashboardPage() {
             <div>
               <div className="flex items-center justify-between mb-4">
                 <h2 
-                  className="text-xl font-semibold text-[var(--foreground)]"
+                  className="text-xl font-bold text-[var(--foreground)]"
                   style={{ fontFamily: 'var(--font-heading)' }}
                 >
                   Your Courses
                 </h2>
                 <Link 
                   href="/courses"
-                  className="text-sm text-[var(--primary)] hover:text-[var(--primary-dark)] flex items-center gap-1 transition-colors font-medium"
+                  className="text-sm text-[var(--accent)] hover:text-[var(--accent-dark)] flex items-center gap-1 transition-colors font-semibold"
                 >
                   View all
                   <ChevronRight className="w-4 h-4" />
@@ -228,7 +235,7 @@ export default async function DashboardPage() {
           <div>
             <div className="flex items-center justify-between mb-4">
               <h2 
-                className="text-xl font-semibold text-[var(--foreground)]"
+                className="text-xl font-bold text-[var(--foreground)]"
                 style={{ fontFamily: 'var(--font-heading)' }}
               >
                 Continue Learning
@@ -252,45 +259,74 @@ export default async function DashboardPage() {
               </div>
             ) : hasEnrolledCourses ? (
               /* Empty state when enrolled but no activities in progress */
-              <div className="card-elevated p-6 text-center">
-                <div className="w-12 h-12 mx-auto mb-3 rounded-xl bg-[var(--progress-bg)] flex items-center justify-center">
-                  <Play className="w-6 h-6 text-[var(--primary)]" />
+              <div className="card-elevated p-8 text-center">
+                <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-[var(--accent)]/10 to-[var(--accent)]/5 flex items-center justify-center">
+                  <Play className="w-7 h-7 text-[var(--accent)]" />
                 </div>
                 <h3 
-                  className="text-base font-semibold mb-1 text-[var(--foreground)]"
+                  className="text-lg font-bold mb-2 text-[var(--foreground)]"
                   style={{ fontFamily: 'var(--font-heading)' }}
                 >
                   Ready for your next activity?
                 </h3>
-                <p className="text-sm text-[var(--foreground-muted)] mb-4">
+                <p className="text-sm text-[var(--foreground-muted)] mb-6">
                   Continue with your enrolled courses to keep making progress.
                 </p>
                 <Link href={`/courses/${enrolledCourses[0].course_slug}/learn`}>
-                  <Button className="bg-[var(--primary)] text-white font-semibold hover:bg-[var(--primary-dark)] shadow-md shadow-[var(--primary)]/25">
+                  <Button variant="accent">
                     Continue Course
                   </Button>
                 </Link>
               </div>
             ) : (
-              /* Empty State - No courses */
-              <div className="card-elevated p-8 text-center">
-                <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-[var(--progress-bg)] flex items-center justify-center">
-                  <GraduationCap className="w-8 h-8 text-[var(--primary)]" />
+              /* Enhanced Empty State - No courses with Quick Start button */
+              <div className="card-elevated p-10 text-center">
+                <div className="w-18 h-18 mx-auto mb-5 rounded-2xl bg-gradient-to-br from-[var(--primary)]/10 to-[var(--accent)]/10 flex items-center justify-center w-[72px] h-[72px]">
+                  <Sparkles className="w-9 h-9 text-[var(--primary)]" />
                 </div>
+                
                 <h3 
-                  className="text-lg font-semibold mb-2 text-[var(--foreground)]"
+                  className="text-xl font-bold mb-3 text-[var(--foreground)]"
                   style={{ fontFamily: 'var(--font-heading)' }}
                 >
-                  Start Your Learning Journey
+                  Ready to Start Learning?
                 </h3>
-                <p className="text-[var(--foreground-muted)] mb-6 max-w-sm mx-auto">
-                  Explore our courses and begin mastering new skills today.
+                <p className="text-[var(--foreground-muted)] mb-8 max-w-sm mx-auto">
+                  Start your learning journey with just one click. We&apos;ll enroll you in our recommended beginner course.
                 </p>
-                <Link href="/courses">
-                  <Button className="bg-[var(--primary)] text-white font-semibold hover:bg-[var(--primary-dark)] shadow-md shadow-[var(--primary)]/25">
-                    Browse Courses
-                  </Button>
-                </Link>
+                
+                {/* Onboarding checklist */}
+                <div className="text-left max-w-xs mx-auto mb-8 space-y-3">
+                  <div className="flex items-center gap-3 text-sm">
+                    <div className="w-6 h-6 rounded-full bg-[var(--success)] flex items-center justify-center flex-shrink-0">
+                      <CheckCircle2 className="w-4 h-4 text-white" />
+                    </div>
+                    <span className="text-[var(--foreground-muted)]">Account created</span>
+                  </div>
+                  <div className="flex items-center gap-3 text-sm">
+                    <div className="w-6 h-6 rounded-full border-2 border-[var(--accent)] flex-shrink-0 flex items-center justify-center">
+                      <div className="w-2 h-2 rounded-full bg-[var(--accent)]" />
+                    </div>
+                    <span className="text-[var(--foreground)] font-medium">Start first activity</span>
+                  </div>
+                  <div className="flex items-center gap-3 text-sm">
+                    <div className="w-6 h-6 rounded-full border-2 border-[var(--card-border)] flex-shrink-0" />
+                    <span className="text-[var(--foreground-muted)]">Master your first skill</span>
+                  </div>
+                </div>
+                
+                {/* Quick Start Button - one click to first activity */}
+                <div className="mb-4">
+                  <QuickStartButton />
+                </div>
+                
+                {/* Alternative: Browse courses */}
+                <p className="text-sm text-[var(--foreground-muted)]">
+                  or{" "}
+                  <Link href="/courses" className="text-[var(--accent)] hover:underline font-medium">
+                    browse all courses
+                  </Link>
+                </p>
               </div>
             )}
           </div>
@@ -299,14 +335,14 @@ export default async function DashboardPage() {
         {/* Sidebar */}
         <div className="space-y-6">
           {/* Quick Actions */}
-          <div className="card-elevated p-6">
+          <div className="card-elevated p-6" data-tour="quick-actions">
             <h3 
-              className="text-lg font-semibold mb-4 text-[var(--foreground)]"
+              className="text-lg font-bold mb-5 text-[var(--foreground)]"
               style={{ fontFamily: 'var(--font-heading)' }}
             >
               Quick Actions
             </h3>
-            <div className="space-y-3">
+            <div className="space-y-2">
               <QuickAction
                 href="/courses"
                 icon={GraduationCap}
@@ -325,21 +361,21 @@ export default async function DashboardPage() {
           {/* Subscription Status */}
           <div className="card-elevated p-6">
             <h3 
-              className="text-lg font-semibold mb-4 text-[var(--foreground)]"
+              className="text-lg font-bold mb-5 text-[var(--foreground)]"
               style={{ fontFamily: 'var(--font-heading)' }}
             >
               Your Plan
             </h3>
-            <div className="p-4 rounded-xl bg-[var(--background-secondary)] border border-[var(--border)]">
-              <div className="flex items-center gap-2 mb-1">
-                <Zap className="w-4 h-4 text-[var(--primary)]" />
-                <p className="font-medium text-[var(--foreground)]">Free Access</p>
+            <div className="p-5 rounded-xl bg-gradient-to-br from-[var(--background)] to-[var(--background-secondary)] border border-[var(--card-border)]">
+              <div className="flex items-center gap-2 mb-2">
+                <Zap className="w-5 h-5 text-[var(--accent)]" />
+                <p className="font-semibold text-[var(--foreground)]">Free Access</p>
               </div>
-              <p className="text-sm text-[var(--foreground-muted)] mb-4">
+              <p className="text-sm text-[var(--foreground-muted)] mb-5">
                 Preview lessons available
               </p>
               <Link href="/#pricing">
-                <Button variant="outline" size="sm" className="w-full border-[var(--primary)] text-[var(--primary)] hover:bg-[var(--progress-bg)]">
+                <Button variant="outline" size="sm" className="w-full">
                   Upgrade Plan
                 </Button>
               </Link>
@@ -360,21 +396,24 @@ function StatCard({
   icon: React.ComponentType<{ className?: string }>;
   label: string;
   value: number;
-  color: "blue" | "green" | "purple" | "orange";
+  color: "navy" | "teal" | "purple" | "coral";
 }) {
   const colorClasses = {
-    blue: "bg-blue-50 text-blue-600",
-    green: "bg-emerald-50 text-emerald-600",
-    purple: "bg-purple-50 text-purple-600",
-    orange: "bg-orange-50 text-orange-600",
+    navy: "bg-[var(--primary)]/10 text-[var(--primary)]",
+    teal: "bg-[var(--success)]/10 text-[var(--success)]",
+    purple: "bg-purple-100 text-purple-600",
+    coral: "bg-[var(--accent)]/10 text-[var(--accent)]",
   };
 
   return (
     <div className="card-elevated p-5">
-      <div className={`w-10 h-10 rounded-lg ${colorClasses[color]} flex items-center justify-center mb-3`}>
+      <div className={`w-11 h-11 rounded-xl ${colorClasses[color]} flex items-center justify-center mb-4`}>
         <Icon className="w-5 h-5" />
       </div>
-      <p className="text-2xl font-bold text-[var(--foreground)]" style={{ fontFamily: 'var(--font-heading)' }}>
+      <p 
+        className="text-3xl font-bold text-[var(--foreground)] mb-1"
+        style={{ fontFamily: 'var(--font-heading)', letterSpacing: '-0.02em' }}
+      >
         {value}
       </p>
       <p className="text-sm text-[var(--foreground-muted)]">{label}</p>
@@ -396,25 +435,25 @@ function QuickAction({
   return (
     <Link
       href={href}
-      className="flex items-center gap-3 p-3 rounded-xl hover:bg-[var(--background-secondary)] transition-colors group"
+      className="flex items-center gap-4 p-4 rounded-xl hover:bg-[var(--background)] transition-all group"
     >
-      <div className="w-10 h-10 rounded-lg bg-[var(--progress-bg)] flex items-center justify-center group-hover:bg-[var(--primary)] transition-colors">
+      <div className="w-11 h-11 rounded-xl bg-[var(--progress-bg)] flex items-center justify-center group-hover:bg-[var(--primary)] transition-colors">
         <Icon className="w-5 h-5 text-[var(--primary)] group-hover:text-white transition-colors" />
       </div>
-      <div>
+      <div className="flex-1">
         <p className="font-medium text-sm text-[var(--foreground)]">{label}</p>
         <p className="text-xs text-[var(--foreground-muted)]">{description}</p>
       </div>
-      <ChevronRight className="w-4 h-4 text-[var(--foreground-muted)] ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
+      <ChevronRight className="w-4 h-4 text-[var(--foreground-muted)] opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
     </Link>
   );
 }
 
 const categoryColors: Record<string, { bg: string; icon: string }> = {
   ct_foundations: { bg: 'from-amber-500/20 to-orange-500/10', icon: 'text-amber-600' },
-  python_basics: { bg: 'from-blue-500/20 to-indigo-500/10', icon: 'text-blue-600' },
-  control_flow: { bg: 'from-violet-500/20 to-purple-500/10', icon: 'text-violet-600' },
-  data_structures: { bg: 'from-emerald-500/20 to-teal-500/10', icon: 'text-emerald-600' },
+  python_basics: { bg: 'from-[var(--primary)]/20 to-blue-500/10', icon: 'text-[var(--primary)]' },
+  control_flow: { bg: 'from-purple-500/20 to-violet-500/10', icon: 'text-purple-600' },
+  data_structures: { bg: 'from-[var(--success)]/20 to-teal-500/10', icon: 'text-[var(--success)]' },
   functions: { bg: 'from-rose-500/20 to-pink-500/10', icon: 'text-rose-600' },
   advanced_topics: { bg: 'from-cyan-500/20 to-blue-500/10', icon: 'text-cyan-600' },
 };
@@ -432,39 +471,39 @@ function CourseProgressCard({ course }: { course: CourseWithProgress }) {
   return (
     <Link
       href={`/courses/${course.course_slug}/learn`}
-      className="card-elevated p-4 flex items-center gap-4 hover:shadow-md transition-shadow group"
+      className="card-elevated p-5 flex items-center gap-5 hover:shadow-lg transition-all group"
     >
       {/* Course Icon */}
-      <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-violet-500/20 to-purple-500/10 flex items-center justify-center flex-shrink-0">
-        <GraduationCap className="w-7 h-7 text-violet-600" />
+      <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[var(--primary)]/20 to-[var(--primary-light)]/10 flex items-center justify-center flex-shrink-0">
+        <GraduationCap className="w-8 h-8 text-[var(--primary)]" />
       </div>
       
       {/* Content */}
       <div className="flex-1 min-w-0">
         <h4 
-          className="font-semibold text-[var(--foreground)] truncate"
+          className="font-bold text-[var(--foreground)] truncate mb-1"
           style={{ fontFamily: 'var(--font-heading)' }}
         >
           {course.course_title}
         </h4>
-        <div className="flex items-center gap-4 mt-1">
-          <div className="flex items-center gap-1 text-xs text-[var(--foreground-muted)]">
-            <Sparkles className="w-3 h-3 text-amber-500" />
+        <div className="flex items-center gap-4 mt-1.5">
+          <div className="flex items-center gap-1.5 text-xs text-[var(--foreground-muted)]">
+            <Sparkles className="w-3.5 h-3.5 text-amber-500" />
             <span>{course.foundations_mastered}/{course.foundations_total}</span>
           </div>
-          <div className="flex items-center gap-1 text-xs text-[var(--foreground-muted)]">
-            <Target className="w-3 h-3 text-violet-500" />
+          <div className="flex items-center gap-1.5 text-xs text-[var(--foreground-muted)]">
+            <Target className="w-3.5 h-3.5 text-[var(--primary)]" />
             <span>{course.skills_mastered}/{course.skills_total}</span>
           </div>
         </div>
-        <div className="mt-2">
-          <div className="flex items-center justify-between text-xs text-[var(--foreground-muted)] mb-1">
+        <div className="mt-3">
+          <div className="flex items-center justify-between text-xs text-[var(--foreground-muted)] mb-1.5">
             <span>Progress</span>
-            <span>{course.overall_progress_percent}%</span>
+            <span className="font-semibold text-[var(--accent)]">{course.overall_progress_percent}%</span>
           </div>
-          <div className="h-1.5 bg-slate-200 rounded-full overflow-hidden">
+          <div className="h-2 bg-[var(--background-tertiary)] rounded-full overflow-hidden">
             <div 
-              className="h-full rounded-full bg-gradient-to-r from-violet-500 to-purple-500"
+              className="h-full rounded-full bg-gradient-to-r from-[var(--accent)] to-[var(--accent-light)]"
               style={{ width: `${course.overall_progress_percent}%` }}
             />
           </div>
@@ -472,8 +511,8 @@ function CourseProgressCard({ course }: { course: CourseWithProgress }) {
       </div>
       
       {/* Continue Button */}
-      <div className="flex items-center gap-2 px-3 py-1.5 bg-[var(--primary)] text-white text-sm font-medium rounded-lg group-hover:bg-[var(--primary-hover)] transition-colors flex-shrink-0">
-        <Play className="w-3 h-3" />
+      <div className="flex items-center gap-2 px-4 py-2 bg-[var(--accent)] text-white text-sm font-semibold rounded-xl group-hover:bg-[var(--accent-dark)] transition-colors flex-shrink-0">
+        <Play className="w-4 h-4" />
         <span className="hidden sm:inline">Continue</span>
       </div>
     </Link>
@@ -504,41 +543,41 @@ function SkillContinueCard({
   return (
     <Link
       href={`/skills/${skillSlug}/${activitySlug}`}
-      className="card-elevated p-4 flex items-center gap-4 hover:shadow-md transition-shadow group"
+      className="card-elevated p-5 flex items-center gap-4 hover:shadow-lg transition-all group"
     >
       {/* Skill Icon */}
-      <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${colors.bg} flex items-center justify-center flex-shrink-0`}>
+      <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${colors.bg} flex items-center justify-center flex-shrink-0`}>
         <Target className={`w-6 h-6 ${colors.icon}`} />
       </div>
       
       {/* Content */}
       <div className="flex-1 min-w-0">
-        <p className="text-xs text-[var(--foreground-muted)] mb-0.5">
+        <p className="text-xs text-[var(--foreground-muted)] mb-1">
           {categoryLabel} - {skillName}
         </p>
         <h4 
-          className="font-semibold text-[var(--foreground)] truncate"
+          className="font-bold text-[var(--foreground)] truncate"
           style={{ fontFamily: 'var(--font-heading)' }}
         >
           {activityTitle}
         </h4>
-        <div className="flex items-center gap-3 mt-1 text-xs text-[var(--foreground-muted)]">
-          <div className="flex items-center gap-1">
-            <div className="w-12 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+        <div className="flex items-center gap-4 mt-2 text-xs text-[var(--foreground-muted)]">
+          <div className="flex items-center gap-1.5">
+            <div className="w-14 h-1.5 bg-[var(--background-tertiary)] rounded-full overflow-hidden">
               <div 
-                className={`h-full rounded-full ${masteryLevel >= 70 ? 'bg-emerald-500' : 'bg-amber-500'}`}
+                className={`h-full rounded-full ${masteryLevel >= 70 ? 'bg-[var(--success)]' : 'bg-[var(--accent)]'}`}
                 style={{ width: `${masteryLevel}%` }}
               />
             </div>
-            <span>{masteryLevel}%</span>
+            <span className="font-medium">{masteryLevel}%</span>
           </div>
           <span>{timeAgo}</span>
         </div>
       </div>
       
       {/* Continue Button */}
-      <div className="flex items-center gap-2 px-3 py-1.5 bg-[var(--primary)] text-white text-sm font-medium rounded-lg group-hover:bg-[var(--primary-hover)] transition-colors flex-shrink-0">
-        <Play className="w-3 h-3" />
+      <div className="flex items-center gap-2 px-4 py-2 bg-[var(--accent)] text-white text-sm font-semibold rounded-xl group-hover:bg-[var(--accent-dark)] transition-colors flex-shrink-0">
+        <Play className="w-4 h-4" />
         <span className="hidden sm:inline">Continue</span>
       </div>
     </Link>

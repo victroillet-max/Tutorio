@@ -431,6 +431,83 @@ async function updateSkillMasteryForActivity(userId: string, activityId: string)
 }
 
 /**
+ * Quick start learning - enrolls user in recommended course and returns first activity URL
+ * Used for one-click onboarding from the empty dashboard state
+ */
+export async function quickStartLearning(): Promise<{ success: boolean; redirectUrl?: string; error?: string }> {
+  const supabase = await createClient();
+  
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    return { success: false, error: "Not authenticated" };
+  }
+
+  try {
+    // Find the first published beginner course (or first course if none marked beginner)
+    const { data: course } = await supabase
+      .from("courses")
+      .select("id, slug")
+      .eq("is_published", true)
+      .order("sort_order")
+      .limit(1)
+      .single();
+
+    if (!course) {
+      return { success: false, error: "No courses available" };
+    }
+
+    // Enroll user in course
+    await supabase
+      .from("course_enrollments")
+      .upsert({
+        user_id: user.id,
+        course_id: course.id,
+        enrolled_at: new Date().toISOString(),
+      }, {
+        onConflict: "user_id,course_id",
+      });
+
+    // Get first skill for this course
+    const { data: firstSkill } = await supabase
+      .from("skills")
+      .select("id, slug")
+      .eq("course_id", course.id)
+      .eq("is_active", true)
+      .order("sort_order")
+      .limit(1)
+      .single();
+
+    if (!firstSkill) {
+      // No skills yet, just go to course page
+      return { success: true, redirectUrl: `/courses/${course.slug}/learn` };
+    }
+
+    // Get first activity for this skill
+    const { data: skillActivities } = await supabase
+      .rpc("get_skill_activities", {
+        p_skill_id: firstSkill.id,
+        p_user_id: user.id
+      });
+
+    if (skillActivities && skillActivities.length > 0) {
+      const firstActivity = skillActivities[0];
+      revalidatePath("/dashboard");
+      return { 
+        success: true, 
+        redirectUrl: `/skills/${firstSkill.slug}/${firstActivity.activity_slug}` 
+      };
+    }
+
+    // Fallback to skill page
+    revalidatePath("/dashboard");
+    return { success: true, redirectUrl: `/skills/${firstSkill.slug}` };
+  } catch (error) {
+    console.error("Quick start failed:", error);
+    return { success: false, error: "Failed to start learning" };
+  }
+}
+
+/**
  * Recalculate all skill mastery for the current user
  * This is useful after database migrations or to fix inconsistent data
  */

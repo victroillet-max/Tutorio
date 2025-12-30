@@ -1,20 +1,30 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { CheckCircle2, BookOpen, ChevronRight } from "lucide-react";
+import Link from "next/link";
+import { CheckCircle2, BookOpen, ChevronRight, ArrowRight, Sparkles } from "lucide-react";
 import type { Activity } from "@/lib/database.types";
 import { markActivityComplete, trackActivityView, updateActivityProgress } from "@/lib/activities/actions";
 import { EnhancedMarkdown } from "./enhanced-markdown";
+import { Confetti } from "@/components/ui/confetti";
+
+interface NextActivityInfo {
+  slug: string;
+  title: string;
+  skillSlug: string;
+}
 
 interface LessonViewerProps {
   activity: Activity;
   userId: string;
   isCompleted: boolean;
+  nextActivity?: NextActivityInfo;
 }
 
-export function LessonViewer({ activity, userId, isCompleted }: LessonViewerProps) {
+export function LessonViewer({ activity, userId, isCompleted, nextActivity }: LessonViewerProps) {
   const [completed, setCompleted] = useState(isCompleted);
   const [isMarking, setIsMarking] = useState(false);
+  const [showConfetti, setShowConfetti] = useState(false);
   
   const content = activity.content as { markdown?: string } | null;
   const markdown = content?.markdown || "";
@@ -73,6 +83,8 @@ export function LessonViewer({ activity, userId, isCompleted }: LessonViewerProp
       await saveTimeSpent();
       await markActivityComplete(activity.id);
       setCompleted(true);
+      // Trigger celebration confetti
+      setShowConfetti(true);
     } catch (error) {
       console.error("Failed to mark activity complete:", error);
     } finally {
@@ -81,7 +93,14 @@ export function LessonViewer({ activity, userId, isCompleted }: LessonViewerProp
   }
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-[var(--border)] overflow-hidden">
+    <>
+      {/* Celebration Confetti */}
+      <Confetti 
+        trigger={showConfetti} 
+        onComplete={() => setShowConfetti(false)} 
+      />
+      
+      <div className="bg-white rounded-2xl shadow-sm border border-[var(--border)] overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)] bg-slate-50">
         <div className="flex items-center gap-3">
@@ -117,13 +136,29 @@ export function LessonViewer({ activity, userId, isCompleted }: LessonViewerProp
       
       {/* Footer - Single action button */}
       <div className="px-6 py-4 border-t border-[var(--border)] bg-slate-50">
-        <div className="flex justify-end">
-          {completed ? (
+        {completed ? (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-2 text-emerald-600">
               <CheckCircle2 className="w-5 h-5" />
               <span className="font-medium">Lesson Complete</span>
             </div>
-          ) : (
+            
+            {/* Prominent next activity CTA after completion */}
+            {nextActivity && (
+              <Link
+                href={`/skills/${nextActivity.skillSlug}/${nextActivity.slug}`}
+                className="group flex items-center gap-3 px-6 py-3 bg-[var(--primary)] text-white font-semibold rounded-xl hover:bg-[var(--primary-hover)] transition-all shadow-lg shadow-[var(--primary)]/25"
+              >
+                <div className="flex flex-col items-start">
+                  <span className="text-xs text-white/70 font-normal">Up Next</span>
+                  <span className="truncate max-w-[200px]">{nextActivity.title}</span>
+                </div>
+                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+              </Link>
+            )}
+          </div>
+        ) : (
+          <div className="flex justify-end">
             <button
               onClick={handleComplete}
               disabled={isMarking}
@@ -132,10 +167,11 @@ export function LessonViewer({ activity, userId, isCompleted }: LessonViewerProp
               {isMarking ? "Saving..." : "Complete Lesson"}
               <ChevronRight className="w-4 h-4" />
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
+    </>
   );
 }
 

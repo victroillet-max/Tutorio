@@ -11,7 +11,7 @@ interface ChatActivityContext {
   currentQuestionNumber?: number;
 }
 
-export type PopupType = 'welcome' | 'help';
+export type PopupType = 'welcome' | 'help' | 'struggling';
 
 interface PopupState {
   show: boolean;

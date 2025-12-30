@@ -44,19 +44,64 @@ export function ChatWidget({
   // Get popup state from context
   const { dismissPopup, markWelcomeSeen } = useChatContext();
   
-  // Track the activityId that the current conversation is associated with
-  const [conversationActivityId, setConversationActivityId] = useState<string | undefined>(undefined);
+  // Track the skillId for persistence
+  const [currentSkillId, setCurrentSkillId] = useState<string | undefined>(skillId);
   
-  // Clear conversation when activity changes to ensure fresh context
+  // Storage key for persisting messages by skill
+  const storageKey = skillId ? `tutorio-chat-${skillId}` : null;
+  
+  // Load messages from localStorage on mount or skill change
   useEffect(() => {
-    if (activityId !== conversationActivityId) {
-      // Activity changed - start a fresh conversation
+    if (skillId !== currentSkillId) {
+      // Skill changed - load messages for new skill
+      setCurrentSkillId(skillId);
       setConversationId(null);
-      setMessages([]);
       setError(null);
-      setConversationActivityId(activityId);
+      
+      if (skillId) {
+        const stored = localStorage.getItem(`tutorio-chat-${skillId}`);
+        if (stored) {
+          try {
+            const parsed = JSON.parse(stored);
+            // Restore messages with Date objects
+            const restoredMessages = parsed.messages?.map((m: Message & { timestamp: string }) => ({
+              ...m,
+              timestamp: new Date(m.timestamp)
+            })) || [];
+            setMessages(restoredMessages);
+            setConversationId(parsed.conversationId || null);
+          } catch {
+            setMessages([]);
+          }
+        } else {
+          setMessages([]);
+        }
+      } else {
+        setMessages([]);
+      }
     }
-  }, [activityId, conversationActivityId]);
+  }, [skillId, currentSkillId]);
+  
+  // Persist messages to localStorage when they change
+  useEffect(() => {
+    if (storageKey && messages.length > 0) {
+      localStorage.setItem(storageKey, JSON.stringify({
+        messages,
+        conversationId,
+        updatedAt: new Date().toISOString()
+      }));
+    }
+  }, [messages, conversationId, storageKey]);
+  
+  // Clear chat history function
+  const clearChatHistory = () => {
+    setMessages([]);
+    setConversationId(null);
+    setError(null);
+    if (storageKey) {
+      localStorage.removeItem(storageKey);
+    }
+  };
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
@@ -115,7 +160,6 @@ export function ChatWidget({
       
       if (data.conversationId && !conversationId) {
         setConversationId(data.conversationId);
-        setConversationActivityId(activityId);
       }
 
       const assistantMessage: Message = {
@@ -167,8 +211,9 @@ export function ChatWidget({
       {/* Floating Button */}
       <button
         onClick={toggleWidget}
+        data-tour="chat-widget"
         className={cn(
-          "fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full shadow-lg",
+          "fixed right-6 z-50 w-14 h-14 rounded-full shadow-lg safe-bottom",
           "bg-gradient-to-br from-violet-600 to-indigo-600 text-white",
           "flex items-center justify-center",
           "hover:from-violet-500 hover:to-indigo-500 transition-all",
@@ -222,16 +267,27 @@ export function ChatWidget({
                 <p className="text-xs text-zinc-400">Your AI Tutor</p>
               </div>
             </div>
-            <button
-              onClick={() => setIsOpen(false)}
-              className="text-zinc-400 hover:text-white transition-colors"
-              aria-label="Close chat"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
-            </button>
+            <div className="flex items-center gap-2">
+              {messages.length > 0 && (
+                <button
+                  onClick={clearChatHistory}
+                  className="text-zinc-500 hover:text-zinc-300 transition-colors text-xs px-2 py-1 rounded hover:bg-zinc-800"
+                  aria-label="Clear chat history"
+                >
+                  Clear
+                </button>
+              )}
+              <button
+                onClick={() => setIsOpen(false)}
+                className="text-zinc-400 hover:text-white transition-colors"
+                aria-label="Close chat"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
           </div>
 
           {/* Messages */}

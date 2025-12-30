@@ -49,6 +49,19 @@ export interface DashboardStats {
   revenueGrowth: number;
   totalActivities: number;
   completedActivities: number;
+  // SaaS-specific metrics
+  mrr: number;
+  arr: number;
+  avgRevenuePerUser: number;
+  conversionRate: number;
+  churnRate: number;
+  ltv: number;
+  cac: number;
+  ltvCacRatio: number;
+  paybackMonths: number;
+  netRevenueRetention: number;
+  // Monthly trend data
+  mrrTrend: Array<{ month: string; mrr: number; subscribers: number }>;
 }
 
 export async function getDashboardStats(): Promise<DashboardStats> {
@@ -88,48 +101,114 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     .select("*", { count: "exact", head: true })
     .eq("is_published", true);
   
-  // Active subscriptions
-  const { count: activeSubscriptions } = await supabase
+  // Get all subscriptions with tier info for calculations
+  const { data: allSubscriptions } = await supabase
     .from("subscriptions")
-    .select("*", { count: "exact", head: true })
-    .in("status", ["active", "trialing"])
-    .gt("current_period_end", now.toISOString());
+    .select(`
+      *,
+      tier:subscription_tiers(id, name, price_monthly)
+    `);
   
-  // Subscriptions last month
-  const { count: subscriptionsLastMonth } = await supabase
-    .from("subscriptions")
-    .select("*", { count: "exact", head: true })
-    .in("status", ["active", "trialing"])
-    .gte("created_at", twoMonthsAgo.toISOString())
-    .lt("created_at", oneMonthAgo.toISOString());
-  
-  // Revenue calculation
-  const { data: currentMonthSubs } = await supabase
-    .from("subscriptions")
-    .select("tier_id")
-    .in("status", ["active", "trialing"])
-    .gte("created_at", oneMonthAgo.toISOString());
-  
-  const { data: lastMonthSubs } = await supabase
-    .from("subscriptions")
-    .select("tier_id")
-    .in("status", ["active", "trialing"])
-    .gte("created_at", twoMonthsAgo.toISOString())
-    .lt("created_at", oneMonthAgo.toISOString());
-  
+  // Get tiers for pricing
   const { data: tiers } = await supabase
     .from("subscription_tiers")
     .select("id, price_monthly");
   
   const tierPrices = new Map(tiers?.map(t => [t.id, t.price_monthly]) || []);
   
-  const monthlyRevenue = currentMonthSubs?.reduce((sum, sub) => {
-    return sum + (tierPrices.get(sub.tier_id) || 0);
-  }, 0) || 0;
+  // Active subscriptions (currently active)
+  const activeSubs = allSubscriptions?.filter(sub => 
+    (sub.status === "active" || sub.status === "trialing") &&
+    new Date(sub.current_period_end) > now
+  ) || [];
   
-  const lastMonthRevenue = lastMonthSubs?.reduce((sum, sub) => {
-    return sum + (tierPrices.get(sub.tier_id) || 0);
-  }, 0) || 0;
+  const activeSubscriptions = activeSubs.length;
+  
+  // Subscriptions created last month (for growth comparison)
+  const subsLastMonth = allSubscriptions?.filter(sub => {
+    const createdAt = new Date(sub.created_at);
+    return createdAt >= twoMonthsAgo && createdAt < oneMonthAgo &&
+           (sub.status === "active" || sub.status === "trialing");
+  }).length || 0;
+  
+  // MRR calculation (all active subscriptions)
+  const mrr = activeSubs.reduce((sum, sub) => {
+    return sum + (sub.tier?.price_monthly || tierPrices.get(sub.tier_id) || 0);
+  }, 0);
+  
+  const arr = mrr * 12;
+  
+  // ARPU (Average Revenue Per User)
+  const avgRevenuePerUser = activeSubscriptions > 0 ? mrr / activeSubscriptions : 0;
+  
+  // Conversion rate (subscribers / total users)
+  const conversionRate = (totalUsers || 0) > 0 
+    ? Math.round((activeSubscriptions / (totalUsers || 1)) * 100) 
+    : 0;
+  
+  // Calculate churn rate (cancelled this month / active at start of month)
+  const cancelledThisMonth = allSubscriptions?.filter(sub => {
+    if (sub.status !== "cancelled" && sub.status !== "expired") return false;
+    const cancelledAt = sub.cancelled_at ? new Date(sub.cancelled_at) : null;
+    if (!cancelledAt) return false;
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    return cancelledAt >= monthStart;
+  }).length || 0;
+  
+  const totalActiveStart = activeSubscriptions + cancelledThisMonth;
+  const churnRate = totalActiveStart > 0 
+    ? Math.round((cancelledThisMonth / totalActiveStart) * 100 * 10) / 10 
+    : 0;
+  
+  // LTV calculation (ARPU / churn rate) - use 5% as default churn if no data
+  const effectiveChurn = churnRate > 0 ? churnRate / 100 : 0.05;
+  const ltv = avgRevenuePerUser / effectiveChurn;
+  
+  // CAC estimation (based on marketing cost per acquired user - using placeholder logic)
+  // In real implementation, this would come from marketing spend tracking
+  const cac = avgRevenuePerUser * 2; // Placeholder: assume CAC is 2x ARPU
+  
+  // LTV/CAC ratio
+  const ltvCacRatio = cac > 0 ? Math.round((ltv / cac) * 10) / 10 : 0;
+  
+  // Payback period in months (CAC / ARPU)
+  const paybackMonths = avgRevenuePerUser > 0 ? Math.round((cac / avgRevenuePerUser) * 10) / 10 : 0;
+  
+  // Net Revenue Retention (NRR) - simplified calculation
+  // Would normally compare MRR from same cohort
+  const monthlyRevenue = mrr; // This month's MRR from new subs
+  const lastMonthRevenue = allSubscriptions?.filter(sub => {
+    const createdAt = new Date(sub.created_at);
+    return createdAt >= twoMonthsAgo && createdAt < oneMonthAgo &&
+           (sub.status === "active" || sub.status === "trialing");
+  }).reduce((sum, sub) => sum + (sub.tier?.price_monthly || 0), 0) || 0;
+  
+  const netRevenueRetention = lastMonthRevenue > 0 
+    ? Math.round((mrr / (mrr + lastMonthRevenue - monthlyRevenue)) * 100) 
+    : 100;
+  
+  // MRR Trend (last 6 months)
+  const mrrTrend: Array<{ month: string; mrr: number; subscribers: number }> = [];
+  for (let i = 5; i >= 0; i--) {
+    const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0);
+    const monthName = monthStart.toLocaleString('default', { month: 'short' });
+    
+    const monthSubs = allSubscriptions?.filter(sub => {
+      const createdAt = new Date(sub.created_at);
+      return createdAt <= monthEnd && 
+             (sub.status === "active" || sub.status === "trialing" || 
+              (sub.cancelled_at && new Date(sub.cancelled_at) > monthEnd));
+    }) || [];
+    
+    const monthMrr = monthSubs.reduce((sum, sub) => sum + (sub.tier?.price_monthly || 0), 0);
+    
+    mrrTrend.push({
+      month: monthName,
+      mrr: monthMrr,
+      subscribers: monthSubs.length,
+    });
+  }
   
   // Activities
   const { count: totalActivities } = await supabase
@@ -146,9 +225,9 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     ? Math.round(((newUsersThisWeek || 0) - (newUsersLastWeek || 0)) / newUsersLastWeek * 100)
     : (newUsersThisWeek || 0) > 0 ? 100 : 0;
   
-  const subscriptionGrowth = subscriptionsLastMonth
-    ? Math.round(((activeSubscriptions || 0) - (subscriptionsLastMonth || 0)) / subscriptionsLastMonth * 100)
-    : (activeSubscriptions || 0) > 0 ? 100 : 0;
+  const subscriptionGrowth = subsLastMonth
+    ? Math.round((activeSubscriptions - subsLastMonth) / subsLastMonth * 100)
+    : activeSubscriptions > 0 ? 100 : 0;
   
   const revenueGrowth = lastMonthRevenue
     ? Math.round((monthlyRevenue - lastMonthRevenue) / lastMonthRevenue * 100)
@@ -161,14 +240,26 @@ export async function getDashboardStats(): Promise<DashboardStats> {
     userGrowth,
     totalCourses: totalCourses || 0,
     publishedCourses: publishedCourses || 0,
-    activeSubscriptions: activeSubscriptions || 0,
-    subscriptionsLastMonth: subscriptionsLastMonth || 0,
+    activeSubscriptions,
+    subscriptionsLastMonth: subsLastMonth,
     subscriptionGrowth,
     monthlyRevenue,
     lastMonthRevenue,
     revenueGrowth,
     totalActivities: totalActivities || 0,
     completedActivities: completedActivities || 0,
+    // SaaS metrics
+    mrr,
+    arr,
+    avgRevenuePerUser,
+    conversionRate,
+    churnRate,
+    ltv,
+    cac,
+    ltvCacRatio,
+    paybackMonths,
+    netRevenueRetention,
+    mrrTrend,
   };
 }
 

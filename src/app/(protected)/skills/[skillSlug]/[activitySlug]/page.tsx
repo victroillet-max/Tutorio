@@ -16,6 +16,7 @@ import { InteractiveViewer } from "@/components/activities/interactive-viewer";
 import { CheckpointViewer } from "@/components/activities/checkpoint-viewer";
 import { ActivityPrerequisiteWarning } from "@/components/activities/prerequisite-warning";
 import { ActivityChatContext } from "@/components/activities/activity-chat-context";
+import { KeyboardNavigation, KeyboardShortcutsHint } from "@/components/activities/keyboard-navigation";
 
 interface SkillActivityPageProps {
   params: Promise<{ skillSlug: string; activitySlug: string }>;
@@ -186,6 +187,13 @@ export default async function SkillActivityPage({ params }: SkillActivityPagePro
       {/* Set activity context for AI tutor */}
       <ActivityChatContext activityId={activity.id} skillId={skill.id} />
       
+      {/* Keyboard navigation (Left/Right arrows, Esc) */}
+      <KeyboardNavigation
+        prevUrl={prevActivity ? `/skills/${skillSlug}/${prevActivity.activity_slug}` : undefined}
+        nextUrl={nextActivity ? `/skills/${skillSlug}/${nextActivity.activity_slug}` : undefined}
+        skillUrl={`/skills/${skillSlug}`}
+      />
+      
       {/* Header */}
       <div className="sticky top-16 z-40 bg-white border-b border-[var(--border)]">
         <div className={`${containerClass} mx-auto px-4 sm:px-6 lg:px-8`}>
@@ -246,6 +254,11 @@ export default async function SkillActivityPage({ params }: SkillActivityPagePro
           activity={activity as Activity} 
           userId={user.id}
           isCompleted={progress?.completed ?? false}
+          nextActivity={nextActivity ? {
+            slug: nextActivity.activity_slug,
+            title: nextActivity.activity_title,
+            skillSlug: skillSlug
+          } : undefined}
         />
       </div>
 
@@ -265,8 +278,12 @@ export default async function SkillActivityPage({ params }: SkillActivityPagePro
               <div />
             )}
             
-            {/* Center progress dots */}
-            <div className="hidden sm:flex items-center gap-1.5">
+            {/* Center progress dots + keyboard hints */}
+            <div className="hidden sm:flex items-center gap-4">
+              {/* Keyboard shortcuts hint */}
+              <KeyboardShortcutsHint hasPrev={!!prevActivity} hasNext={!!nextActivity} />
+              
+              <div className="flex items-center gap-1.5">
               {activities.slice(Math.max(0, currentIndex - 2), Math.min(activities.length, currentIndex + 3)).map((a: { activity_id: string; activity_slug: string; activity_title: string }, i: number) => {
                 const actualIndex = Math.max(0, currentIndex - 2) + i;
                 return (
@@ -284,6 +301,7 @@ export default async function SkillActivityPage({ params }: SkillActivityPagePro
                   />
                 );
               })}
+              </div>
             </div>
             
             {nextActivity ? (
@@ -315,13 +333,20 @@ function checkAccess(required: PlanTier, userPlan: PlanTier): boolean {
   return tierOrder[userPlan] >= tierOrder[required];
 }
 
+interface NextActivityInfo {
+  slug: string;
+  title: string;
+  skillSlug: string;
+}
+
 interface ActivityRendererProps {
   activity: Activity;
   userId: string;
   isCompleted: boolean;
+  nextActivity?: NextActivityInfo;
 }
 
-function ActivityRenderer({ activity, userId, isCompleted }: ActivityRendererProps) {
+function ActivityRenderer({ activity, userId, isCompleted, nextActivity }: ActivityRendererProps) {
   switch (activity.type) {
     case 'lesson':
       return (
@@ -329,6 +354,7 @@ function ActivityRenderer({ activity, userId, isCompleted }: ActivityRendererPro
           activity={activity} 
           userId={userId}
           isCompleted={isCompleted}
+          nextActivity={nextActivity}
         />
       );
     

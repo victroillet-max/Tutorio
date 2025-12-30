@@ -77,9 +77,10 @@ async function markEventProcessed(
 ): Promise<void> {
   await supabase
     .from("stripe_webhook_events")
-    .insert({ id: eventId, type: eventType })
-    .onConflict("id")
-    .ignore();
+    .upsert(
+      { id: eventId, type: eventType },
+      { onConflict: "id", ignoreDuplicates: true }
+    );
 }
 
 /**
@@ -282,23 +283,49 @@ async function handleSubscriptionUpdated(
 
   const status = statusMap[subscription.status] || "expired";
 
+  // Check if the tier changed (from metadata)
+  const newTierSlug = subscription.metadata?.tier;
+  let tierId: string | undefined;
+
+  if (newTierSlug) {
+    const { data: tierData } = await supabase
+      .from("subscription_tiers")
+      .select("id")
+      .eq("slug", newTierSlug)
+      .single();
+    
+    if (tierData) {
+      tierId = tierData.id;
+    }
+  }
+
+  // Build update object
+  const updateData: Record<string, unknown> = {
+    status,
+    current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
+    current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+    cancel_at_period_end: subscription.cancel_at_period_end,
+    cancelled_at: subscription.canceled_at 
+      ? new Date(subscription.canceled_at * 1000).toISOString() 
+      : null,
+    updated_at: new Date().toISOString(),
+  };
+
+  // Include tier update if tier changed
+  if (tierId) {
+    updateData.tier_id = tierId;
+  }
+
   // Update subscription in database
   const { error } = await supabase
     .from("subscriptions")
-    .update({
-      status,
-      current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
-      current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
-      cancel_at_period_end: subscription.cancel_at_period_end,
-      cancelled_at: subscription.canceled_at 
-        ? new Date(subscription.canceled_at * 1000).toISOString() 
-        : null,
-      updated_at: new Date().toISOString(),
-    })
+    .update(updateData)
     .eq("stripe_subscription_id", subscription.id);
 
   if (error) {
     console.error("Failed to update subscription:", error);
+  } else if (tierId) {
+    console.log(`Subscription ${subscription.id} tier updated to ${newTierSlug}`);
   }
 }
 
@@ -330,9 +357,12 @@ async function handlePaymentSucceeded(
   supabase: SupabaseServiceClient,
   invoice: Stripe.Invoice
 ) {
-  const subscriptionId = typeof invoice.subscription === 'string' 
-    ? invoice.subscription 
-    : invoice.subscription?.id;
+  // subscription can be a string ID or an expanded Subscription object
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const subscriptionData = (invoice as any).subscription;
+  const subscriptionId = typeof subscriptionData === 'string' 
+    ? subscriptionData 
+    : (subscriptionData as { id?: string } | null)?.id;
   if (!subscriptionId) return;
 
   // Get the updated subscription from Stripe with retry logic
@@ -366,9 +396,11 @@ async function handlePaymentFailed(
   supabase: SupabaseServiceClient,
   invoice: Stripe.Invoice
 ) {
-  const subscriptionId = typeof invoice.subscription === 'string' 
-    ? invoice.subscription 
-    : invoice.subscription?.id;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const subscriptionData = (invoice as any).subscription;
+  const subscriptionId = typeof subscriptionData === 'string' 
+    ? subscriptionData 
+    : (subscriptionData as { id?: string } | null)?.id;
   if (!subscriptionId) return;
 
   // Mark subscription as past_due

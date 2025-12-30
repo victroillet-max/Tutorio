@@ -9,6 +9,8 @@ export type AuthActionResult = {
   error?: string;
   success?: boolean;
   message?: string;
+  // Preserve form values on error for better UX
+  email?: string;
 };
 
 /**
@@ -22,11 +24,11 @@ export async function signUp(formData: FormData): Promise<AuthActionResult> {
   const fullName = formData.get("fullName") as string;
 
   if (!email || !password) {
-    return { error: "Email and password are required" };
+    return { error: "Email and password are required", email };
   }
 
   if (password.length < 8) {
-    return { error: "Password must be at least 8 characters" };
+    return { error: "Password must be at least 8 characters", email };
   }
 
   const siteUrl = getSiteUrl();
@@ -44,7 +46,7 @@ export async function signUp(formData: FormData): Promise<AuthActionResult> {
 
   if (error) {
     console.error("Signup error:", error.message);
-    return { error: error.message };
+    return { error: error.message, email };
   }
 
   return { 
@@ -61,7 +63,7 @@ export async function signIn(formData: FormData): Promise<AuthActionResult> {
   const password = formData.get("password") as string;
 
   if (!email || !password) {
-    return { error: "Email and password are required" };
+    return { error: "Email and password are required", email };
   }
 
   let supabase;
@@ -69,7 +71,7 @@ export async function signIn(formData: FormData): Promise<AuthActionResult> {
     supabase = await createClient();
   } catch (err) {
     console.error("Failed to create Supabase client:", err);
-    return { error: "Authentication service is unavailable. Please try again later." };
+    return { error: "Authentication service is unavailable. Please try again later.", email };
   }
 
   try {
@@ -80,7 +82,7 @@ export async function signIn(formData: FormData): Promise<AuthActionResult> {
 
     if (error) {
       console.error("Login error:", error.message);
-      return { error: error.message };
+      return { error: error.message, email };
     }
   } catch (err) {
     console.error("Sign in exception:", err);
@@ -88,12 +90,13 @@ export async function signIn(formData: FormData): Promise<AuthActionResult> {
     if (err instanceof Error) {
       if (err.message.includes("Unexpected end of JSON input")) {
         return { 
-          error: "Authentication service configuration error. Please check Supabase environment variables." 
+          error: "Authentication service configuration error. Please check Supabase environment variables.",
+          email 
         };
       }
-      return { error: err.message };
+      return { error: err.message, email };
     }
-    return { error: "An unexpected error occurred during sign in" };
+    return { error: "An unexpected error occurred during sign in", email };
   }
 
   revalidatePath("/", "layout");

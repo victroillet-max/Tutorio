@@ -21,11 +21,11 @@ export default async function AuthLayout({
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-b from-white to-[var(--background-secondary)]">
+    <div className="min-h-screen flex flex-col bg-[var(--background)]">
       {/* Header */}
       <header className="p-6">
-        <Link href="/" className="inline-flex items-center gap-2 group">
-          <div className="w-10 h-10 rounded-xl bg-[var(--primary)] flex items-center justify-center transition-transform group-hover:scale-105 shadow-md shadow-[var(--primary)]/25">
+        <Link href="/" className="inline-flex items-center gap-3 group">
+          <div className="w-11 h-11 rounded-xl bg-[var(--primary)] flex items-center justify-center transition-transform group-hover:rotate-[-5deg] group-hover:scale-105 shadow-md shadow-[var(--primary)]/25">
             <BookOpen className="w-5 h-5 text-white" />
           </div>
           <span 
@@ -46,8 +46,12 @@ export default async function AuthLayout({
 
       {/* Background decoration */}
       <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
-        <div className="absolute top-1/4 -left-32 w-96 h-96 bg-[var(--primary)]/5 rounded-full blur-3xl" />
-        <div className="absolute bottom-1/4 -right-32 w-80 h-80 bg-[var(--primary)]/10 rounded-full blur-3xl" />
+        {/* Top right gradient */}
+        <div className="absolute top-[-20%] right-[-10%] w-[50%] h-[100%] bg-gradient-to-br from-[var(--primary)]/5 via-[var(--primary-light)]/3 to-[var(--accent)]/5 rounded-[0_0_0_40%]" />
+        {/* Bottom left circle */}
+        <div className="absolute bottom-[10%] left-[-10%] w-[400px] h-[400px] bg-[var(--accent)]/5 rounded-full blur-[80px]" />
+        {/* Center circle */}
+        <div className="absolute top-[40%] right-[20%] w-[300px] h-[300px] bg-[var(--primary)]/4 rounded-full blur-[60px]" />
       </div>
     </div>
   );

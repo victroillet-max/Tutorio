@@ -27,38 +27,8 @@ export function CheckpointViewer({ activity, userId, isCompleted }: CheckpointVi
   // Extract specific methods to avoid dependency on entire context object (prevents infinite re-renders)
   const { updateCurrentQuestion, triggerPopup, hasDismissedHelp } = useChatContext();
 
-  // Track activity view and set up time tracking
-  useEffect(() => {
-    trackActivityView(activity.id).catch(console.error);
-    lastSavedTimeRef.current = Date.now();
-    
-    // Save time when page is hidden
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        saveTimeSpent();
-      }
-    };
-    
-    document.addEventListener("visibilitychange", handleVisibilityChange);
-    
-    return () => {
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
-      saveTimeSpent();
-    };
-  }, [activity.id, saveTimeSpent]);
-  
   const [started, setStarted] = useState(false);
   const [currentQuestion, setCurrentQuestion] = useState(0);
-  
-  // Update chat context with current question whenever it changes
-  useEffect(() => {
-    if (!started) return; // Only track when exam has started
-    const question = questions[currentQuestion];
-    if (question?.question) {
-      updateCurrentQuestion(question.question, currentQuestion + 1);
-    }
-  }, [currentQuestion, questions, updateCurrentQuestion, started]);
-  
   const [answers, setAnswers] = useState<Record<string, number | boolean | string>>({});
   const [showResults, setShowResults] = useState(isCompleted);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -86,12 +56,41 @@ export function CheckpointViewer({ activity, userId, isCompleted }: CheckpointVi
     }
   }, [activity.id]);
 
+  // Track activity view and set up time tracking
+  useEffect(() => {
+    trackActivityView(activity.id).catch(console.error);
+    lastSavedTimeRef.current = Date.now();
+    
+    // Save time when page is hidden
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        saveTimeSpent();
+      }
+    };
+    
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      saveTimeSpent();
+    };
+  }, [activity.id, saveTimeSpent]);
+  
+  // Update chat context with current question whenever it changes
+  useEffect(() => {
+    if (!started) return; // Only track when exam has started
+    const question = questions[currentQuestion];
+    if (question?.question) {
+      updateCurrentQuestion(question.question, currentQuestion + 1);
+    }
+  }, [currentQuestion, questions, updateCurrentQuestion, started]);
+
   const question = questions[currentQuestion];
   const totalQuestions = questions.length;
   const answeredCount = Object.keys(answers).length;
   
   // Ref for submit handler to avoid stale closure in timer
-  const handleSubmitRef = useRef<() => Promise<void>>();
+  const handleSubmitRef = useRef<(() => Promise<void>) | undefined>(undefined);
 
   // Timer effect - Fixed: was incorrectly using useState instead of useEffect
   useEffect(() => {

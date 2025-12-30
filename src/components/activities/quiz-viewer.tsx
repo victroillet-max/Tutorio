@@ -5,6 +5,7 @@ import { CheckCircle2, XCircle, HelpCircle, ChevronRight, BookOpen, Lightbulb, M
 import type { Activity, QuizQuestion } from "@/lib/database.types";
 import { markActivityComplete, trackActivityView, updateActivityProgress } from "@/lib/activities/actions";
 import { useChatContext } from "@/components/chat";
+import { Confetti } from "@/components/ui/confetti";
 
 interface QuizViewerProps {
   activity: Activity;
@@ -80,6 +81,7 @@ export function QuizViewer({ activity, userId, isCompleted }: QuizViewerProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [score, setScore] = useState<number | null>(null);
   const [showExplanation, setShowExplanation] = useState<string | null>(null);
+  const [showConfetti, setShowConfetti] = useState(false);
   
   // Struggling detection state
   const [wrongAnswerCount, setWrongAnswerCount] = useState(0);
@@ -129,6 +131,11 @@ export function QuizViewer({ activity, userId, isCompleted }: QuizViewerProps) {
     setScore(finalScore);
     setShowResults(true);
     
+    // Trigger confetti if passed
+    if (finalScore >= passingScore) {
+      setShowConfetti(true);
+    }
+    
     try {
       // B8: Save time spent before marking complete
       await saveTimeSpent();
@@ -152,6 +159,13 @@ export function QuizViewer({ activity, userId, isCompleted }: QuizViewerProps) {
     const passed = score >= passingScore;
     
     return (
+      <>
+      {/* Celebration Confetti */}
+      <Confetti 
+        trigger={showConfetti} 
+        onComplete={() => setShowConfetti(false)} 
+      />
+      
       <div className="bg-white rounded-2xl shadow-sm border border-[var(--border)] overflow-hidden">
         <div className={`p-8 text-center ${passed ? 'bg-emerald-50' : 'bg-red-50'}`}>
           <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 ${passed ? 'bg-emerald-100' : 'bg-red-100'}`}>
@@ -214,6 +228,7 @@ export function QuizViewer({ activity, userId, isCompleted }: QuizViewerProps) {
           </div>
         </div>
       </div>
+      </>
     );
   }
 

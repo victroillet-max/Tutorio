@@ -278,7 +278,7 @@ async function populateCFSTemplate() {
   
   const sheetIds: Record<string, number> = {};
   spreadsheetData.data.sheets?.forEach(sheet => {
-    if (sheet.properties?.title && sheet.properties?.sheetId !== undefined) {
+    if (sheet.properties?.title && sheet.properties?.sheetId != null) {
       sheetIds[sheet.properties.title] = sheet.properties.sheetId;
     }
   });
