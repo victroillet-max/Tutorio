@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- Split/separated gem facets - deconstructed -->
+  <!-- Left half -->
+  <polygon points="30,6 30,30 10,22" fill="#1e3a5f"/>
+  <polygon points="10,22 30,30 30,58" fill="#152a45"/>
+  <!-- Right half (slightly offset) -->
+  <polygon points="34,4 54,20 34,28" fill="#2d5a8b"/>
+  <polygon points="54,20 34,28 34,56" fill="#1e3a5f"/>
+  <!-- Gap creates dynamic tension -->
+  <!-- Accent bridging the gap -->
+  <circle cx="32" cy="16" r="5" fill="#e76f51"/>
+</svg>
+

@@ -5,47 +5,19 @@ import { Suspense } from "react";
 import { 
   Check, 
   X,
-  Zap,
-  Crown,
   ChevronLeft,
-  Sparkles,
   BookOpen,
   ArrowRight,
   AlertCircle
 } from "lucide-react";
 import type { SubscriptionTier, Course } from "@/lib/database.types";
-import { PricingError } from "@/components/stripe";
-import { SubscribeButton } from "@/components/stripe";
+import { PricingError, FlipPricingCard } from "@/components/stripe";
 
 export const metadata = {
   title: "Pricing | Tutorio",
   description: "Choose the plan that's right for you",
 };
 
-// Features comparison for the tiers
-const tierFeatures = {
-  demo: [
-    { name: "First 5 activities", included: true },
-    { name: "Basic AI tutor (5 messages/day)", included: true },
-    { name: "Progress tracking", included: true },
-    { name: "Full course access", included: false },
-    { name: "Unlimited AI tutor", included: false },
-  ],
-  basic: [
-    { name: "Full course access", included: true },
-    { name: "All activities & challenges", included: true },
-    { name: "AI tutor (25 messages/day)", included: true },
-    { name: "Progress tracking", included: true },
-    { name: "Unlimited AI tutor", included: false },
-  ],
-  advanced: [
-    { name: "Full course access", included: true },
-    { name: "All activities & challenges", included: true },
-    { name: "Unlimited AI tutor", included: true },
-    { name: "Priority support", included: true },
-    { name: "Advanced debugging help", included: true },
-  ],
-};
 
 export default async function PricingPage({
   searchParams,
@@ -217,10 +189,11 @@ export default async function PricingPage({
             
             <div className="grid md:grid-cols-2 gap-8 max-w-3xl mx-auto">
               {tiers.map((tier) => (
-                <PricingCard 
+                <FlipPricingCard 
                   key={tier.id} 
                   tier={tier as SubscriptionTier} 
-                  course={selectedCourse}
+                  courseId={selectedCourse.id}
+                  courseName={selectedCourse.title}
                   existingSubscription={subscriptions?.find((s: { course_id: string; tier_slug: string; tier_name: string }) => s.course_id === selectedCourse.id)}
                   stripeEnabled={stripeConfigured && hasPriceIds}
                 />
@@ -292,141 +265,6 @@ export default async function PricingPage({
         </div>
       </div>
     </div>
-  );
-}
-
-interface PricingCardProps {
-  tier: SubscriptionTier;
-  course: Course;
-  existingSubscription?: {
-    tier_slug: string;
-    tier_name: string;
-  };
-  stripeEnabled: boolean;
-}
-
-function PricingCard({ tier, course, existingSubscription, stripeEnabled }: PricingCardProps) {
-  const isAdvanced = tier.slug === 'advanced';
-  const isCurrentPlan = existingSubscription?.tier_slug === tier.slug;
-  const canUpgrade = existingSubscription?.tier_slug === 'basic' && tier.slug === 'advanced';
-  
-  const Icon = isAdvanced ? Crown : Zap;
-  
-  return (
-    <div className={`
-      relative bg-white rounded-2xl border-2 p-6 transition-all
-      ${isCurrentPlan ? 'border-emerald-500 shadow-lg' : isAdvanced ? 'border-[var(--primary)]' : 'border-[var(--border)]'}
-    `}>
-      {isCurrentPlan && (
-        <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-emerald-500 text-white text-xs font-medium rounded-full">
-          Current Plan
-        </div>
-      )}
-      
-      {isAdvanced && !isCurrentPlan && (
-        <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-[var(--primary)] text-white text-xs font-medium rounded-full">
-          Best Value
-        </div>
-      )}
-      
-      <div className="text-center mb-6">
-        <div className={`w-14 h-14 rounded-xl flex items-center justify-center mx-auto mb-4 ${
-          isAdvanced ? 'bg-[var(--primary)]/10' : 'bg-slate-100'
-        }`}>
-          <Icon className={`w-7 h-7 ${isAdvanced ? 'text-[var(--primary)]' : 'text-slate-600'}`} />
-        </div>
-        
-        <h3 className="text-xl font-bold mb-2">{tier.name}</h3>
-        
-        <div className="mb-2">
-          <span className="text-4xl font-bold">
-            CHF {tier.price_monthly.toFixed(0)}
-          </span>
-          <span className="text-[var(--foreground-muted)]">/month</span>
-        </div>
-        
-        {/* AI Limit Badge */}
-        <div className="inline-flex items-center gap-1 px-2 py-1 bg-[var(--progress-bg)] rounded-lg">
-          <Sparkles className="w-3 h-3 text-[var(--primary)]" />
-          <span className="text-xs font-medium text-[var(--primary)]">
-            AI Tutor: {isAdvanced ? 'Unlimited' : '25/day'}
-          </span>
-        </div>
-      </div>
-      
-      <p className="text-[var(--foreground-muted)] text-center text-sm mb-6">
-        {tier.description}
-      </p>
-      
-      {/* Features List */}
-      <ul className="space-y-3 mb-6">
-        {(isAdvanced ? tierFeatures.advanced : tierFeatures.basic).map((feature) => (
-          <FeatureItem key={feature.name} included={feature.included}>
-            {feature.name}
-          </FeatureItem>
-        ))}
-      </ul>
-      
-      {/* CTA Button */}
-      {isCurrentPlan ? (
-        <button
-          disabled
-          className="w-full py-3 px-4 bg-slate-100 text-slate-500 font-semibold rounded-xl cursor-not-allowed"
-        >
-          Current Plan
-        </button>
-      ) : !stripeEnabled ? (
-        <button
-          disabled
-          className="w-full py-3 px-4 bg-slate-100 text-slate-400 font-semibold rounded-xl cursor-not-allowed"
-        >
-          Coming Soon
-        </button>
-      ) : canUpgrade ? (
-        <SubscribeButton
-          courseId={course.id}
-          tier={tier.slug as "basic" | "advanced"}
-          upgrade
-          className="w-full py-3 px-4 bg-[var(--primary)] text-white font-semibold rounded-xl hover:bg-[var(--primary-dark)] transition-colors"
-        >
-          Upgrade to {tier.name}
-        </SubscribeButton>
-      ) : (
-        <SubscribeButton
-          courseId={course.id}
-          tier={tier.slug as "basic" | "advanced"}
-          className={`w-full py-3 px-4 font-semibold rounded-xl transition-colors ${
-            isAdvanced 
-              ? 'bg-[var(--primary)] text-white hover:bg-[var(--primary-dark)]'
-              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-          }`}
-          variant={isAdvanced ? "default" : "secondary"}
-        >
-          Subscribe to {tier.name}
-        </SubscribeButton>
-      )}
-    </div>
-  );
-}
-
-function FeatureItem({ 
-  children, 
-  included 
-}: { 
-  children: React.ReactNode; 
-  included: boolean;
-}) {
-  return (
-    <li className="flex items-center gap-3">
-      {included ? (
-        <Check className="w-5 h-5 text-emerald-500 flex-shrink-0" />
-      ) : (
-        <X className="w-5 h-5 text-slate-300 flex-shrink-0" />
-      )}
-      <span className={included ? 'text-[var(--foreground)]' : 'text-slate-400'}>
-        {children}
-      </span>
-    </li>
   );
 }
 

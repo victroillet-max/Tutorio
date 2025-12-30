@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- Fragmented/abstract shape -->
+  <polygon points="6,32 24,8 32,24" fill="#1e3a5f"/>
+  <polygon points="32,24 40,8 58,32" fill="#2d5a8b"/>
+  <polygon points="6,32 32,24 24,56" fill="#2d5a8b"/>
+  <polygon points="32,24 58,32 40,56" fill="#1e3a5f"/>
+  <!-- Center accent -->
+  <polygon points="28,28 36,28 36,36 28,36" fill="#e76f51"/>
+</svg>
+

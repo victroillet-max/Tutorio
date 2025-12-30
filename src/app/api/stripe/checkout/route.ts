@@ -2,6 +2,9 @@ import { createClient } from "@/utils/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { getSiteUrl } from "@/lib/env";
+import { checkoutSchema, createValidationErrorResponse } from "@/lib/validation/schemas";
+import { logger, startTimer } from "@/lib/logging";
+import { applyRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
 
 // Initialize Stripe
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
@@ -12,6 +15,8 @@ const FALLBACK_PRICE_IDS: Record<string, string | undefined> = {
   basic: process.env.STRIPE_BASIC_PRICE_ID,
   advanced: process.env.STRIPE_ADVANCED_PRICE_ID,
 };
+
+const log = logger.child({ handler: "stripe/checkout" });
 
 /**
  * Get price ID for a course and tier
@@ -32,19 +37,29 @@ function getPriceId(
  * Creates a Stripe Checkout session for per-course subscription
  */
 export async function POST(request: NextRequest) {
+  const timer = startTimer();
   const supabase = await createClient();
   
   const { data: { user } } = await supabase.auth.getUser();
   
   if (!user) {
+    log.warn("Unauthorized checkout attempt");
     return NextResponse.json(
       { error: "Not authenticated" },
       { status: 401 }
     );
   }
 
+  // Apply rate limiting
+  const rateLimitResult = await applyRateLimit(request, user.id, "checkout");
+  if (rateLimitResult) {
+    log.warn("Rate limit exceeded for checkout", { userId: user.id });
+    return createRateLimitResponse(rateLimitResult);
+  }
+
   // Check if Stripe is configured
   if (!stripe) {
+    log.error("Stripe not configured");
     return NextResponse.json(
       { 
         error: "Stripe not configured",
@@ -56,22 +71,15 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { courseId, tier, upgrade } = body;
-
-    if (!courseId || !tier) {
-      return NextResponse.json(
-        { error: "Missing required parameters: courseId and tier" },
-        { status: 400 }
-      );
+    
+    // Validate input
+    const validation = checkoutSchema.safeParse(body);
+    if (!validation.success) {
+      log.warn("Checkout validation failed", { errors: validation.error.flatten() });
+      return createValidationErrorResponse(validation.error.issues);
     }
 
-    // Validate tier
-    if (!['basic', 'advanced'].includes(tier)) {
-      return NextResponse.json(
-        { error: "Invalid tier. Must be 'basic' or 'advanced'" },
-        { status: 400 }
-      );
-    }
+    const { courseId, tier, upgrade } = validation.data;
 
     // Get course details including Stripe price IDs
     const { data: course, error: courseError } = await supabase
@@ -81,6 +89,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (courseError || !course) {
+      log.warn("Course not found for checkout", { courseId });
       return NextResponse.json(
         { error: "Course not found" },
         { status: 404 }
@@ -88,8 +97,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Get the price ID for this course and tier
-    const priceId = getPriceId(course, tier as 'basic' | 'advanced');
+    const priceId = getPriceId(course, tier);
     if (!priceId) {
+      log.warn("Pricing not configured", { courseId, tier });
       return NextResponse.json(
         { 
           error: "Pricing not configured",
@@ -159,13 +169,21 @@ export async function POST(request: NextRequest) {
         }
 
         const siteUrl = getSiteUrl();
+        
+        log.info("Subscription upgraded", { 
+          userId: user.id, 
+          courseId, 
+          tier 
+        });
+        timer.log("Checkout upgrade completed");
+
         return NextResponse.json({
           success: true,
           message: "Subscription upgraded successfully",
           redirectUrl: `${siteUrl}/courses/${course.slug}?checkout=success`,
         });
       } catch (upgradeError) {
-        console.error("Subscription upgrade error:", upgradeError);
+        log.error("Subscription upgrade error", upgradeError);
         // Fall back to billing portal if upgrade fails
         return NextResponse.json({
           redirectUrl: "/api/stripe/portal",
@@ -180,6 +198,7 @@ export async function POST(request: NextRequest) {
       const currentTierSlug = Array.isArray(currentTier) ? currentTier[0]?.slug : currentTier?.slug;
       
       if (currentTierSlug === tier || (currentTierSlug === 'advanced' && tier === 'basic')) {
+        log.info("Already subscribed", { userId: user.id, courseId, currentTier: currentTierSlug });
         return NextResponse.json(
           { error: "You already have an active subscription for this course" },
           { status: 400 }
@@ -215,6 +234,7 @@ export async function POST(request: NextRequest) {
         },
       });
       customerId = customer.id;
+      log.info("Created Stripe customer", { userId: user.id, customerId });
     }
 
     const siteUrl = getSiteUrl();
@@ -244,10 +264,18 @@ export async function POST(request: NextRequest) {
           tier: tier,
         },
       },
-      success_url: `${siteUrl}/courses/${course.slug}?checkout=success`,
+      success_url: `${siteUrl}/courses/${course.slug}?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${siteUrl}/pricing?course=${course.slug}&checkout=cancelled`,
       allow_promotion_codes: true,
     });
+
+    log.info("Checkout session created", { 
+      userId: user.id, 
+      courseId, 
+      tier, 
+      sessionId: session.id 
+    });
+    timer.log("Checkout session created");
 
     return NextResponse.json({
       checkoutUrl: session.url,
@@ -255,7 +283,7 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error("Stripe checkout error:", error);
+    log.error("Stripe checkout error", error);
     return NextResponse.json(
       { 
         error: "Failed to create checkout session",
@@ -324,7 +352,7 @@ export async function GET(request: NextRequest) {
     );
 
   } catch (error) {
-    console.error("Checkout redirect error:", error);
+    log.error("Checkout redirect error", error);
     const siteUrl = getSiteUrl();
     return NextResponse.redirect(new URL("/pricing?error=checkout_failed", siteUrl));
   }

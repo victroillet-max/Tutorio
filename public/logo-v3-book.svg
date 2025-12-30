@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- Open book with rising spark (AI-powered learning) -->
+  <!-- Left page -->
+  <path d="M8 16 L32 20 L32 52 L8 48 Z" fill="#1e3a5f"/>
+  <!-- Right page -->
+  <path d="M56 16 L32 20 L32 52 L56 48 Z" fill="#2d5a8b"/>
+  <!-- Rising AI spark from book -->
+  <path d="M32 20 L32 8" stroke="#e76f51" stroke-width="3" stroke-linecap="round"/>
+  <circle cx="32" cy="6" r="4" fill="#e76f51"/>
+  <!-- Spark rays -->
+  <line x1="26" y1="10" x2="24" y2="6" stroke="#e76f51" stroke-width="2" stroke-linecap="round"/>
+  <line x1="38" y1="10" x2="40" y2="6" stroke="#e76f51" stroke-width="2" stroke-linecap="round"/>
+</svg>
+

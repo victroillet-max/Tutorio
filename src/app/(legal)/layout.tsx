@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BookOpen, ChevronLeft } from "lucide-react";
+import { ChevronLeft } from "lucide-react";
 
 export default function LegalLayout({
   children,
@@ -13,10 +13,13 @@ export default function LegalLayout({
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
-            <Link href="/" className="flex items-center gap-2 group">
-              <div className="w-9 h-9 rounded-lg bg-[var(--primary)] flex items-center justify-center transition-transform group-hover:scale-105">
-                <BookOpen className="w-4 h-4 text-white" />
-              </div>
+            <Link href="/" className="flex items-center gap-3 group">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img 
+                src="/logo-cropped.svg" 
+                alt="Tutorio" 
+                className="w-11 h-11 transition-transform duration-300 group-hover:rotate-[-5deg] group-hover:scale-105"
+              />
               <span 
                 className="text-lg font-bold tracking-tight text-[var(--foreground)]"
                 style={{ fontFamily: 'var(--font-heading)' }}

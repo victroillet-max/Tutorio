@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- Stacked knowledge blocks forming T with AI glow -->
+  <!-- Top bar of T - 3 blocks -->
+  <rect x="8" y="12" width="14" height="14" rx="3" fill="#1e3a5f"/>
+  <rect x="25" y="12" width="14" height="14" rx="3" fill="#1e3a5f"/>
+  <rect x="42" y="12" width="14" height="14" rx="3" fill="#1e3a5f"/>
+  <!-- Stem of T - 2 blocks -->
+  <rect x="25" y="29" width="14" height="14" rx="3" fill="#2d5a8b"/>
+  <rect x="25" y="46" width="14" height="14" rx="3" fill="#2d5a8b"/>
+  <!-- AI spark -->
+  <circle cx="56" cy="8" r="6" fill="#e76f51"/>
+  <circle cx="52" cy="14" r="2.5" fill="#e76f51" opacity="0.5"/>
+</svg>
+

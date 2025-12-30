@@ -19,6 +19,10 @@ import {
 import { Button } from "@/components/ui/button";
 import type { UserCourseSubscription, SubscriptionTier } from "@/lib/database.types";
 import { PlanSwitcher } from "./plan-switcher";
+import { RecoverPurchase } from "./recover-purchase";
+import { logger } from "@/lib/logging";
+
+const log = logger.child({ module: "subscriptions/page" });
 
 export const metadata = {
   title: "My Subscriptions | Tutorio",
@@ -40,7 +44,7 @@ export default async function SubscriptionsPage() {
     .rpc("get_user_subscriptions", { p_user_id: user.id });
 
   if (error) {
-    console.error("Error fetching subscriptions:", error);
+    log.error("Error fetching subscriptions", error);
   }
 
   // Get all subscription tiers for plan comparison
@@ -94,6 +98,11 @@ export default async function SubscriptionsPage() {
             </p>
           </div>
         </div>
+      )}
+
+      {/* Recover Purchase - for when webhook fails */}
+      {stripeConfigured && activeSubscriptions.length === 0 && (
+        <RecoverPurchase />
       )}
 
       {/* No Subscriptions State */}

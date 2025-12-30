@@ -123,20 +123,11 @@
     .logo-icon {
       width: 44px;
       height: 44px;
-      background: var(--primary);
-      border-radius: var(--radius);
-      display: flex;
-      align-items: center;
-      justify-content: center;
       transition: transform 0.3s ease;
     }
     
     .logo:hover .logo-icon {
       transform: rotate(-5deg) scale(1.05);
-    }
-    
-    .logo-icon svg {
-      color: white;
     }
     
     .logo-text {
@@ -1403,9 +1394,7 @@
   <nav class="nav" id="nav">
     <div class="container nav-inner">
       <a href="#" class="logo">
-        <div class="logo-icon">
-          <i data-lucide="book-open" style="width: 20px; height: 20px;"></i>
-        </div>
+        <img src="../public/logo-cropped.svg" alt="Tutorio" class="logo-icon">
         <span class="logo-text">Tutorio</span>
       </a>
       
@@ -1896,9 +1885,7 @@
       <div class="footer-grid">
         <div class="footer-brand">
           <a href="#" class="logo">
-            <div class="logo-icon">
-              <i data-lucide="book-open" style="width: 20px; height: 20px;"></i>
-            </div>
+            <img src="../public/logo.svg" alt="Tutorio" class="logo-icon">
             <span class="logo-text">Tutorio</span>
           </a>
           <p>Quality tutoring content at a fraction of the cost. Stop overpaying for private lessons.</p>

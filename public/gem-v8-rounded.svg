@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- Rounded/soft gem - friendlier feel -->
+  <path d="M32 6 Q52 6 52 26 L32 58 L12 26 Q12 6 32 6" fill="#1e3a5f"/>
+  <!-- Facet division -->
+  <path d="M12 26 L52 26" stroke="#2d5a8b" stroke-width="2"/>
+  <!-- Light side -->
+  <path d="M32 6 Q52 6 52 26 L32 26 Z" fill="#2d5a8b"/>
+  <!-- Apex accent -->
+  <ellipse cx="32" cy="10" rx="8" ry="4" fill="#e76f51"/>
+</svg>
+

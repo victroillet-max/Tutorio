@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { createClient } from "@/utils/supabase/server";
+import { logger } from "@/lib/logging";
+
+const log = logger.child({ module: "api/validate/error" });
 
 // Lazy initialization of OpenAI client to avoid build-time errors
 function getOpenAIClient() {
@@ -104,7 +107,7 @@ Please explain this error to a beginner Python student.`;
     try {
       result = JSON.parse(responseText);
     } catch {
-      console.error("Failed to parse AI response:", responseText);
+      log.error("Failed to parse AI response", undefined, { responseText });
       return NextResponse.json(
         { error: "Invalid AI response" },
         { status: 500 }
@@ -118,7 +121,7 @@ Please explain this error to a beginner Python student.`;
     });
 
   } catch (error) {
-    console.error("Error explanation failed:", error);
+    log.error("Error explanation failed", error);
     return NextResponse.json(
       { error: "Failed to explain error" },
       { status: 500 }

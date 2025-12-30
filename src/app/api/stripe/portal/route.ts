@@ -2,6 +2,9 @@ import { createClient } from "@/utils/supabase/server";
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { getSiteUrl } from "@/lib/env";
+import { logger } from "@/lib/logging";
+
+const log = logger.child({ module: "api/stripe/portal" });
 
 // Initialize Stripe
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
@@ -54,7 +57,7 @@ export async function GET() {
     return NextResponse.redirect(portalSession.url);
 
   } catch (error) {
-    console.error("Stripe portal error:", error);
+    log.error("Stripe portal error", error);
     const siteUrl = getSiteUrl();
     return NextResponse.redirect(new URL("/subscriptions?error=portal_failed", siteUrl));
   }

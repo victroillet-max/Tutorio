@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- Learning path with checkpoints - skill progression -->
+  <!-- Path line -->
+  <path d="M8 56 Q20 40 32 36 Q44 32 56 16" stroke="#1e3a5f" stroke-width="4" stroke-linecap="round" fill="none"/>
+  <!-- Milestone dots -->
+  <circle cx="8" cy="56" r="5" fill="#1e3a5f"/>
+  <circle cx="32" cy="36" r="6" fill="#2d5a8b"/>
+  <circle cx="56" cy="16" r="8" fill="#e76f51"/>
+  <!-- Star at destination -->
+  <polygon points="56,8 58,13 63,13 59,17 61,22 56,19 51,22 53,17 49,13 54,13" fill="#e76f51" opacity="0.6"/>
+</svg>
+

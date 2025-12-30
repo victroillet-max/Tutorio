@@ -4,6 +4,9 @@ import { createClient } from "@/utils/supabase/server";
 import { revalidatePath } from "next/cache";
 import { getGoogleSheetsService, isGoogleSheetsConfigured, type SheetExerciseResult, type GradingCriteria } from "./client";
 import { markActivityComplete } from "@/lib/activities/actions";
+import { logger } from "@/lib/logging";
+
+const log = logger.child({ module: "google-sheets/actions" });
 
 export interface UserSheet {
   id: string;
@@ -62,7 +65,7 @@ export async function getUserSheet(activityId: string): Promise<GetUserSheetResu
     .single();
 
   if (error && error.code !== "PGRST116") { // PGRST116 = no rows returned
-    console.error("Error fetching user sheet:", error);
+    log.error("Error fetching user sheet", error, { activityId });
     return { sheet: null, embedUrl: null, editUrl: null, needsCreation: false, error: "Failed to fetch sheet" };
   }
 
@@ -167,7 +170,7 @@ export async function createUserSheet(
     if (insertError) {
       // Clean up the created sheet if database insert fails
       await sheetsService.deleteSheet(copyResult.sheetId);
-      console.error("Failed to save sheet record:", insertError);
+      log.error("Failed to save sheet record", insertError, { activityId });
       return { success: false, error: "Failed to save sheet record" };
     }
 
@@ -192,7 +195,7 @@ export async function createUserSheet(
       editUrl: sheetsService.getEditUrl(copyResult.sheetId),
     };
   } catch (error) {
-    console.error("Error creating user sheet:", error);
+    log.error("Error creating user sheet", error, { activityId });
     return { success: false, error: error instanceof Error ? error.message : "Failed to create sheet" };
   }
 }
@@ -291,7 +294,7 @@ export async function gradeUserSheet(activityId: string): Promise<GradeSheetResu
 
     return { success: true, result, passed: result.passed };
   } catch (error) {
-    console.error("Error grading sheet:", error);
+    log.error("Error grading sheet", error, { activityId });
     return { success: false, error: error instanceof Error ? error.message : "Failed to grade sheet" };
   }
 }

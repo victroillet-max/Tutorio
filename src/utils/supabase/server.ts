@@ -1,5 +1,8 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { logger } from "@/lib/logging";
+
+const log = logger.child({ module: "supabase/server" });
 
 export async function createClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -7,7 +10,7 @@ export async function createClient() {
 
   // Validate environment variables
   if (!supabaseUrl || !supabaseAnonKey) {
-    console.error("Missing Supabase environment variables:", {
+    log.error("Missing Supabase environment variables", undefined, {
       hasUrl: !!supabaseUrl,
       hasAnonKey: !!supabaseAnonKey,
     });
@@ -18,7 +21,7 @@ export async function createClient() {
   try {
     new URL(supabaseUrl);
   } catch {
-    console.error("Invalid NEXT_PUBLIC_SUPABASE_URL format:", supabaseUrl);
+    log.error("Invalid NEXT_PUBLIC_SUPABASE_URL format", undefined, { supabaseUrl });
     throw new Error("NEXT_PUBLIC_SUPABASE_URL is not a valid URL.");
   }
 

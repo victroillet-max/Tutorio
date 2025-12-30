@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- Abstract crystalline gem -->
+  <!-- Main crystal -->
+  <polygon points="24,4 44,10 48,40 32,60 16,40 20,10" fill="#1e3a5f"/>
+  <!-- Facet highlights -->
+  <polygon points="24,4 44,10 36,30 28,30 20,10" fill="#2d5a8b"/>
+  <!-- Inner facet -->
+  <polygon points="28,30 36,30 32,60" fill="#152a45"/>
+  <!-- Side accents -->
+  <polygon points="44,10 48,40 36,30" fill="#152a45"/>
+  <polygon points="20,10 16,40 28,30" fill="#0f1f30"/>
+  <!-- Top sparkle -->
+  <polygon points="32,4 36,8 32,12 28,8" fill="#e76f51"/>
+</svg>
+

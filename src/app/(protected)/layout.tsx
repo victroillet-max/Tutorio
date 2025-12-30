@@ -62,9 +62,12 @@ export default async function ProtectedLayout({
         <div className="max-w-7xl mx-auto h-full px-4 sm:px-6 lg:px-8 flex items-center justify-between">
           {/* Logo */}
           <Link href="/dashboard" className="flex items-center gap-3 group">
-            <div className="w-10 h-10 rounded-xl bg-[var(--primary)] flex items-center justify-center transition-transform group-hover:rotate-[-5deg] group-hover:scale-105">
-              <BookOpen className="w-5 h-5 text-white" />
-            </div>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img 
+              src="/logo-cropped.svg" 
+              alt="Tutorio" 
+              className="w-11 h-11 transition-transform duration-300 group-hover:rotate-[-5deg] group-hover:scale-105"
+            />
             <span 
               className="text-lg font-bold tracking-tight text-[var(--foreground)] hidden sm:block"
               style={{ fontFamily: 'var(--font-heading)' }}

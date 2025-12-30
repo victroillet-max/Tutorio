@@ -1,6 +1,7 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
+import { logger, startTimer } from "@/lib/logging";
 
 // Initialize Stripe
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
@@ -13,6 +14,8 @@ const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type SupabaseServiceClient = SupabaseClient<any, "public", any>;
+
+const log = logger.child({ handler: "stripe/webhook" });
 
 /**
  * Retry wrapper for Stripe API calls
@@ -88,8 +91,10 @@ async function markEventProcessed(
  * Handles Stripe webhook events for subscription management
  */
 export async function POST(request: NextRequest) {
+  const timer = startTimer();
+  
   if (!stripe || !webhookSecret) {
-    console.error("Stripe webhook not configured");
+    log.error("Stripe webhook not configured");
     return NextResponse.json(
       { error: "Webhook not configured" },
       { status: 501 }
@@ -97,7 +102,7 @@ export async function POST(request: NextRequest) {
   }
 
   if (!supabaseServiceKey) {
-    console.error("Supabase service role key not configured");
+    log.error("Supabase service role key not configured");
     return NextResponse.json(
       { error: "Server configuration error" },
       { status: 500 }
@@ -122,7 +127,7 @@ export async function POST(request: NextRequest) {
   try {
     event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
   } catch (err) {
-    console.error("Webhook signature verification failed:", err);
+    log.error("Webhook signature verification failed", err);
     return NextResponse.json(
       { error: "Invalid signature" },
       { status: 400 }
@@ -132,9 +137,11 @@ export async function POST(request: NextRequest) {
   // Idempotency check: Skip if event was already processed
   const alreadyProcessed = await isEventProcessed(supabase, event.id);
   if (alreadyProcessed) {
-    console.log(`Event ${event.id} already processed, skipping`);
+    log.info("Event already processed, skipping", { eventId: event.id, eventType: event.type });
     return NextResponse.json({ received: true, skipped: true });
   }
+  
+  log.info("Processing webhook event", { eventId: event.id, eventType: event.type });
 
   try {
     switch (event.type) {
@@ -169,16 +176,17 @@ export async function POST(request: NextRequest) {
       }
 
       default:
-        console.log(`Unhandled event type: ${event.type}`);
+        log.debug("Unhandled event type", { eventType: event.type });
     }
 
     // Mark event as processed after successful handling
     await markEventProcessed(supabase, event.id, event.type);
 
+    timer.log("Webhook processed", { eventId: event.id, eventType: event.type });
     return NextResponse.json({ received: true });
 
   } catch (error) {
-    console.error("Webhook handler error:", error);
+    log.error("Webhook handler error", error, { eventId: event.id, eventType: event.type });
     // Don't mark as processed on error - Stripe will retry
     return NextResponse.json(
       { error: "Webhook handler failed" },
@@ -198,14 +206,14 @@ async function handleCheckoutCompleted(
   const { supabase_user_id, course_id, tier } = session.metadata || {};
 
   if (!supabase_user_id || !course_id || !tier) {
-    console.error("Missing metadata in checkout session:", session.id);
+    log.error("Missing metadata in checkout session", undefined, { sessionId: session.id });
     return;
   }
 
   // Get the subscription from Stripe
   const stripeSubscriptionId = session.subscription as string;
   if (!stripeSubscriptionId) {
-    console.error("No subscription in checkout session:", session.id);
+    log.error("No subscription in checkout session", undefined, { sessionId: session.id });
     return;
   }
 
@@ -224,7 +232,7 @@ async function handleCheckoutCompleted(
     .single();
 
   if (tierError || !tierData) {
-    console.error("Failed to find tier:", tier, tierError);
+    log.error("Failed to find tier", tierError, { tier });
     return;
   }
 
@@ -246,11 +254,18 @@ async function handleCheckoutCompleted(
     });
 
   if (subError) {
-    console.error("Failed to create/update subscription:", subError);
+    log.error("Failed to create/update subscription", subError, { 
+      userId: supabase_user_id, 
+      courseId: course_id 
+    });
     return;
   }
 
-  console.log(`Subscription created/updated for user ${supabase_user_id} on course ${course_id}`);
+  log.info("Subscription created/updated", { 
+    userId: supabase_user_id, 
+    courseId: course_id, 
+    tier 
+  });
 }
 
 /**
@@ -268,7 +283,9 @@ async function handleSubscriptionUpdated(
     .single();
 
   if (!existingSub) {
-    console.error("Could not find subscription to update:", subscription.id);
+    log.error("Could not find subscription to update", undefined, { 
+      stripeSubscriptionId: subscription.id 
+    });
     return;
   }
 
@@ -323,9 +340,14 @@ async function handleSubscriptionUpdated(
     .eq("stripe_subscription_id", subscription.id);
 
   if (error) {
-    console.error("Failed to update subscription:", error);
+    log.error("Failed to update subscription", error, { 
+      stripeSubscriptionId: subscription.id 
+    });
   } else if (tierId) {
-    console.log(`Subscription ${subscription.id} tier updated to ${newTierSlug}`);
+    log.info("Subscription tier updated", { 
+      stripeSubscriptionId: subscription.id, 
+      newTier: newTierSlug 
+    });
   }
 }
 
@@ -346,7 +368,13 @@ async function handleSubscriptionDeleted(
     .eq("stripe_subscription_id", subscription.id);
 
   if (error) {
-    console.error("Failed to mark subscription as expired:", error);
+    log.error("Failed to mark subscription as expired", error, { 
+      stripeSubscriptionId: subscription.id 
+    });
+  } else {
+    log.info("Subscription marked as expired", { 
+      stripeSubscriptionId: subscription.id 
+    });
   }
 }
 
@@ -385,7 +413,11 @@ async function handlePaymentSucceeded(
     .eq("stripe_subscription_id", subscriptionId);
 
   if (error) {
-    console.error("Failed to update subscription after payment:", error);
+    log.error("Failed to update subscription after payment", error, { 
+      stripeSubscriptionId: subscriptionId 
+    });
+  } else {
+    log.info("Subscription renewed", { stripeSubscriptionId: subscriptionId });
   }
 }
 
@@ -413,7 +445,13 @@ async function handlePaymentFailed(
     .eq("stripe_subscription_id", subscriptionId);
 
   if (error) {
-    console.error("Failed to mark subscription as past_due:", error);
+    log.error("Failed to mark subscription as past_due", error, { 
+      stripeSubscriptionId: subscriptionId 
+    });
+  } else {
+    log.warn("Subscription marked as past_due due to payment failure", { 
+      stripeSubscriptionId: subscriptionId 
+    });
   }
 }
 

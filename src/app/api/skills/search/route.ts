@@ -1,5 +1,8 @@
 import { createClient } from "@/utils/supabase/server";
 import { NextRequest } from "next/server";
+import { logger } from "@/lib/logging";
+
+const log = logger.child({ module: "api/skills/search" });
 
 export async function GET(request: NextRequest) {
   try {
@@ -20,7 +23,7 @@ export async function GET(request: NextRequest) {
     });
 
     if (error) {
-      console.error("Search error:", error);
+      log.error("Search error", error, { query });
       return new Response(JSON.stringify({ error: "Search failed" }), {
         status: 500,
         headers: { "Content-Type": "application/json" },
@@ -40,7 +43,7 @@ export async function GET(request: NextRequest) {
       headers: { "Content-Type": "application/json" },
     });
   } catch (error) {
-    console.error("Search error:", error);
+    log.error("Search error", error);
     return new Response(JSON.stringify({ error: "Internal server error" }), {
       status: 500,
       headers: { "Content-Type": "application/json" },

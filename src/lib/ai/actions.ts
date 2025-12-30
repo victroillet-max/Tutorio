@@ -8,6 +8,9 @@ import type {
   AIUsage,
   UserRateLimit,
 } from "@/lib/database.types";
+import { logger } from "@/lib/logging";
+
+const log = logger.child({ module: "ai/actions" });
 
 /**
  * Get user's rate limit information
@@ -26,7 +29,7 @@ export async function getUserRateLimit(): Promise<UserRateLimit> {
     });
 
   if (error) {
-    console.error("Failed to get rate limit:", error);
+    log.error("Failed to get rate limit", error);
     throw new Error("Failed to get rate limit");
   }
 
@@ -57,7 +60,7 @@ export async function canSendMessage(): Promise<boolean> {
     });
 
   if (error) {
-    console.error("Failed to check rate limit:", error);
+    log.error("Failed to check rate limit", error);
     return false;
   }
 
@@ -91,7 +94,7 @@ export async function createConversation(
     .single();
 
   if (error) {
-    console.error("Failed to create conversation:", error);
+    log.error("Failed to create conversation", error);
     throw new Error("Failed to create conversation");
   }
 
@@ -118,7 +121,7 @@ export async function getConversations(limit: number = 20): Promise<ChatConversa
     .limit(limit);
 
   if (error) {
-    console.error("Failed to fetch conversations:", error);
+    log.error("Failed to fetch conversations", error);
     throw new Error("Failed to fetch conversations");
   }
 
@@ -147,7 +150,7 @@ export async function getConversationMessages(
     .limit(limit);
 
   if (error) {
-    console.error("Failed to fetch messages:", error);
+    log.error("Failed to fetch messages", error, { conversationId });
     throw new Error("Failed to fetch messages");
   }
 
@@ -198,7 +201,7 @@ export async function addMessage(
     .single();
 
   if (error) {
-    console.error("Failed to add message:", error);
+    log.error("Failed to add message", error, { conversationId, role });
     throw new Error("Failed to add message");
   }
 
@@ -228,7 +231,7 @@ export async function updateConversationTitle(
     .single();
 
   if (error) {
-    console.error("Failed to update conversation:", error);
+    log.error("Failed to update conversation", error, { conversationId });
     throw new Error("Failed to update conversation");
   }
 
@@ -253,7 +256,7 @@ export async function archiveConversation(conversationId: string): Promise<void>
     .eq("user_id", user.id);
 
   if (error) {
-    console.error("Failed to archive conversation:", error);
+    log.error("Failed to archive conversation", error, { conversationId });
     throw new Error("Failed to archive conversation");
   }
 
@@ -278,7 +281,7 @@ export async function deleteConversation(conversationId: string): Promise<void> 
     .eq("user_id", user.id);
 
   if (error) {
-    console.error("Failed to delete conversation:", error);
+    log.error("Failed to delete conversation", error, { conversationId });
     throw new Error("Failed to delete conversation");
   }
 
@@ -302,7 +305,7 @@ export async function getAISkillContext() {
     });
 
   if (error) {
-    console.error("Failed to get skill context:", error);
+    log.error("Failed to get skill context", error);
     throw new Error("Failed to get skill context");
   }
 
@@ -335,7 +338,7 @@ export async function getUsageStats(): Promise<AIUsage | null> {
     .single();
 
   if (error && error.code !== "PGRST116") {
-    console.error("Failed to get usage stats:", error);
+    log.error("Failed to get usage stats", error);
     throw new Error("Failed to get usage stats");
   }
 
@@ -365,7 +368,7 @@ export async function getConversationWithContext(conversationId: string) {
     .single();
 
   if (error) {
-    console.error("Failed to get conversation:", error);
+    log.error("Failed to get conversation", error, { conversationId });
     throw new Error("Failed to get conversation");
   }
 
@@ -392,10 +395,48 @@ export async function hasUserChatHistory(): Promise<boolean> {
     .gt("message_count", 0);
 
   if (error) {
-    console.error("Failed to check chat history:", error);
+    log.error("Failed to check chat history", error);
     return false;
   }
 
   return (count ?? 0) > 0;
+}
+
+/**
+ * Get course info for a skill (used to display course name in chat widget)
+ */
+export async function getSkillCourseInfo(skillId: string): Promise<{
+  courseName: string;
+  courseId: string;
+} | null> {
+  const supabase = await createClient();
+  
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    return null;
+  }
+
+  // Get skill with its course
+  const { data, error } = await supabase
+    .from("skills")
+    .select(`
+      course_id,
+      course:courses(id, title)
+    `)
+    .eq("id", skillId)
+    .single();
+
+  if (error || !data || !data.course) {
+    log.error("Failed to get skill course info", error);
+    return null;
+  }
+
+  // Handle both array and single object responses
+  const course = Array.isArray(data.course) ? data.course[0] : data.course;
+  
+  return {
+    courseName: course.title,
+    courseId: course.id,
+  };
 }
 

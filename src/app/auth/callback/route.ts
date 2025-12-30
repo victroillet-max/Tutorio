@@ -1,5 +1,8 @@
 import { createClient } from "@/utils/supabase/server";
 import { NextResponse } from "next/server";
+import { logger } from "@/lib/logging";
+
+const log = logger.child({ module: "auth/callback" });
 
 /**
  * Auth callback handler for Supabase OAuth and magic link authentication
@@ -14,7 +17,7 @@ export async function GET(request: Request) {
 
   // Handle OAuth/magic link errors
   if (error) {
-    console.error("Auth callback error:", error, errorDescription);
+    log.error("Auth callback error", undefined, { error, errorDescription });
     const errorMessage = encodeURIComponent(errorDescription || error);
     return NextResponse.redirect(`${origin}/login?error=${errorMessage}`);
   }
@@ -25,7 +28,7 @@ export async function GET(request: Request) {
     const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
 
     if (exchangeError) {
-      console.error("Code exchange error:", exchangeError.message);
+      log.error("Code exchange error", new Error(exchangeError.message));
       const errorMessage = encodeURIComponent(exchangeError.message);
       return NextResponse.redirect(`${origin}/login?error=${errorMessage}`);
     }

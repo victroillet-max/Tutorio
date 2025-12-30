@@ -9,6 +9,9 @@
  */
 
 import { google, sheets_v4, drive_v3 } from 'googleapis';
+import { logger } from '@/lib/logging';
+
+const log = logger.child({ module: 'google-sheets/client' });
 
 // Types for our Google Sheets integration
 export interface SheetCellValue {
@@ -101,7 +104,7 @@ export class GoogleSheetsService {
     sheetTitle: string
   ): Promise<CopySheetResult> {
     try {
-      console.log('[GoogleSheets] Creating sheet for user:', {
+      log.debug('Creating sheet for user', {
         templateSheetId,
         sheetTitle,
         targetFolderId: this.folderId || 'NOT SET',
@@ -128,7 +131,7 @@ export class GoogleSheetsService {
         throw new Error('Failed to create sheet - no ID returned');
       }
 
-      console.log('[GoogleSheets] Created new sheet in folder:', newSheetId);
+      log.debug('Created new sheet in folder', { sheetId: newSheetId });
 
       // Step 2: Get the template sheet structure and data
       const templateInfo = await this.sheets.spreadsheets.get({
@@ -205,7 +208,7 @@ export class GoogleSheetsService {
             });
           }
         } catch (copyErr) {
-          console.warn(`[GoogleSheets] Could not copy data for sheet "${sheetName}":`, copyErr);
+          log.warn(`Could not copy data for sheet "${sheetName}"`, { error: copyErr });
         }
       }
 
@@ -233,7 +236,7 @@ export class GoogleSheetsService {
 
       const sheetUrl = `https://docs.google.com/spreadsheets/d/${newSheetId}/edit`;
 
-      console.log('[GoogleSheets] Sheet ready:', sheetUrl);
+      log.info('Sheet ready', { sheetUrl });
 
       return {
         sheetId: newSheetId,
@@ -241,7 +244,7 @@ export class GoogleSheetsService {
         title: sheetTitle,
       };
     } catch (error) {
-      console.error('Error creating user sheet:', error);
+      log.error('Error creating user sheet', error);
       throw new Error(`Failed to create sheet copy: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -284,7 +287,7 @@ export class GoogleSheetsService {
 
       return results;
     } catch (error) {
-      console.error('Error reading cell values:', error);
+      log.error('Error reading cell values', error, { spreadsheetId });
       throw new Error(`Failed to read sheet values: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
@@ -422,7 +425,7 @@ export class GoogleSheetsService {
         fileId: spreadsheetId,
       });
     } catch (error) {
-      console.error('Error deleting sheet:', error);
+      log.warn('Error deleting sheet', { spreadsheetId, error });
       // Don't throw - deletion failures shouldn't break the flow
     }
   }

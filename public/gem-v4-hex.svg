@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- Hexagonal gem - 6 sided -->
+  <!-- Top crown -->
+  <polygon points="32,4 48,12 56,28 48,44 32,52 16,44 8,28 16,12" fill="none"/>
+  <!-- Upper facets -->
+  <polygon points="32,4 48,12 32,28" fill="#2d5a8b"/>
+  <polygon points="32,4 16,12 32,28" fill="#1e3a5f"/>
+  <!-- Side facets -->
+  <polygon points="48,12 56,28 32,28" fill="#1e3a5f"/>
+  <polygon points="16,12 8,28 32,28" fill="#152a45"/>
+  <!-- Lower facets -->
+  <polygon points="56,28 48,44 32,28" fill="#152a45"/>
+  <polygon points="8,28 16,44 32,28" fill="#0f1f30"/>
+  <!-- Bottom -->
+  <polygon points="48,44 32,52 32,28" fill="#1e3a5f"/>
+  <polygon points="16,44 32,52 32,28" fill="#152a45"/>
+  <!-- Crown accent -->
+  <polygon points="32,4 38,8 32,12 26,8" fill="#e76f51"/>
+</svg>
+

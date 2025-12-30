@@ -2,7 +2,6 @@ import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { 
-  BookOpen, 
   ChevronLeft,
   LogOut
 } from "lucide-react";
@@ -43,10 +42,13 @@ export default async function AdminLayout({
       <aside className="fixed left-0 top-0 bottom-0 w-64 bg-white border-r border-[var(--border)] flex flex-col shadow-sm z-50">
         {/* Logo */}
         <div className="h-16 px-6 flex items-center border-b border-[var(--border)]">
-          <Link href="/admin" className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-[var(--primary)] flex items-center justify-center">
-              <BookOpen className="w-4 h-4 text-white" />
-            </div>
+          <Link href="/admin" className="flex items-center gap-3 group">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img 
+              src="/logo-cropped.svg" 
+              alt="Tutorio" 
+              className="w-11 h-11 transition-transform duration-300 group-hover:rotate-[-5deg] group-hover:scale-105"
+            />
             <div>
               <span 
                 className="text-lg font-bold tracking-tight text-[var(--foreground)]"

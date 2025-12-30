@@ -178,9 +178,12 @@ function Navigation() {
           <div className="flex items-center justify-between">
             {/* Logo */}
             <Link href="/" className="flex items-center gap-3 group">
-              <div className="w-11 h-11 rounded-xl bg-[var(--primary)] flex items-center justify-center transition-transform group-hover:rotate-[-5deg] group-hover:scale-105">
-                <BookOpen className="w-5 h-5 text-white" />
-              </div>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img 
+                src="/logo-cropped.svg" 
+                alt="Tutorio" 
+                className="w-11 h-11 transition-transform duration-300 group-hover:rotate-[-5deg] group-hover:scale-105"
+              />
               <span 
                 className="text-2xl font-bold tracking-tight text-[var(--foreground)]"
                 style={{ fontFamily: 'var(--font-heading)', letterSpacing: '-0.02em' }}
@@ -283,10 +286,38 @@ function Navigation() {
 function HeroSection() {
   return (
     <section className="relative min-h-screen flex items-center pt-24 overflow-hidden">
-      {/* Background Elements */}
-      <div className="absolute inset-0 -z-10">
-        <div className="absolute top-[-20%] right-[-10%] w-[60%] h-[120%] bg-gradient-to-br from-[var(--primary)] via-[var(--primary-light)] to-[var(--accent)] opacity-[0.06] rounded-[0_0_0_40%]" />
+      {/* Background Elements - Partial grey/blue gradient background like prototype */}
+      <div className="absolute inset-0 -z-10 overflow-hidden">
+        {/* Main background shape - matching prototype: gradient from primary to accent with curve */}
+        <div 
+          className="absolute"
+          style={{
+            top: '-20%',
+            right: '-10%',
+            width: '60%',
+            height: '120%',
+            background: 'linear-gradient(135deg, #1e3a5f 0%, #2d5a8b 50%, #e76f51 100%)',
+            opacity: 0.06,
+            borderRadius: '0 0 0 40%',
+          }}
+        />
+        {/* Secondary visible grey layer for more visibility */}
+        <div 
+          className="absolute"
+          style={{
+            top: 0,
+            right: 0,
+            width: '55%',
+            height: '100%',
+            background: 'linear-gradient(135deg, #e8e5df 0%, #f5f3ef 100%)',
+            opacity: 0.8,
+            borderRadius: '0 0 0 50%',
+            zIndex: -1,
+          }}
+        />
+        {/* Accent glow - bottom left */}
         <div className="absolute bottom-[10%] left-[-5%] w-[400px] h-[400px] bg-[var(--accent)] opacity-5 rounded-full blur-[80px]" />
+        {/* Primary glow - center right */}
         <div className="absolute top-[20%] right-[30%] w-[300px] h-[300px] bg-[var(--primary)] opacity-[0.04] rounded-full blur-[60px]" />
       </div>
 
@@ -300,8 +331,8 @@ function HeroSection() {
             </div>
 
             <h1 
-              className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight mb-6 text-[var(--foreground)]"
-              style={{ fontFamily: 'var(--font-heading)', letterSpacing: '-0.03em', lineHeight: 1.2 }}
+              className="text-4xl sm:text-5xl lg:text-6xl font-bold mb-6 text-[var(--foreground)]"
+              style={{ letterSpacing: '-0.03em', lineHeight: 1.2 }}
             >
               Stop Overpaying
               <br />
@@ -869,9 +900,12 @@ function Footer() {
           {/* Brand */}
           <div className="lg:col-span-1">
             <Link href="/" className="flex items-center gap-3 mb-4 group">
-              <div className="w-11 h-11 rounded-xl bg-[var(--primary)] flex items-center justify-center transition-transform group-hover:rotate-[-5deg] group-hover:scale-105">
-                <BookOpen className="w-5 h-5 text-white" />
-              </div>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img 
+                src="/logo-cropped.svg" 
+                alt="Tutorio" 
+                className="w-11 h-11 transition-transform duration-300 group-hover:rotate-[-5deg] group-hover:scale-105"
+              />
               <span 
                 className="text-xl font-bold tracking-tight text-[var(--foreground)]"
                 style={{ fontFamily: 'var(--font-heading)' }}

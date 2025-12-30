@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- Multi-faceted brilliant cut -->
+  <!-- Crown top -->
+  <polygon points="32,4 44,12 32,16 20,12" fill="#e76f51"/>
+  <!-- Upper crown facets -->
+  <polygon points="32,16 44,12 50,20 32,24" fill="#2d5a8b"/>
+  <polygon points="32,16 20,12 14,20 32,24" fill="#1e3a5f"/>
+  <!-- Girdle facets -->
+  <polygon points="50,20 52,32 38,36 32,24" fill="#1e3a5f"/>
+  <polygon points="14,20 12,32 26,36 32,24" fill="#152a45"/>
+  <!-- Pavilion -->
+  <polygon points="38,36 52,32 32,58" fill="#152a45"/>
+  <polygon points="26,36 12,32 32,58" fill="#0f1f30"/>
+  <polygon points="38,36 26,36 32,58 32,24" fill="#1e3a5f"/>
+</svg>
+

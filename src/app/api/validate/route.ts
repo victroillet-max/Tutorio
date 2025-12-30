@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { createClient } from "@/utils/supabase/server";
+import { logger } from "@/lib/logging";
+
+const log = logger.child({ module: "api/validate" });
 
 // Lazy initialization of OpenAI client to avoid build-time errors
 function getOpenAIClient() {
@@ -125,7 +128,7 @@ Evaluate if this code meets the exercise requirements. Be specific about what's 
     try {
       result = JSON.parse(responseText);
     } catch {
-      console.error("Failed to parse AI response:", responseText);
+      log.error("Failed to parse AI response", undefined, { responseText });
       return NextResponse.json(
         { error: "Invalid AI response format" },
         { status: 500 }
@@ -148,7 +151,7 @@ Evaluate if this code meets the exercise requirements. Be specific about what's 
     return NextResponse.json(validatedResult);
 
   } catch (error) {
-    console.error("Validation error:", error);
+    log.error("Validation error", error);
     
     // Handle specific OpenAI errors
     if (error instanceof OpenAI.APIError) {

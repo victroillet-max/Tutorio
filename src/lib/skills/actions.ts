@@ -9,6 +9,9 @@ import type {
   SkillCategory,
   DiagnosticResult,
 } from "@/lib/database.types";
+import { logger } from "@/lib/logging";
+
+const log = logger.child({ module: "skills/actions" });
 
 /**
  * Get all skills with user progress
@@ -30,7 +33,7 @@ export async function getSkillsWithProgress(): Promise<SkillWithProgress[]> {
     .order("sort_order");
 
   if (skillsError) {
-    console.error("Failed to fetch skills:", skillsError);
+    log.error("Failed to fetch skills", skillsError);
     throw new Error("Failed to fetch skills");
   }
 
@@ -41,7 +44,7 @@ export async function getSkillsWithProgress(): Promise<SkillWithProgress[]> {
     .eq("user_id", user.id);
 
   if (progressError) {
-    console.error("Failed to fetch skill progress:", progressError);
+    log.error("Failed to fetch skill progress", progressError);
     throw new Error("Failed to fetch skill progress");
   }
 
@@ -68,7 +71,7 @@ export async function getSkillsByCategory(category: SkillCategory): Promise<Skil
     .order("sort_order");
 
   if (error) {
-    console.error("Failed to fetch skills by category:", error);
+    log.error("Failed to fetch skills by category", error, { category });
     throw new Error("Failed to fetch skills");
   }
 
@@ -93,7 +96,7 @@ export async function getSkillPrerequisites(skillId: string) {
     });
 
   if (error) {
-    console.error("Failed to fetch skill prerequisites:", error);
+    log.error("Failed to fetch skill prerequisites", error, { skillId });
     throw new Error("Failed to fetch skill prerequisites");
   }
 
@@ -117,7 +120,7 @@ export async function getStrugglingSkills() {
     });
 
   if (error) {
-    console.error("Failed to fetch struggling skills:", error);
+    log.error("Failed to fetch struggling skills", error);
     throw new Error("Failed to fetch struggling skills");
   }
 
@@ -141,7 +144,7 @@ export async function getUserSkillMastery() {
     });
 
   if (error) {
-    console.error("Failed to fetch skill mastery:", error);
+    log.error("Failed to fetch skill mastery", error);
     throw new Error("Failed to fetch skill mastery");
   }
 
@@ -166,7 +169,7 @@ export async function updateSkillMastery(skillId: string): Promise<number> {
     });
 
   if (error) {
-    console.error("Failed to calculate skill mastery:", error);
+    log.error("Failed to calculate skill mastery", error, { skillId });
     throw new Error("Failed to calculate skill mastery");
   }
 
@@ -226,7 +229,7 @@ export async function updateSkillProgressFromQuestion(
     .single();
 
   if (error) {
-    console.error("Failed to update skill progress:", error);
+    log.error("Failed to update skill progress", error, { skillId, isCorrect });
     throw new Error("Failed to update skill progress");
   }
 
@@ -245,7 +248,7 @@ export async function searchSkills(query: string): Promise<Skill[]> {
     });
 
   if (error) {
-    console.error("Failed to search skills:", error);
+    log.error("Failed to search skills", error, { query });
     throw new Error("Failed to search skills");
   }
 
@@ -281,7 +284,7 @@ export async function getActivitiesForSkill(skillId: string) {
     .order("is_primary", { ascending: false });
 
   if (error) {
-    console.error("Failed to fetch activities for skill:", error);
+    log.error("Failed to fetch activities for skill", error, { skillId });
     throw new Error("Failed to fetch activities for skill");
   }
 
@@ -322,7 +325,7 @@ export async function saveDiagnosticResult(
     .single();
 
   if (error) {
-    console.error("Failed to save diagnostic result:", error);
+    log.error("Failed to save diagnostic result", error, { skillCluster });
     throw new Error("Failed to save diagnostic result");
   }
 
@@ -356,7 +359,7 @@ export async function getDiagnosticHistory(skillCluster?: string) {
   const { data, error } = await query;
 
   if (error) {
-    console.error("Failed to fetch diagnostic history:", error);
+    log.error("Failed to fetch diagnostic history", error, { skillCluster });
     throw new Error("Failed to fetch diagnostic history");
   }
 
@@ -380,7 +383,7 @@ export async function getSkillTree() {
     .order("sort_order");
 
   if (skillsError) {
-    console.error("Failed to fetch skills:", skillsError);
+    log.error("Failed to fetch skills", skillsError);
     throw new Error("Failed to fetch skills");
   }
 
@@ -390,7 +393,7 @@ export async function getSkillTree() {
     .select("*");
 
   if (prereqError) {
-    console.error("Failed to fetch prerequisites:", prereqError);
+    log.error("Failed to fetch prerequisites", prereqError);
     throw new Error("Failed to fetch prerequisites");
   }
 
@@ -495,7 +498,7 @@ export async function getCourseSkills(courseId: string) {
     });
 
   if (error) {
-    console.error("Failed to fetch course skills:", error);
+    log.error("Failed to fetch course skills", error, { courseId });
     throw new Error("Failed to fetch course skills");
   }
 
@@ -517,7 +520,7 @@ export async function getCourseFoundations(courseId: string) {
     });
 
   if (error) {
-    console.error("Failed to fetch course foundations:", error);
+    log.error("Failed to fetch course foundations", error, { courseId });
     throw new Error("Failed to fetch course foundations");
   }
 
@@ -539,7 +542,7 @@ export async function getCourseCodingSkills(courseId: string) {
     });
 
   if (error) {
-    console.error("Failed to fetch course coding skills:", error);
+    log.error("Failed to fetch course coding skills", error, { courseId });
     throw new Error("Failed to fetch course coding skills");
   }
 
@@ -572,7 +575,7 @@ export async function getCourseSkillProgress(courseId: string) {
     });
 
   if (error) {
-    console.error("Failed to fetch course skill progress:", error);
+    log.error("Failed to fetch course skill progress", error, { courseId });
     throw new Error("Failed to fetch course skill progress");
   }
 
@@ -605,7 +608,7 @@ export async function enrollInCourse(courseId: string) {
     });
 
   if (error) {
-    console.error("Failed to enroll in course:", error);
+    log.error("Failed to enroll in course", error, { courseId });
     throw new Error("Failed to enroll in course");
   }
 
@@ -632,7 +635,7 @@ export async function getEnrolledCourses() {
     });
 
   if (error) {
-    console.error("Failed to fetch enrolled courses:", error);
+    log.error("Failed to fetch enrolled courses", error);
     throw new Error("Failed to fetch enrolled courses");
   }
 

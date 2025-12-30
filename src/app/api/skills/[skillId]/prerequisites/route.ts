@@ -1,5 +1,8 @@
 import { createClient } from "@/utils/supabase/server";
 import { NextRequest } from "next/server";
+import { logger } from "@/lib/logging";
+
+const log = logger.child({ module: "api/skills/prerequisites" });
 
 export async function GET(
   request: NextRequest,
@@ -24,7 +27,7 @@ export async function GET(
     });
 
     if (error) {
-      console.error("Prerequisites error:", error);
+      log.error("Prerequisites error", error, { skillId });
       return new Response(JSON.stringify({ error: "Failed to get prerequisites" }), {
         status: 500,
         headers: { "Content-Type": "application/json" },
@@ -50,7 +53,7 @@ export async function GET(
       headers: { "Content-Type": "application/json" },
     });
   } catch (error) {
-    console.error("Prerequisites error:", error);
+    log.error("Prerequisites error", error);
     return new Response(JSON.stringify({ error: "Internal server error" }), {
       status: 500,
       headers: { "Content-Type": "application/json" },

@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tutorio Gem Variations</title>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #1e3a5f;
+      --accent: #e76f51;
+      --background: #faf9f7;
+    }
+    
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--background);
+      padding: 48px;
+    }
+    
+    h1 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 2rem;
+      margin-bottom: 8px;
+    }
+    
+    .subtitle {
+      color: #5a5a6e;
+      margin-bottom: 48px;
+    }
+    
+    .logo-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 20px;
+    }
+    
+    .logo-card {
+      background: white;
+      border-radius: 16px;
+      padding: 16px;
+      border: 1px solid #e8e5df;
+      text-align: center;
+      transition: all 0.2s ease;
+    }
+    
+    .logo-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 24px rgba(30, 58, 95, 0.12);
+    }
+    
+    .logo-display {
+      background: var(--background);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100px;
+    }
+    
+    .logo-display.dark {
+      background: var(--primary);
+    }
+    
+    .logo-display img {
+      width: 64px;
+      height: 64px;
+    }
+    
+    .logo-card h3 {
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+    
+    .logo-card p {
+      font-size: 0.7rem;
+      color: #5a5a6e;
+    }
+  </style>
+</head>
+<body>
+  <h1>Faceted Gem Variations</h1>
+  <p class="subtitle">12 versions exploring the gem/crystal concept</p>
+  
+  <div class="logo-grid">
+    <div class="logo-card">
+      <div class="logo-display">
+        <img src="gem-v1-classic.svg" alt="">
+      </div>
+      <h3>Classic</h3>
+      <p>Original refined diamond</p>
+    </div>
+    
+    <div class="logo-card">
+      <div class="logo-display">
+        <img src="gem-v2-wide.svg" alt="">
+      </div>
+      <h3>Wide Brilliant</h3>
+      <p>Expanded facets</p>
+    </div>
+    
+    <div class="logo-card">
+      <div class="logo-display">
+        <img src="gem-v3-tall.svg" alt="">
+      </div>
+      <h3>Tall Elegant</h3>
+      <p>Elongated form</p>
+    </div>
+    
+    <div class="logo-card">
+      <div class="logo-display">
+        <img src="gem-v4-hex.svg" alt="">
+      </div>
+      <h3>Hexagonal</h3>
+      <p>6-sided crystal</p>
+    </div>
+    
+    <div class="logo-card">
+      <div class="logo-display">
+        <img src="gem-v5-minimal.svg" alt="">
+      </div>
+      <h3>Minimal Line</h3>
+      <p>Outline only</p>
+    </div>
+    
+    <div class="logo-card">
+      <div class="logo-display">
+        <img src="gem-v6-glow.svg" alt="">
+      </div>
+      <h3>Glowing</h3>
+      <p>With soft glow</p>
+    </div>
+    
+    <div class="logo-card">
+      <div class="logo-display">
+        <img src="gem-v7-multi.svg" alt="">
+      </div>
+      <h3>Multi-Facet</h3>
+      <p>Brilliant cut</p>
+    </div>
+    
+    <div class="logo-card">
+      <div class="logo-display">
+        <img src="gem-v8-rounded.svg" alt="">
+      </div>
+      <h3>Rounded</h3>
+      <p>Softer/friendlier</p>
+    </div>
+    
+    <div class="logo-card">
+      <div class="logo-display">
+        <img src="gem-v9-shield.svg" alt="">
+      </div>
+      <h3>Shield Cut</h3>
+      <p>Stable/trustworthy</p>
+    </div>
+    
+    <div class="logo-card">
+      <div class="logo-display">
+        <img src="gem-v10-modern.svg" alt="">
+      </div>
+      <h3>Modern</h3>
+      <p>Center accent</p>
+    </div>
+    
+    <div class="logo-card">
+      <div class="logo-display">
+        <img src="gem-v11-abstract.svg" alt="">
+      </div>
+      <h3>Abstract Crystal</h3>
+      <p>Asymmetric facets</p>
+    </div>
+    
+    <div class="logo-card">
+      <div class="logo-display">
+        <img src="gem-v12-split.svg" alt="">
+      </div>
+      <h3>Split</h3>
+      <p>Deconstructed</p>
+    </div>
+  </div>
+  
+  <!-- Dark background preview -->
+  <h2 style="font-family: 'Space Grotesk'; margin: 48px 0 24px; font-size: 1.25rem;">On Dark Background</h2>
+  <div class="logo-grid">
+    <div class="logo-card">
+      <div class="logo-display dark">
+        <img src="gem-v1-classic.svg" alt="">
+      </div>
+      <h3>Classic</h3>
+    </div>
+    <div class="logo-card">
+      <div class="logo-display dark">
+        <img src="gem-v5-minimal.svg" alt="">
+      </div>
+      <h3>Minimal</h3>
+    </div>
+    <div class="logo-card">
+      <div class="logo-display dark">
+        <img src="gem-v6-glow.svg" alt="">
+      </div>
+      <h3>Glowing</h3>
+    </div>
+    <div class="logo-card">
+      <div class="logo-display dark">
+        <img src="gem-v10-modern.svg" alt="">
+      </div>
+      <h3>Modern</h3>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,5 +1,8 @@
 import { createClient } from "@/utils/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
+import { logger } from "@/lib/logging";
+
+const log = logger.child({ module: "api/admin/courses/stripe-prices" });
 
 /**
  * POST /api/admin/courses/stripe-prices
@@ -69,7 +72,7 @@ export async function POST(request: NextRequest) {
       .eq("id", courseId);
 
     if (error) {
-      console.error("Error updating stripe prices:", error);
+      log.error("Error updating stripe prices", error, { courseId });
       return NextResponse.json(
         { error: "Failed to update stripe prices" },
         { status: 500 }
@@ -82,7 +85,7 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error("Stripe prices update error:", error);
+    log.error("Stripe prices update error", error);
     return NextResponse.json(
       { error: "Failed to process request" },
       { status: 500 }

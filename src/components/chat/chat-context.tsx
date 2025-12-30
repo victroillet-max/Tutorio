@@ -9,6 +9,8 @@ interface ChatActivityContext {
   errorMessage?: string;
   currentQuestionText?: string;
   currentQuestionNumber?: number;
+  courseName?: string;
+  courseId?: string;
 }
 
 export type PopupType = 'welcome' | 'help' | 'struggling';
@@ -33,6 +35,8 @@ interface ChatContextValue {
   triggerPopup: (message: string, type: PopupType) => void;
   dismissPopup: () => void;
   markWelcomeSeen: () => void;
+  // Visibility control
+  isVisible: boolean;
 }
 
 const ChatContext = createContext<ChatContextValue | undefined>(undefined);
@@ -92,6 +96,9 @@ export function ChatContextProvider({ children }: { children: React.ReactNode })
     setHasSeenWelcome(true);
   }, []);
 
+  // Chat is only visible when there's an active activity context
+  const isVisible = Boolean(context.activityId || context.skillId);
+
   return (
     <ChatContext.Provider
       value={{
@@ -107,6 +114,7 @@ export function ChatContextProvider({ children }: { children: React.ReactNode })
         triggerPopup,
         dismissPopup,
         markWelcomeSeen,
+        isVisible,
       }}
     >
       {children}

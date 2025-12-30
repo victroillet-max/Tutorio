@@ -12,13 +12,17 @@ This guide walks you through setting up Stripe payments for Tutorio.
 
 1. Go to [Stripe Dashboard](https://dashboard.stripe.com)
 2. Navigate to **Developers > API keys**
-3. Copy your **Secret key** (starts with `sk_test_` for test mode or `sk_live_` for production)
+3. Copy your **Publishable key** (starts with `pk_test_` for test mode or `pk_live_` for production)
+4. Copy your **Secret key** (starts with `sk_test_` for test mode or `sk_live_` for production)
 
 Add to your `.env.local`:
 
 ```env
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_your_publishable_key_here
 STRIPE_SECRET_KEY=sk_test_your_secret_key_here
 ```
+
+> **Note**: The publishable key is used for the embedded checkout experience. It's safe to expose in the browser.
 
 ## Step 2: Create Products and Prices
 
@@ -156,6 +160,7 @@ When you're ready for production:
 2. Create live products/prices (same as test mode)
 3. Update environment variables with live keys:
    ```env
+   NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_live_...
    STRIPE_SECRET_KEY=sk_live_...
    STRIPE_BASIC_PRICE_ID=price_...
    STRIPE_ADVANCED_PRICE_ID=price_...
@@ -168,10 +173,11 @@ When you're ready for production:
 
 ```env
 # Stripe Configuration
-STRIPE_SECRET_KEY=sk_test_...           # Your Stripe secret key
-STRIPE_WEBHOOK_SECRET=whsec_...         # Webhook signing secret
-STRIPE_BASIC_PRICE_ID=price_...         # Price ID for Basic plan
-STRIPE_ADVANCED_PRICE_ID=price_...      # Price ID for Advanced plan
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...  # Your Stripe publishable key (public)
+STRIPE_SECRET_KEY=sk_test_...                    # Your Stripe secret key (server-only)
+STRIPE_WEBHOOK_SECRET=whsec_...                  # Webhook signing secret
+STRIPE_BASIC_PRICE_ID=price_...                  # Price ID for Basic plan
+STRIPE_ADVANCED_PRICE_ID=price_...               # Price ID for Advanced plan
 ```
 
 ## Troubleshooting
@@ -198,8 +204,9 @@ STRIPE_ADVANCED_PRICE_ID=price_...      # Price ID for Advanced plan
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/api/stripe/checkout` | POST | Create checkout session |
+| `/api/stripe/checkout` | POST | Create checkout session (redirect mode) |
 | `/api/stripe/checkout` | GET | Redirect to checkout (query params) |
+| `/api/stripe/embedded-checkout` | POST | Create embedded checkout session |
 | `/api/stripe/webhook` | POST | Handle Stripe webhooks |
 | `/api/stripe/portal` | GET | Redirect to customer portal |
 

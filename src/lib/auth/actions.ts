@@ -3,7 +3,29 @@
 import { createClient } from "@/utils/supabase/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { getSiteUrl } from "@/lib/env";
+import { logger } from "@/lib/logging";
+import { rateLimiters, getIpRateLimitKey } from "@/lib/rate-limit";
+
+// Module-level logger
+const log = logger.child({ module: "auth/actions" });
+
+/**
+ * Get the client IP from headers for rate limiting
+ */
+async function getClientIpFromHeaders(): Promise<string> {
+  const headersList = await headers();
+  const forwarded = headersList.get("x-forwarded-for");
+  if (forwarded) {
+    return forwarded.split(",")[0].trim();
+  }
+  const realIp = headersList.get("x-real-ip");
+  if (realIp) {
+    return realIp;
+  }
+  return "unknown";
+}
 
 export type AuthActionResult = {
   error?: string;
@@ -17,6 +39,19 @@ export type AuthActionResult = {
  * Sign up a new user with email and password
  */
 export async function signUp(formData: FormData): Promise<AuthActionResult> {
+  // Apply rate limiting
+  const ip = await getClientIpFromHeaders();
+  const rateLimitKey = getIpRateLimitKey(ip, "auth");
+  const rateLimitResult = rateLimiters.auth.check(rateLimitKey);
+  
+  if (!rateLimitResult.success) {
+    log.warn("Rate limit exceeded for signup", { ip });
+    return {
+      error: `Too many attempts. Please try again in ${rateLimitResult.retryAfter} seconds.`,
+      email: formData.get("email") as string,
+    };
+  }
+
   const supabase = await createClient();
 
   const email = formData.get("email") as string;
@@ -45,7 +80,7 @@ export async function signUp(formData: FormData): Promise<AuthActionResult> {
   });
 
   if (error) {
-    console.error("Signup error:", error.message);
+    log.warn("Signup failed", { email, errorMessage: error.message });
     return { error: error.message, email };
   }
 
@@ -66,11 +101,24 @@ export async function signIn(formData: FormData): Promise<AuthActionResult> {
     return { error: "Email and password are required", email };
   }
 
+  // Apply rate limiting
+  const ip = await getClientIpFromHeaders();
+  const rateLimitKey = getIpRateLimitKey(ip, "auth");
+  const rateLimitResult = rateLimiters.auth.check(rateLimitKey);
+  
+  if (!rateLimitResult.success) {
+    log.warn("Rate limit exceeded for signin", { ip, email });
+    return {
+      error: `Too many login attempts. Please try again in ${rateLimitResult.retryAfter} seconds.`,
+      email,
+    };
+  }
+
   let supabase;
   try {
     supabase = await createClient();
   } catch (err) {
-    console.error("Failed to create Supabase client:", err);
+    log.error("Failed to create Supabase client", err);
     return { error: "Authentication service is unavailable. Please try again later.", email };
   }
 
@@ -81,11 +129,11 @@ export async function signIn(formData: FormData): Promise<AuthActionResult> {
     });
 
     if (error) {
-      console.error("Login error:", error.message);
+      log.warn("Login failed", { email, errorMessage: error.message });
       return { error: error.message, email };
     }
   } catch (err) {
-    console.error("Sign in exception:", err);
+    log.error("Sign in exception", err);
     // Check for common configuration errors
     if (err instanceof Error) {
       if (err.message.includes("Unexpected end of JSON input")) {
@@ -107,6 +155,18 @@ export async function signIn(formData: FormData): Promise<AuthActionResult> {
  * Sign in with OAuth provider (Google, GitHub, etc.)
  */
 export async function signInWithOAuth(provider: "google" | "github") {
+  // Apply rate limiting
+  const ip = await getClientIpFromHeaders();
+  const rateLimitKey = getIpRateLimitKey(ip, "auth");
+  const rateLimitResult = rateLimiters.auth.check(rateLimitKey);
+  
+  if (!rateLimitResult.success) {
+    log.warn("Rate limit exceeded for OAuth", { ip, provider });
+    return {
+      error: `Too many attempts. Please try again in ${rateLimitResult.retryAfter} seconds.`,
+    };
+  }
+
   const supabase = await createClient();
   const siteUrl = getSiteUrl();
 
@@ -118,7 +178,7 @@ export async function signInWithOAuth(provider: "google" | "github") {
   });
 
   if (error) {
-    console.error("OAuth error:", error.message);
+    log.error("OAuth error", new Error(error.message), { provider });
     return { error: error.message };
   }
 
@@ -143,13 +203,25 @@ export async function signOut() {
  * Request password reset email
  */
 export async function forgotPassword(formData: FormData): Promise<AuthActionResult> {
-  const supabase = await createClient();
   const email = formData.get("email") as string;
 
   if (!email) {
     return { error: "Email is required" };
   }
 
+  // Apply stricter rate limiting for password reset
+  const ip = await getClientIpFromHeaders();
+  const rateLimitKey = getIpRateLimitKey(ip, "passwordReset");
+  const rateLimitResult = rateLimiters.passwordReset.check(rateLimitKey);
+  
+  if (!rateLimitResult.success) {
+    log.warn("Rate limit exceeded for password reset", { ip, email });
+    return {
+      error: `Too many password reset requests. Please try again in ${rateLimitResult.retryAfter} seconds.`,
+    };
+  }
+
+  const supabase = await createClient();
   const siteUrl = getSiteUrl();
 
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
@@ -157,7 +229,7 @@ export async function forgotPassword(formData: FormData): Promise<AuthActionResu
   });
 
   if (error) {
-    console.error("Password reset error:", error.message);
+    log.warn("Password reset failed", { email, errorMessage: error.message });
     return { error: error.message };
   }
 
@@ -171,6 +243,18 @@ export async function forgotPassword(formData: FormData): Promise<AuthActionResu
  * Reset password with new password
  */
 export async function resetPassword(formData: FormData): Promise<AuthActionResult> {
+  // Apply rate limiting
+  const ip = await getClientIpFromHeaders();
+  const rateLimitKey = getIpRateLimitKey(ip, "passwordReset");
+  const rateLimitResult = rateLimiters.passwordReset.check(rateLimitKey);
+  
+  if (!rateLimitResult.success) {
+    log.warn("Rate limit exceeded for password update", { ip });
+    return {
+      error: `Too many attempts. Please try again in ${rateLimitResult.retryAfter} seconds.`,
+    };
+  }
+
   const supabase = await createClient();
   const password = formData.get("password") as string;
   const confirmPassword = formData.get("confirmPassword") as string;
@@ -192,7 +276,7 @@ export async function resetPassword(formData: FormData): Promise<AuthActionResul
   });
 
   if (error) {
-    console.error("Password update error:", error.message);
+    log.error("Password update failed", new Error(error.message));
     return { error: error.message };
   }
 
@@ -217,4 +301,3 @@ export async function getUser() {
   const { data: { user } } = await supabase.auth.getUser();
   return user;
 }
-

@@ -2,6 +2,9 @@
 
 import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
+import { logger } from "@/lib/logging";
+
+const log = logger.child({ module: "admin/actions" });
 
 /**
  * Admin data fetching utilities
@@ -322,7 +325,7 @@ export async function getUsers(options?: {
     .range(offset, offset + limit - 1);
   
   if (error) {
-    console.error("Error fetching users:", error);
+    log.error("Error fetching users", error);
     return { users: [], total: 0 };
   }
   
@@ -411,7 +414,7 @@ export async function getCourses(): Promise<AdminCourse[]> {
     .order("sort_order");
   
   if (error) {
-    console.error("Error fetching courses:", error);
+    log.error("Error fetching courses", error);
     return [];
   }
   
@@ -492,7 +495,7 @@ export async function getCourseDetail(slug: string): Promise<AdminCourseDetail |
     .single();
   
   if (error || !course) {
-    console.error("Error fetching course:", error);
+    log.error("Error fetching course", error, { slug });
     return null;
   }
   

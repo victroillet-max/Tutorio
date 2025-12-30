@@ -1,6 +1,9 @@
 import { createClient } from "@/utils/supabase/server";
 import { NextRequest } from "next/server";
 import { buildSystemPrompt, type SkillContext, type CourseMaterialContext } from "@/lib/ai/prompts";
+import { chatMessageSchema, createValidationErrorResponse } from "@/lib/validation/schemas";
+import { logger, startTimer } from "@/lib/logging";
+import { getAIRateLimit } from "@/lib/config";
 
 // Check if OpenAI is configured
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
@@ -28,31 +31,69 @@ interface ActivityWithContext {
 }
 
 export async function POST(request: NextRequest) {
+  const timer = startTimer();
+  const log = logger.child({ handler: "chat" });
+
   try {
     // Check authentication
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     
     if (!user) {
+      log.warn("Unauthorized chat attempt");
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: { "Content-Type": "application/json" },
       });
     }
 
-    // Get user's rate limit info and check if they can send
+    // Parse and validate request body
+    const body = await request.json();
+    const validation = chatMessageSchema.safeParse(body);
+    
+    if (!validation.success) {
+      log.warn("Chat validation failed", { errors: validation.error.flatten() });
+      return createValidationErrorResponse(validation.error.issues);
+    }
+
+    const { 
+      message, 
+      conversationId, 
+      activityId, 
+      skillId,
+      courseId: providedCourseId,
+      studentCode,
+      errorMessage,
+      currentQuestionText,
+      currentQuestionNumber,
+    } = validation.data;
+
+    // If courseId not provided but skillId is, get course from skill
+    let courseId = providedCourseId;
+    if (!courseId && skillId) {
+      const { data: skillData } = await supabase
+        .from("skills")
+        .select("course_id")
+        .eq("id", skillId)
+        .single();
+      courseId = skillData?.course_id || undefined;
+    }
+
+    // Get user's rate limit info and check if they can send (per-course)
     const { data: rateLimitInfo } = await supabase.rpc("get_user_rate_limit", {
       p_user_id: user.id,
+      p_course_id: courseId || null,
     });
 
     const rateLimit = rateLimitInfo?.[0];
-    const tier = rateLimit?.tier || 'free';
+    const tier = (rateLimit?.tier || 'free') as keyof typeof import("@/lib/config").AI_RATE_LIMITS;
     const messagesRemaining = rateLimit?.messages_remaining_today || 0;
-    const messagesPerDay = rateLimit?.messages_per_day || 5;
+    const tierConfig = getAIRateLimit(tier);
 
-    // Check rate limit
+    // Check rate limit (per-course)
     const { data: canSend } = await supabase.rpc("can_send_ai_message", {
       p_user_id: user.id,
+      p_course_id: courseId || null,
     });
 
     if (!canSend) {
@@ -64,34 +105,16 @@ export async function POST(request: NextRequest) {
         upgradeMessage = "Upgrade to Advanced for unlimited AI tutor access.";
       }
 
+      log.info("Rate limit exceeded", { userId: user.id, tier });
+
       return new Response(JSON.stringify({ 
         error: "Rate limit exceeded",
-        message: `You've used all ${messagesPerDay} AI messages for today. ${upgradeMessage}`,
+        message: `You've used all ${tierConfig.messagesPerDay} AI messages for today. ${upgradeMessage}`,
         tier,
-        limit: messagesPerDay,
+        limit: tierConfig.messagesPerDay,
         remaining: 0,
       }), {
         status: 429,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-
-    // Parse request body
-    const body = await request.json();
-    const { 
-      message, 
-      conversationId, 
-      activityId, 
-      skillId,
-      studentCode,
-      errorMessage,
-      currentQuestionText,
-      currentQuestionNumber,
-    } = body;
-
-    if (!message || typeof message !== "string") {
-      return new Response(JSON.stringify({ error: "Message is required" }), {
-        status: 400,
         headers: { "Content-Type": "application/json" },
       });
     }
@@ -105,13 +128,14 @@ export async function POST(request: NextRequest) {
           user_id: user.id,
           activity_id: activityId || null,
           skill_id: skillId || null,
+          course_id: courseId || null,
           title: message.slice(0, 50) + (message.length > 50 ? "..." : ""),
         })
         .select()
         .single();
 
       if (convError) {
-        console.error("Failed to create conversation:", convError);
+        log.error("Failed to create conversation", convError, { userId: user.id });
         return new Response(JSON.stringify({ error: "Failed to create conversation" }), {
           status: 500,
           headers: { "Content-Type": "application/json" },
@@ -245,10 +269,11 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Increment usage
+    // Increment usage (per-course)
     await supabase.rpc("increment_ai_usage", {
       p_user_id: user.id,
       p_tokens: 0, // Will be updated after response
+      p_course_id: courseId || null,
     });
 
     // Check if OpenAI is configured
@@ -264,13 +289,15 @@ export async function POST(request: NextRequest) {
         tokens_used: 0,
       });
 
+      timer.log("Chat completed (mock)", { userId: user.id, conversationId: convId });
+
       return new Response(JSON.stringify({
         message: mockResponse,
         conversationId: convId,
         mock: true,
         rateLimit: {
           tier,
-          limit: messagesPerDay,
+          limit: tierConfig.messagesPerDay,
           remaining: Math.max(0, messagesRemaining - 1),
         },
       }), {
@@ -296,7 +323,7 @@ export async function POST(request: NextRequest) {
 
     if (!openaiResponse.ok) {
       const errorData = await openaiResponse.json();
-      console.error("OpenAI API error:", errorData);
+      log.error("OpenAI API error", new Error(errorData.error?.message), { statusCode: openaiResponse.status });
       return new Response(JSON.stringify({ 
         error: "AI service error",
         details: errorData.error?.message || "Unknown error",
@@ -318,13 +345,15 @@ export async function POST(request: NextRequest) {
       tokens_used: tokensUsed,
     });
 
+    timer.log("Chat completed", { userId: user.id, conversationId: convId, tokensUsed });
+
     return new Response(JSON.stringify({
       message: assistantMessage,
       conversationId: convId,
       tokensUsed,
       rateLimit: {
         tier,
-        limit: messagesPerDay,
+        limit: tierConfig.messagesPerDay,
         remaining: Math.max(0, messagesRemaining - 1),
       },
     }), {
@@ -332,7 +361,7 @@ export async function POST(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error("Chat API error:", error);
+    log.error("Chat API error", error);
     return new Response(JSON.stringify({ 
       error: "Internal server error",
       message: error instanceof Error ? error.message : "Unknown error",
@@ -516,4 +545,3 @@ function formatQuizQuestionsForPrompt(questions: unknown): string | undefined {
   
   return formatted || undefined;
 }
-

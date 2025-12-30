@@ -17,7 +17,7 @@ import {
   Zap
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { CheckoutResult } from "@/components/stripe";
+import { SubscriptionSuccessPopup } from "@/components/stripe";
 
 interface CourseLearnPageProps {
   params: Promise<{ slug: string }>;
@@ -136,9 +136,12 @@ export default async function CourseLearnPage({ params, searchParams }: CourseLe
 
   return (
     <div className="min-h-screen bg-[var(--background-secondary)]">
-      {/* Checkout Result Handler */}
+      {/* Subscription Success Popup */}
       <Suspense fallback={null}>
-        <CheckoutResult courseTitle={course.title} />
+        <SubscriptionSuccessPopup 
+          courseTitle={course.title} 
+          courseSlug={course.slug}
+        />
       </Suspense>
 
       {/* Header */}

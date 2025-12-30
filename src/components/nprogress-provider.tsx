@@ -33,37 +33,39 @@ export function NProgressProvider() {
     // Create progress bar element
     const progressBar = document.createElement("div");
     progressBar.id = "nprogress-bar";
-    progressBar.innerHTML = `
-      <style>
-        #nprogress-bar {
-          position: fixed;
-          top: 0;
-          left: 0;
-          width: 0;
-          height: 3px;
-          background: linear-gradient(90deg, var(--primary) 0%, var(--primary-light) 100%);
-          z-index: 9999;
-          pointer-events: none;
-          transition: width 0.2s ease, opacity 0.3s ease;
-          opacity: 0;
-        }
-        #nprogress-bar.loading {
-          width: 80%;
-          opacity: 1;
-          animation: nprogress-loading 2s ease-out forwards;
-        }
-        #nprogress-bar.complete {
-          width: 100%;
-          opacity: 0;
-        }
-        @keyframes nprogress-loading {
-          0% { width: 0%; }
-          10% { width: 20%; }
-          50% { width: 60%; }
-          100% { width: 80%; }
-        }
-      </style>
+    
+    // Create style element properly (avoiding innerHTML for security)
+    const style = document.createElement("style");
+    style.textContent = `
+      #nprogress-bar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 0;
+        height: 3px;
+        background: linear-gradient(90deg, var(--primary) 0%, var(--primary-light) 100%);
+        z-index: 9999;
+        pointer-events: none;
+        transition: width 0.2s ease, opacity 0.3s ease;
+        opacity: 0;
+      }
+      #nprogress-bar.loading {
+        width: 80%;
+        opacity: 1;
+        animation: nprogress-loading 2s ease-out forwards;
+      }
+      #nprogress-bar.complete {
+        width: 100%;
+        opacity: 0;
+      }
+      @keyframes nprogress-loading {
+        0% { width: 0%; }
+        10% { width: 20%; }
+        50% { width: 60%; }
+        100% { width: 80%; }
+      }
     `;
+    document.head.appendChild(style);
     document.body.appendChild(progressBar);
 
     // Intercept link clicks to show progress bar
@@ -95,6 +97,7 @@ export function NProgressProvider() {
 
     return () => {
       document.removeEventListener("click", handleClick);
+      style.remove();
       progressBar.remove();
     };
   }, []);
@@ -105,4 +108,3 @@ export function NProgressProvider() {
     </Suspense>
   );
 }
-

@@ -18,6 +18,9 @@ import {
   getActivityGradingCriteria,
   checkGoogleSheetsStatus,
 } from "@/lib/google-sheets/actions";
+import { logger } from "@/lib/logging";
+
+const log = logger.child({ module: "api/sheets" });
 
 export async function GET(request: NextRequest) {
   const supabase = await createClient();
@@ -79,7 +82,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(result);
   } catch (error) {
-    console.error("Error in POST /api/sheets:", error);
+    log.error("Error in POST /api/sheets", error);
     return NextResponse.json(
       { error: "Failed to create sheet" },
       { status: 500 }
@@ -126,7 +129,7 @@ export async function PUT(request: NextRequest) {
         });
 
       if (progressError) {
-        console.error("Error saving progress:", progressError);
+        log.error("Error saving progress", progressError, { activityId });
         return NextResponse.json({ error: "Failed to save progress" }, { status: 500 });
       }
 
@@ -147,7 +150,7 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json(result);
   } catch (error) {
-    console.error("Error in PUT /api/sheets:", error);
+    log.error("Error in PUT /api/sheets", error);
     return NextResponse.json(
       { error: "Failed to grade sheet" },
       { status: 500 }

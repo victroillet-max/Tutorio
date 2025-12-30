@@ -20,6 +20,8 @@ interface ChatWidgetProps {
   errorMessage?: string;
   currentQuestionText?: string;
   currentQuestionNumber?: number;
+  courseName?: string;
+  courseId?: string;
   className?: string;
 }
 
@@ -30,6 +32,8 @@ export function ChatWidget({
   errorMessage,
   currentQuestionText,
   currentQuestionNumber,
+  courseName,
+  courseId,
   className,
 }: ChatWidgetProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -143,6 +147,7 @@ export function ChatWidget({
           errorMessage,
           currentQuestionText,
           currentQuestionNumber,
+          courseId,
         }),
       });
 
@@ -214,10 +219,10 @@ export function ChatWidget({
         data-tour="chat-widget"
         className={cn(
           "fixed right-6 z-50 w-14 h-14 rounded-full shadow-lg safe-bottom",
-          "bg-gradient-to-br from-violet-600 to-indigo-600 text-white",
+          "bg-gradient-to-br from-[var(--primary)] to-[var(--primary-light)] text-white",
           "flex items-center justify-center",
-          "hover:from-violet-500 hover:to-indigo-500 transition-all",
-          "focus:outline-none focus:ring-2 focus:ring-violet-500 focus:ring-offset-2",
+          "hover:from-[var(--primary-hover)] hover:to-[var(--primary)] transition-all",
+          "focus:outline-none focus:ring-2 focus:ring-[var(--primary)] focus:ring-offset-2",
           isOpen && "rotate-90",
           className
         )}
@@ -249,7 +254,7 @@ export function ChatWidget({
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800 bg-zinc-900/80 backdrop-blur-sm">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-indigo-500 flex items-center justify-center">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[var(--primary)] to-[var(--primary-light)] flex items-center justify-center">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="12" cy="12" r="3" />
                   <path d="M12 2v2" />
@@ -295,15 +300,17 @@ export function ChatWidget({
             {messages.length === 0 && (
               <div className="text-center text-zinc-500 py-8">
                 <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-zinc-800 flex items-center justify-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-violet-400">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--accent)]">
                     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
                   </svg>
                 </div>
                 <p className="text-sm font-medium text-zinc-300 mb-1">Hi! I&apos;m Bob, your AI Tutor</p>
                 {activityId ? (
                   <p className="text-xs text-zinc-500">I can see the activity you&apos;re working on. Ask me anything about it!</p>
+                ) : courseName ? (
+                  <p className="text-xs text-zinc-500">Ask me anything about {courseName}.</p>
                 ) : (
-                  <p className="text-xs text-zinc-500">Ask me anything about Python or computational thinking.</p>
+                  <p className="text-xs text-zinc-500">Ask me anything about your current lesson.</p>
                 )}
               </div>
             )}
@@ -320,7 +327,7 @@ export function ChatWidget({
                   className={cn(
                     "max-w-[85%] rounded-2xl px-4 py-2.5 text-sm",
                     message.role === "user"
-                      ? "bg-violet-600 text-white rounded-br-md"
+                      ? "bg-[var(--primary)] text-white rounded-br-md"
                       : "bg-zinc-800 text-zinc-100 rounded-bl-md"
                   )}
                 >
@@ -333,9 +340,9 @@ export function ChatWidget({
               <div className="flex justify-start">
                 <div className="bg-zinc-800 rounded-2xl rounded-bl-md px-4 py-3">
                   <div className="flex items-center gap-1">
-                    <span className="w-2 h-2 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                    <span className="w-2 h-2 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                    <span className="w-2 h-2 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                    <span className="w-2 h-2 bg-[var(--accent)] rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                    <span className="w-2 h-2 bg-[var(--accent)] rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                    <span className="w-2 h-2 bg-[var(--accent)] rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
                   </div>
                 </div>
               </div>
@@ -363,7 +370,7 @@ export function ChatWidget({
                 className={cn(
                   "flex-1 resize-none rounded-xl border-0 bg-zinc-800 px-4 py-3",
                   "text-sm text-white placeholder:text-zinc-500",
-                  "focus:outline-none focus:ring-2 focus:ring-violet-500",
+                  "focus:outline-none focus:ring-2 focus:ring-[var(--primary)]",
                   "max-h-32"
                 )}
                 style={{ minHeight: "44px" }}
@@ -373,7 +380,7 @@ export function ChatWidget({
                 disabled={!input.trim() || isLoading}
                 className={cn(
                   "h-11 w-11 rounded-xl p-0",
-                  "bg-violet-600 hover:bg-violet-500 text-white",
+                  "bg-[var(--accent)] hover:bg-[var(--accent-dark)] text-white",
                   "disabled:opacity-50 disabled:cursor-not-allowed"
                 )}
               >

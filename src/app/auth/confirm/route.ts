@@ -1,6 +1,9 @@
 import { createClient } from "@/utils/supabase/server";
 import { type EmailOtpType } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { logger } from "@/lib/logging";
+
+const log = logger.child({ module: "auth/confirm" });
 
 /**
  * Email confirmation handler for Supabase email verification
@@ -13,7 +16,7 @@ export async function GET(request: Request) {
   const next = searchParams.get("next") ?? "/dashboard";
 
   if (!token_hash || !type) {
-    console.error("Missing token_hash or type in confirm route");
+    log.warn("Missing token_hash or type in confirm route");
     return NextResponse.redirect(`${origin}/login?error=invalid_confirmation_link`);
   }
 
@@ -24,7 +27,7 @@ export async function GET(request: Request) {
   });
 
   if (error) {
-    console.error("OTP verification error:", error.message);
+    log.error("OTP verification error", new Error(error.message), { type });
     
     // Handle specific error cases
     if (type === "recovery") {

@@ -303,6 +303,7 @@ export interface ChatConversation {
   user_id: string;
   activity_id: string | null;
   skill_id: string | null;
+  course_id: string | null;
   title: string | null;
   is_active: boolean;
   message_count: number;
@@ -323,6 +324,7 @@ export interface ChatMessage {
 export interface AIUsage {
   id: string;
   user_id: string;
+  course_id: string | null;
   date: string;
   messages_count: number;
   tokens_used: number;

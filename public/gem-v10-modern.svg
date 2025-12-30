@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- Modern geometric gem - clean angles -->
+  <!-- Upper left -->
+  <polygon points="32,4 32,32 8,24" fill="#1e3a5f"/>
+  <!-- Upper right -->
+  <polygon points="32,4 32,32 56,24" fill="#2d5a8b"/>
+  <!-- Lower left -->
+  <polygon points="8,24 32,32 32,60" fill="#152a45"/>
+  <!-- Lower right -->
+  <polygon points="56,24 32,32 32,60" fill="#1e3a5f"/>
+  <!-- Center accent -->
+  <circle cx="32" cy="32" r="6" fill="#e76f51"/>
+</svg>
+

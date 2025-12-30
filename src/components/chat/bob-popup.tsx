@@ -29,21 +29,21 @@ export function BobPopup({ onOpenChat }: BobPopupProps) {
   return (
     <div
       className={cn(
-        "fixed bottom-24 right-24 z-50 max-w-[280px]",
+        "fixed bottom-6 right-24 z-50 max-w-[280px]",
         "animate-in slide-in-from-right-5 fade-in duration-300"
       )}
     >
       {/* Speech bubble */}
-      <div
-        onClick={handleClick}
-        className={cn(
-          "relative cursor-pointer rounded-2xl px-4 py-3 shadow-lg",
-          "border transition-all hover:scale-[1.02]",
-          popup.type === "welcome"
-            ? "bg-gradient-to-br from-violet-600 to-indigo-600 border-violet-500 text-white"
-            : "bg-zinc-800 border-zinc-700 text-zinc-100"
-        )}
-      >
+        <div
+          onClick={handleClick}
+          className={cn(
+            "relative cursor-pointer rounded-2xl px-4 py-3 shadow-lg",
+            "border transition-all hover:scale-[1.02]",
+            popup.type === "welcome"
+              ? "bg-gradient-to-br from-[var(--primary)] to-[var(--primary-light)] border-[var(--primary)] text-white"
+              : "bg-zinc-800 border-zinc-700 text-zinc-100"
+          )}
+        >
         {/* Close button */}
         <button
           onClick={handleClose}
@@ -51,7 +51,7 @@ export function BobPopup({ onOpenChat }: BobPopupProps) {
             "absolute -top-2 -right-2 w-6 h-6 rounded-full flex items-center justify-center",
             "transition-colors shadow-md",
             popup.type === "welcome"
-              ? "bg-violet-800 hover:bg-violet-900 text-white"
+              ? "bg-[var(--primary-dark)] hover:bg-[var(--primary)] text-white"
               : "bg-zinc-700 hover:bg-zinc-600 text-zinc-300"
           )}
           aria-label="Dismiss"
@@ -108,7 +108,7 @@ export function BobPopup({ onOpenChat }: BobPopupProps) {
         {/* Help message - simpler layout */}
         {popup.type === "help" && (
           <div className="flex items-start gap-3">
-            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-violet-500/20 flex items-center justify-center">
+            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-[var(--accent)]/20 flex items-center justify-center">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 width="16"
@@ -119,7 +119,7 @@ export function BobPopup({ onOpenChat }: BobPopupProps) {
                 strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                className="text-violet-400"
+                className="text-[var(--accent)]"
               >
                 <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
               </svg>
@@ -136,7 +136,7 @@ export function BobPopup({ onOpenChat }: BobPopupProps) {
           className={cn(
             "absolute -right-2 bottom-4 w-4 h-4 rotate-45",
             popup.type === "welcome"
-              ? "bg-indigo-600"
+              ? "bg-[var(--primary-light)]"
               : "bg-zinc-800 border-r border-b border-zinc-700"
           )}
         />

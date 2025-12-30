@@ -2,6 +2,9 @@
 
 import { createClient } from "@/utils/supabase/server";
 import type { UserCourseSubscription, CourseSubscriptionInfo } from "@/lib/database.types";
+import { logger } from "@/lib/logging";
+
+const log = logger.child({ module: "subscriptions/actions" });
 
 /**
  * Get all subscriptions for the current user
@@ -19,7 +22,7 @@ export async function getUserSubscriptions(): Promise<UserCourseSubscription[]> 
   });
 
   if (error) {
-    console.error("Error fetching subscriptions:", error);
+    log.error("Error fetching subscriptions", error, { userId: user.id });
     return [];
   }
 
@@ -43,7 +46,7 @@ export async function getCourseSubscription(courseId: string): Promise<CourseSub
   });
 
   if (error) {
-    console.error("Error fetching course subscription:", error);
+    log.error("Error fetching course subscription", error, { userId: user.id, courseId });
     return null;
   }
 
@@ -92,7 +95,7 @@ export async function checkActivityAccess(activityId: string): Promise<{
   });
 
   if (error || !data?.[0]) {
-    console.error("Error checking activity access:", error);
+    log.error("Error checking activity access", error, { activityId });
     return {
       hasAccess: false,
       isDemo: false,
@@ -121,7 +124,7 @@ export async function isActivityDemo(activityId: string): Promise<boolean> {
   });
 
   if (error) {
-    console.error("Error checking if activity is demo:", error);
+    log.error("Error checking if activity is demo", error, { activityId });
     return false;
   }
 
@@ -155,7 +158,7 @@ export async function getCourseSubscriptionTier(courseId: string): Promise<strin
   });
 
   if (error) {
-    console.error("Error getting course subscription tier:", error);
+    log.error("Error getting course subscription tier", error, { courseId });
     return null;
   }
 
@@ -183,7 +186,7 @@ export async function getUserRateLimit(): Promise<{
   });
 
   if (error || !data?.[0]) {
-    console.error("Error getting rate limit:", error);
+    log.error("Error getting rate limit", error, { userId: user.id });
     return null;
   }
 

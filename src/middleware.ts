@@ -1,5 +1,8 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { logger } from "@/lib/logging";
+
+const log = logger.child({ module: "middleware" });
 
 /**
  * Middleware for session management and route protection
@@ -23,7 +26,7 @@ export async function middleware(request: NextRequest) {
   // If Supabase is not configured, allow the request through
   // The page-level components will handle the error appropriately
   if (!supabaseUrl || !supabaseAnonKey) {
-    console.error("Middleware: Supabase environment variables not configured");
+    log.error("Supabase environment variables not configured");
     return NextResponse.next({ request });
   }
 
@@ -63,7 +66,7 @@ export async function middleware(request: NextRequest) {
     user = data.user;
   } catch (err) {
     // If getUser fails (e.g., invalid configuration), log and continue
-    console.error("Middleware: Failed to get user:", err);
+    log.error("Failed to get user", err);
     return NextResponse.next({ request });
   }
 

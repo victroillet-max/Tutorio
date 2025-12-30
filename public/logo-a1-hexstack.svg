@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- Stacked hexagons - modular knowledge structure -->
+  <polygon points="32,4 48,14 48,30 32,40 16,30 16,14" fill="#1e3a5f"/>
+  <polygon points="32,24 48,34 48,50 32,60 16,50 16,34" fill="#2d5a8b"/>
+  <!-- Accent corner -->
+  <polygon points="48,14 56,20 56,28 48,30" fill="#e76f51"/>
+</svg>
+

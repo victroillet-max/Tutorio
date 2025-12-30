@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- Tall elegant gem - elongated -->
+  <polygon points="32,2 44,14 32,20" fill="#2d5a8b"/>
+  <polygon points="32,2 20,14 32,20" fill="#1e3a5f"/>
+  <polygon points="20,14 32,20 32,62" fill="#152a45"/>
+  <polygon points="44,14 32,20 32,62" fill="#1e3a5f"/>
+  <!-- Accent at apex -->
+  <circle cx="32" cy="2" r="4" fill="#e76f51"/>
+</svg>
+

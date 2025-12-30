@@ -1,5 +1,8 @@
 import { createClient } from "@/utils/supabase/server";
 import { NextResponse } from "next/server";
+import { logger } from "@/lib/logging";
+
+const log = logger.child({ module: "api/skills/recalculate" });
 
 export async function POST() {
   const supabase = await createClient();
@@ -16,13 +19,13 @@ export async function POST() {
     });
     
     if (error) {
-      console.error("Failed to recalculate skill mastery:", error);
+      log.error("Failed to recalculate skill mastery", error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
     
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Failed to recalculate skill mastery:", error);
+    log.error("Failed to recalculate skill mastery", error);
     return NextResponse.json({ error: "Failed to recalculate" }, { status: 500 });
   }
 }

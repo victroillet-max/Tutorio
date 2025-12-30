@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- Shield-cut gem - more stable/trustworthy -->
+  <!-- Main shape -->
+  <polygon points="12,8 52,8 52,36 32,58 12,36" fill="#1e3a5f"/>
+  <!-- Top facet -->
+  <polygon points="12,8 52,8 44,20 20,20" fill="#2d5a8b"/>
+  <!-- Side facets -->
+  <polygon points="52,8 52,36 44,20" fill="#1e3a5f"/>
+  <polygon points="12,8 12,36 20,20" fill="#152a45"/>
+  <!-- Bottom point facets -->
+  <polygon points="20,20 44,20 32,58" fill="#152a45" opacity="0.8"/>
+  <!-- Crown highlight -->
+  <rect x="26" y="8" width="12" height="6" rx="2" fill="#e76f51"/>
+</svg>
+

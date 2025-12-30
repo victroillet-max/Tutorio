@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- Skill level meter with AI boost -->
+  <!-- Level bars -->
+  <rect x="8" y="48" width="10" height="8" rx="2" fill="#1e3a5f" opacity="0.4"/>
+  <rect x="22" y="38" width="10" height="18" rx="2" fill="#1e3a5f" opacity="0.6"/>
+  <rect x="36" y="26" width="10" height="30" rx="2" fill="#1e3a5f" opacity="0.8"/>
+  <rect x="50" y="14" width="10" height="42" rx="2" fill="#1e3a5f"/>
+  <!-- AI spark on top bar -->
+  <circle cx="55" cy="10" r="6" fill="#e76f51"/>
+  <!-- Small connecting line -->
+  <line x1="55" y1="14" x2="55" y2="16" stroke="#e76f51" stroke-width="2"/>
+</svg>
+

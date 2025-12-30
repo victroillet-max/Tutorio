@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- Abstract arrow/direction - progress -->
+  <polygon points="8,52 8,32 28,32 28,12 56,32 28,52 28,32" fill="#1e3a5f"/>
+  <!-- Accent tip -->
+  <polygon points="42,32 56,32 56,44" fill="#e76f51"/>
+</svg>
+

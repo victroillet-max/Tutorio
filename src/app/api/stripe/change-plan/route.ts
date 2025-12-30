@@ -2,6 +2,9 @@ import { createClient } from "@/utils/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { getSiteUrl } from "@/lib/env";
+import { logger } from "@/lib/logging";
+
+const log = logger.child({ module: "api/stripe/change-plan" });
 
 // Initialize Stripe
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
@@ -170,7 +173,7 @@ export async function POST(request: NextRequest) {
           .eq("id", subscriptionId);
 
         if (updateError) {
-          console.error("Failed to update local subscription:", updateError);
+          log.error("Failed to update local subscription", updateError, { subscriptionId });
           // Don't fail the request - Stripe webhook will catch this
         }
       }
@@ -184,7 +187,7 @@ export async function POST(request: NextRequest) {
       });
 
     } catch (stripeError) {
-      console.error("Stripe subscription update error:", stripeError);
+      log.error("Stripe subscription update error", stripeError, { subscriptionId, newTierSlug });
       
       // If direct update fails, redirect to billing portal
       try {
@@ -210,7 +213,7 @@ export async function POST(request: NextRequest) {
           });
         }
       } catch (portalError) {
-        console.error("Failed to create portal session:", portalError);
+        log.error("Failed to create portal session", portalError);
       }
 
       return NextResponse.json(
@@ -223,7 +226,7 @@ export async function POST(request: NextRequest) {
     }
 
   } catch (error) {
-    console.error("Plan change error:", error);
+    log.error("Plan change error", error);
     return NextResponse.json(
       { 
         error: "Failed to process plan change",
