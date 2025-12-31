@@ -21,11 +21,24 @@ function ResizableSheetViewer({ templateSheetId }: { templateSheetId: string }) 
   const [height, setHeight] = useState(450);
   const [resizeType, setResizeType] = useState<'none' | 'vertical'>('none');
   const [isExpanded, setIsExpanded] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const startPos = useRef({ y: 0 });
   const startHeight = useRef(0);
 
   const MIN_HEIGHT = 300;
   const MAX_HEIGHT = 800;
+
+  const handleIframeLoad = () => {
+    setIsLoading(false);
+  };
+
+  const handleIframeError = () => {
+    setLoadError(true);
+    setIsLoading(false);
+  };
+
+  const sheetUrl = `https://docs.google.com/spreadsheets/d/${templateSheetId}/preview?rm=minimal`;
 
   const handleMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -101,26 +114,66 @@ function ResizableSheetViewer({ templateSheetId }: { templateSheetId: string }) 
         </div>
       </div>
       <div className="relative">
-        <iframe
-          src={`https://docs.google.com/spreadsheets/d/${templateSheetId}/preview?rm=minimal`}
-          className="w-full"
-          style={{ height: `${height}px`, border: "none" }}
-          title="Financial Data Reference"
-        />
+        {/* Loading indicator */}
+        {isLoading && !loadError && (
+          <div 
+            className="absolute inset-0 flex items-center justify-center bg-slate-50 z-10"
+            style={{ height: `${height}px` }}
+          >
+            <div className="text-center">
+              <Loader2 className="w-8 h-8 animate-spin text-violet-600 mx-auto mb-2" />
+              <p className="text-sm text-slate-500">Loading spreadsheet...</p>
+            </div>
+          </div>
+        )}
+
+        {/* Error fallback */}
+        {loadError ? (
+          <div 
+            className="flex flex-col items-center justify-center bg-slate-50 border-2 border-dashed border-slate-200 rounded-lg"
+            style={{ height: `${height}px` }}
+          >
+            <AlertCircle className="w-12 h-12 text-amber-500 mb-3" />
+            <h4 className="text-lg font-medium text-slate-700 mb-1">Unable to load spreadsheet</h4>
+            <p className="text-sm text-slate-500 mb-4 text-center max-w-md px-4">
+              The reference spreadsheet could not be loaded. This may be due to browser security settings or network issues.
+            </p>
+            <a
+              href={sheetUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-4 py-2 bg-violet-600 text-white text-sm font-medium rounded-lg hover:bg-violet-700 transition-colors"
+            >
+              Open in Google Sheets
+            </a>
+          </div>
+        ) : (
+          <iframe
+            src={sheetUrl}
+            className="w-full"
+            style={{ height: `${height}px`, border: "none" }}
+            title="Financial Data Reference"
+            onLoad={handleIframeLoad}
+            onError={handleIframeError}
+            sandbox="allow-scripts allow-same-origin"
+          />
+        )}
         
         {/* Bottom resize handle */}
-        <div
-          onMouseDown={handleMouseDown}
-          className={`
-            absolute bottom-0 left-0 right-0 h-4 cursor-ns-resize
-            flex items-center justify-center
-            bg-gradient-to-t from-slate-200/80 to-transparent
-            hover:from-slate-300/80 transition-colors
-            ${isResizing ? "from-violet-200/80" : ""}
-          `}
-        >
-          <div className="w-12 h-1 bg-slate-400 rounded-full" />
-        </div>
+        {!loadError && (
+          <div
+            onMouseDown={handleMouseDown}
+            className={`
+              absolute bottom-0 left-0 right-0 h-4 cursor-ns-resize
+              flex items-center justify-center
+              bg-gradient-to-t from-slate-200/80 to-transparent
+              hover:from-slate-300/80 transition-colors
+              ${isResizing ? "from-violet-200/80" : ""}
+            `}
+          >
+            <div className="w-12 h-1 bg-slate-400 rounded-full" />
+          </div>
+        )}
       </div>
       
       {/* Height indicator during resize */}

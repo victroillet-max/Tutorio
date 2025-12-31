@@ -16,7 +16,15 @@ const faqs = [
   },
   {
     question: "Can I cancel my subscription anytime?",
-    answer: "Yes! You can cancel your subscription at any time. You'll continue to have access until the end of your billing period. We also offer a 7-day money-back guarantee if you're not satisfied."
+    answer: "Yes! You can cancel your subscription at any time. You'll continue to have access to all your subscription features until the end of your current billing period. Please note that we do not offer refunds for cancellations."
+  },
+  {
+    question: "Can I upgrade or downgrade my plan?",
+    answer: "Absolutely! You can change your plan at any time. Upgrades take effect immediately with a prorated charge. Downgrades are scheduled for the end of your current billing period - you'll keep your current plan benefits until then, but no refund is provided."
+  },
+  {
+    question: "Do you offer refunds?",
+    answer: "Tutorio operates a no-refund policy. Once a payment is processed, it is non-refundable. This applies to all subscription payments. We encourage you to explore our free demo content before subscribing to ensure our platform meets your needs."
   },
   {
     question: "What courses do you offer?",

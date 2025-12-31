@@ -60,6 +60,12 @@ export function InteractiveViewer({ activity, userId, isCompleted }: Interactive
         return <TrialBalanceBuilder content={content} onComplete={handleComplete} completed={completed} />;
       case 'adjusting-entries-builder':
         return <AdjustingEntriesBuilder content={content} onComplete={handleComplete} completed={completed} />;
+      case 'cfs-classifier':
+        return <CFSClassifier content={content} onComplete={handleComplete} completed={completed} />;
+      case 'inventory-calculator':
+        return <InventoryCalculator content={content} onComplete={handleComplete} completed={completed} />;
+      case 'mock-exam':
+        return <MockExamViewer content={content} onComplete={handleComplete} completed={completed} />;
       case 'google-sheets':
       case 'spreadsheet':
       case 'cfs-builder':
@@ -1853,6 +1859,1144 @@ function AdjustingEntriesBuilder({ content, onComplete, completed }: AdjustingEn
       onComplete={onComplete} 
       completed={completed} 
     />
+  );
+}
+
+// ============================================
+// CFS Classifier Component (FA Course)
+// ============================================
+interface CFSClassifierProps {
+  content: Record<string, unknown> | null;
+  onComplete: () => void;
+  completed: boolean;
+}
+
+interface CFSTransaction {
+  id: string;
+  description: string;
+  correctCategory: 'operating' | 'investing' | 'financing';
+  explanation: string;
+}
+
+type CFSCategory = 'operating' | 'investing' | 'financing';
+
+function CFSClassifier({ content, onComplete, completed }: CFSClassifierProps) {
+  const instructions = (content?.instructions as string) || 
+    "Classify each transaction into the correct cash flow category: Operating, Investing, or Financing Activities.";
+  const transactions = (content?.transactions as CFSTransaction[]) || [];
+  const passingScore = (content?.passing_score as number) || 70;
+
+  // Shuffle transactions on client side only
+  const [shuffledTransactions, setShuffledTransactions] = useState<CFSTransaction[]>([]);
+  const [isClient, setIsClient] = useState(false);
+  
+  useEffect(() => {
+    setIsClient(true);
+    if (transactions.length > 0) {
+      const shuffled = [...transactions].sort(() => Math.random() - 0.5);
+      setShuffledTransactions(shuffled);
+    }
+  }, [transactions]);
+
+  // Track classifications: transaction id -> user's selected category
+  const [classifications, setClassifications] = useState<Record<string, CFSCategory | null>>({});
+  const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [showResults, setShowResults] = useState(false);
+  const [score, setScore] = useState<number | null>(null);
+
+  const categories: { id: CFSCategory; label: string; description: string; color: string }[] = [
+    { 
+      id: 'operating', 
+      label: 'Operating Activities', 
+      description: 'Day-to-day business operations',
+      color: 'emerald'
+    },
+    { 
+      id: 'investing', 
+      label: 'Investing Activities', 
+      description: 'Long-term asset transactions',
+      color: 'blue'
+    },
+    { 
+      id: 'financing', 
+      label: 'Financing Activities', 
+      description: 'Debt and equity transactions',
+      color: 'violet'
+    },
+  ];
+
+  const handleDragStart = (transactionId: string) => {
+    if (completed || showResults) return;
+    setDraggedId(transactionId);
+  };
+
+  const handleDrop = (category: CFSCategory) => {
+    if (!draggedId || completed || showResults) return;
+    
+    setClassifications(prev => ({
+      ...prev,
+      [draggedId]: category
+    }));
+    setDraggedId(null);
+  };
+
+  const handleClickClassify = (transactionId: string, category: CFSCategory) => {
+    if (completed || showResults) return;
+    
+    // Toggle: if already in this category, remove it
+    setClassifications(prev => {
+      if (prev[transactionId] === category) {
+        const updated = { ...prev };
+        delete updated[transactionId];
+        return updated;
+      }
+      return { ...prev, [transactionId]: category };
+    });
+  };
+
+  const handleCheckAnswers = () => {
+    const totalTransactions = shuffledTransactions.length;
+    const classifiedCount = Object.keys(classifications).length;
+    
+    if (classifiedCount < totalTransactions) return;
+
+    let correctCount = 0;
+    shuffledTransactions.forEach(tx => {
+      if (classifications[tx.id] === tx.correctCategory) {
+        correctCount++;
+      }
+    });
+
+    const scorePercent = Math.round((correctCount / totalTransactions) * 100);
+    setScore(scorePercent);
+    setShowResults(true);
+
+    if (scorePercent >= passingScore) {
+      onComplete();
+    }
+  };
+
+  const handleReset = () => {
+    setClassifications({});
+    setShowResults(false);
+    setScore(null);
+  };
+
+  const getTransactionsForCategory = (category: CFSCategory) => {
+    return shuffledTransactions.filter(tx => classifications[tx.id] === category);
+  };
+
+  const getUnclassifiedTransactions = () => {
+    return shuffledTransactions.filter(tx => !classifications[tx.id]);
+  };
+
+  const isTransactionCorrect = (tx: CFSTransaction): boolean | null => {
+    if (!showResults) return null;
+    return classifications[tx.id] === tx.correctCategory;
+  };
+
+  // Loading state
+  if (!isClient || shuffledTransactions.length === 0) {
+    return (
+      <div className="text-center py-8">
+        <div className="animate-pulse">
+          <div className="h-4 bg-slate-200 rounded w-3/4 mx-auto mb-4"></div>
+          <div className="grid grid-cols-3 gap-4 mb-6">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="h-32 bg-slate-100 rounded-xl"></div>
+            ))}
+          </div>
+          <div className="space-y-2">
+            {[1, 2, 3, 4].map(i => (
+              <div key={i} className="h-12 bg-slate-100 rounded-lg"></div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const unclassified = getUnclassifiedTransactions();
+  const allClassified = unclassified.length === 0;
+
+  return (
+    <div>
+      <p className="text-[var(--foreground-muted)] mb-6">{instructions}</p>
+
+      {/* Interaction hint */}
+      {!showResults && !completed && (
+        <div className="flex items-center gap-2 text-sm text-[var(--foreground-muted)] mb-4 p-3 bg-blue-50 border border-blue-100 rounded-lg">
+          <GripVertical className="w-4 h-4 text-blue-500" />
+          <span>Drag transactions to categories, or click a transaction then click a category</span>
+        </div>
+      )}
+
+      {/* Category drop zones */}
+      <div className="grid md:grid-cols-3 gap-4 mb-6">
+        {categories.map(cat => {
+          const transactionsInCategory = getTransactionsForCategory(cat.id);
+          const colorMap = {
+            emerald: { bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700', header: 'bg-emerald-100' },
+            blue: { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', header: 'bg-blue-100' },
+            violet: { bg: 'bg-violet-50', border: 'border-violet-200', text: 'text-violet-700', header: 'bg-violet-100' },
+          };
+          const colorClasses = colorMap[cat.color as keyof typeof colorMap] || colorMap.blue;
+
+          return (
+            <div
+              key={cat.id}
+              onDragOver={(e) => {
+                if (!completed && !showResults) e.preventDefault();
+              }}
+              onDrop={() => handleDrop(cat.id)}
+              className={`
+                rounded-xl border-2 transition-all min-h-[180px]
+                ${colorClasses.border} ${colorClasses.bg}
+                ${!completed && !showResults && draggedId ? 'ring-2 ring-offset-2 ring-' + cat.color + '-300' : ''}
+              `}
+            >
+              <div className={`px-4 py-3 ${colorClasses.header} rounded-t-lg border-b ${colorClasses.border}`}>
+                <h4 className={`font-semibold ${colorClasses.text}`}>{cat.label}</h4>
+                <p className="text-xs text-slate-500">{cat.description}</p>
+              </div>
+              
+              <div className="p-3 space-y-2">
+                {transactionsInCategory.length === 0 && !showResults && (
+                  <div className="text-center py-6 text-sm text-slate-400 border-2 border-dashed border-slate-200 rounded-lg">
+                    Drop transactions here
+                  </div>
+                )}
+                
+                {transactionsInCategory.map(tx => {
+                  const isCorrect = isTransactionCorrect(tx);
+                  
+                  return (
+                    <div
+                      key={tx.id}
+                      className={`
+                        px-3 py-2 rounded-lg text-sm transition-all
+                        ${showResults 
+                          ? isCorrect 
+                            ? 'bg-emerald-100 border border-emerald-300' 
+                            : 'bg-red-100 border border-red-300'
+                          : 'bg-white border border-slate-200 shadow-sm'
+                        }
+                      `}
+                    >
+                      <div className="flex items-start gap-2">
+                        <span className="flex-1">{tx.description}</span>
+                        {showResults && (
+                          <span className={isCorrect ? 'text-emerald-600' : 'text-red-600'}>
+                            {isCorrect ? <CheckCircle2 className="w-4 h-4" /> : <X className="w-4 h-4" />}
+                          </span>
+                        )}
+                      </div>
+                      {showResults && !isCorrect && (
+                        <div className="mt-2 pt-2 border-t border-red-200">
+                          <p className="text-xs text-red-700">
+                            Correct: <strong>{categories.find(c => c.id === tx.correctCategory)?.label}</strong>
+                          </p>
+                          <p className="text-xs text-slate-600 mt-1">{tx.explanation}</p>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Unclassified transactions */}
+      {!showResults && unclassified.length > 0 && (
+        <div className="mb-6">
+          <h4 className="text-sm font-medium text-slate-600 mb-3">
+            Transactions to classify ({unclassified.length} remaining)
+          </h4>
+          <div className="space-y-2">
+            {unclassified.map(tx => (
+              <div
+                key={tx.id}
+                draggable={!completed && !showResults}
+                onDragStart={() => handleDragStart(tx.id)}
+                onDragEnd={() => setDraggedId(null)}
+                className={`
+                  p-4 rounded-xl border-2 transition-all text-sm
+                  ${!completed && !showResults ? 'cursor-grab active:cursor-grabbing hover:border-violet-300' : 'cursor-default'}
+                  ${draggedId === tx.id ? 'border-violet-500 bg-violet-50 opacity-50' : 'border-slate-200 bg-white'}
+                `}
+              >
+                <div className="flex items-center gap-3">
+                  {!completed && !showResults && (
+                    <GripVertical className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                  )}
+                  <span className="flex-1">{tx.description}</span>
+                  
+                  {/* Quick classify buttons */}
+                  {!completed && !showResults && (
+                    <div className="flex gap-1">
+                      {categories.map(cat => (
+                        <button
+                          key={cat.id}
+                          onClick={() => handleClickClassify(tx.id, cat.id)}
+                          className={`
+                            px-2 py-1 text-xs rounded font-medium transition-colors
+                            ${cat.color === 'emerald' ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : ''}
+                            ${cat.color === 'blue' ? 'bg-blue-100 text-blue-700 hover:bg-blue-200' : ''}
+                            ${cat.color === 'violet' ? 'bg-violet-100 text-violet-700 hover:bg-violet-200' : ''}
+                          `}
+                          title={cat.label}
+                        >
+                          {cat.label.charAt(0)}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Actions */}
+      {!completed && !showResults && (
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-[var(--foreground-muted)]">
+            {shuffledTransactions.length - unclassified.length} / {shuffledTransactions.length} classified
+          </p>
+          <button
+            onClick={handleCheckAnswers}
+            disabled={!allClassified}
+            className="px-6 py-2.5 bg-violet-600 text-white font-medium rounded-xl hover:bg-violet-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Check Answers
+          </button>
+        </div>
+      )}
+
+      {/* Results */}
+      {showResults && (
+        <div className={`p-4 rounded-xl border ${score !== null && score >= passingScore ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'}`}>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className={`font-medium ${score !== null && score >= passingScore ? 'text-emerald-700' : 'text-amber-700'}`}>
+                Score: {score}%
+              </p>
+              <p className="text-sm text-[var(--foreground-muted)]">
+                {score !== null && score >= passingScore 
+                  ? 'Excellent! You understand cash flow classification.' 
+                  : `You need ${passingScore}% to pass. Review the categories and try again.`}
+              </p>
+            </div>
+            {score !== null && score < passingScore && (
+              <button
+                onClick={handleReset}
+                className="flex items-center gap-2 px-4 py-2 text-amber-700 hover:bg-amber-100 rounded-lg transition-colors"
+              >
+                <RotateCcw className="w-4 h-4" />
+                Try Again
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {completed && !showResults && (
+        <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-center">
+          <p className="text-emerald-700 font-medium">Exercise completed!</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================
+// Mock Exam Viewer Component (FA Course)
+// ============================================
+interface MockExamViewerProps {
+  content: Record<string, unknown> | null;
+  onComplete: () => void;
+  completed: boolean;
+}
+
+interface ExamQuestion {
+  id: string;
+  type: 'mcq' | 'calculation' | 'short-answer';
+  topic: string;
+  question: string;
+  options?: string[];
+  correctAnswer: string | number;
+  points: number;
+  explanation: string;
+  hint?: string;
+}
+
+interface ExamSection {
+  id: string;
+  title: string;
+  questions: ExamQuestion[];
+}
+
+function MockExamViewer({ content, onComplete, completed }: MockExamViewerProps) {
+  const examTitle = (content?.exam_title as string) || "Practice Exam";
+  const instructions = (content?.instructions as string) || 
+    "Complete all sections within the time limit. You can navigate between questions and review your answers before submitting.";
+  const sections = (content?.sections as ExamSection[]) || [];
+  const timeLimitMinutes = (content?.time_limit_minutes as number) || 90;
+  const passingScore = (content?.passing_score as number) || 60;
+
+  const [examStarted, setExamStarted] = useState(false);
+  const [examFinished, setExamFinished] = useState(false);
+  const [timeRemaining, setTimeRemaining] = useState(timeLimitMinutes * 60); // seconds
+  const [currentSectionIndex, setCurrentSectionIndex] = useState(0);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [answers, setAnswers] = useState<Record<string, string | number>>({});
+  const [showReview, setShowReview] = useState(false);
+  const [results, setResults] = useState<{
+    totalPoints: number;
+    earnedPoints: number;
+    scorePercent: number;
+    questionResults: { questionId: string; isCorrect: boolean; userAnswer: string | number; correctAnswer: string | number }[];
+    topicBreakdown: Record<string, { correct: number; total: number }>;
+  } | null>(null);
+
+  // Timer effect
+  useEffect(() => {
+    if (!examStarted || examFinished || completed) return;
+
+    if (timeRemaining <= 0) {
+      handleSubmitExam();
+      return;
+    }
+
+    const timer = setInterval(() => {
+      setTimeRemaining(prev => prev - 1);
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [examStarted, examFinished, timeRemaining, completed]);
+
+  // Get all questions flat
+  const allQuestions = sections.flatMap(s => s.questions);
+  const totalQuestions = allQuestions.length;
+  const totalPoints = allQuestions.reduce((sum, q) => sum + q.points, 0);
+
+  const currentSection = sections[currentSectionIndex];
+  const currentQuestion = currentSection?.questions[currentQuestionIndex];
+
+  // Calculate global question index
+  const getGlobalIndex = (sectionIdx: number, questionIdx: number) => {
+    let idx = 0;
+    for (let i = 0; i < sectionIdx; i++) {
+      idx += sections[i].questions.length;
+    }
+    return idx + questionIdx;
+  };
+
+  const globalQuestionIndex = getGlobalIndex(currentSectionIndex, currentQuestionIndex);
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const handleStartExam = () => {
+    setExamStarted(true);
+    setTimeRemaining(timeLimitMinutes * 60);
+  };
+
+  const handleAnswerChange = (questionId: string, answer: string | number) => {
+    setAnswers(prev => ({ ...prev, [questionId]: answer }));
+  };
+
+  const navigateToQuestion = (sectionIdx: number, questionIdx: number) => {
+    setCurrentSectionIndex(sectionIdx);
+    setCurrentQuestionIndex(questionIdx);
+    setShowReview(false);
+  };
+
+  const handleNext = () => {
+    if (currentQuestionIndex < currentSection.questions.length - 1) {
+      setCurrentQuestionIndex(prev => prev + 1);
+    } else if (currentSectionIndex < sections.length - 1) {
+      setCurrentSectionIndex(prev => prev + 1);
+      setCurrentQuestionIndex(0);
+    } else {
+      setShowReview(true);
+    }
+  };
+
+  const handlePrevious = () => {
+    if (currentQuestionIndex > 0) {
+      setCurrentQuestionIndex(prev => prev - 1);
+    } else if (currentSectionIndex > 0) {
+      setCurrentSectionIndex(prev => prev - 1);
+      setCurrentQuestionIndex(sections[currentSectionIndex - 1].questions.length - 1);
+    }
+  };
+
+  const handleSubmitExam = () => {
+    // Grade the exam
+    const questionResults: { questionId: string; isCorrect: boolean; userAnswer: string | number; correctAnswer: string | number }[] = [];
+    const topicBreakdown: Record<string, { correct: number; total: number }> = {};
+    let earnedPoints = 0;
+
+    allQuestions.forEach(q => {
+      const userAnswer = answers[q.id];
+      let isCorrect = false;
+
+      if (q.type === 'calculation') {
+        const userNum = parseFloat(String(userAnswer || '').replace(/,/g, ''));
+        const correctNum = typeof q.correctAnswer === 'number' ? q.correctAnswer : parseFloat(String(q.correctAnswer));
+        isCorrect = !isNaN(userNum) && Math.abs(userNum - correctNum) < 0.01;
+      } else {
+        isCorrect = String(userAnswer || '').toLowerCase().trim() === String(q.correctAnswer).toLowerCase().trim();
+      }
+
+      if (isCorrect) {
+        earnedPoints += q.points;
+      }
+
+      questionResults.push({
+        questionId: q.id,
+        isCorrect,
+        userAnswer: userAnswer ?? '',
+        correctAnswer: q.correctAnswer
+      });
+
+      // Topic breakdown
+      if (!topicBreakdown[q.topic]) {
+        topicBreakdown[q.topic] = { correct: 0, total: 0 };
+      }
+      topicBreakdown[q.topic].total++;
+      if (isCorrect) topicBreakdown[q.topic].correct++;
+    });
+
+    const scorePercent = Math.round((earnedPoints / totalPoints) * 100);
+
+    setResults({
+      totalPoints,
+      earnedPoints,
+      scorePercent,
+      questionResults,
+      topicBreakdown
+    });
+    setExamFinished(true);
+
+    if (scorePercent >= passingScore) {
+      onComplete();
+    }
+  };
+
+  const answeredCount = Object.keys(answers).length;
+  const isQuestionAnswered = (questionId: string) => answers[questionId] !== undefined && answers[questionId] !== '';
+
+  // Not started state
+  if (!examStarted && !completed) {
+    return (
+      <div className="text-center py-8">
+        <div className="w-20 h-20 bg-violet-100 rounded-full flex items-center justify-center mx-auto mb-6">
+          <BookOpen className="w-10 h-10 text-violet-600" />
+        </div>
+        
+        <h3 className="text-2xl font-bold mb-2" style={{ fontFamily: 'var(--font-heading)' }}>
+          {examTitle}
+        </h3>
+        
+        <p className="text-[var(--foreground-muted)] mb-6 max-w-lg mx-auto">
+          {instructions}
+        </p>
+
+        <div className="bg-slate-50 border border-slate-200 rounded-xl p-6 max-w-md mx-auto mb-6">
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <p className="text-slate-500">Time Limit</p>
+              <p className="font-semibold text-slate-800">{timeLimitMinutes} minutes</p>
+            </div>
+            <div>
+              <p className="text-slate-500">Questions</p>
+              <p className="font-semibold text-slate-800">{totalQuestions} questions</p>
+            </div>
+            <div>
+              <p className="text-slate-500">Total Points</p>
+              <p className="font-semibold text-slate-800">{totalPoints} points</p>
+            </div>
+            <div>
+              <p className="text-slate-500">Passing Score</p>
+              <p className="font-semibold text-slate-800">{passingScore}%</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 max-w-md mx-auto mb-6">
+          <div className="flex items-start gap-3">
+            <Lightbulb className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+            <div className="text-sm text-amber-800 text-left">
+              <p className="font-medium mb-1">Before you begin:</p>
+              <ul className="list-disc list-inside space-y-1 text-amber-700">
+                <li>Find a quiet place without distractions</li>
+                <li>Have a calculator ready if needed</li>
+                <li>The timer starts when you click Start</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <button
+          onClick={handleStartExam}
+          className="px-8 py-4 bg-violet-600 text-white font-semibold rounded-xl hover:bg-violet-700 transition-colors text-lg"
+        >
+          Start Exam
+        </button>
+      </div>
+    );
+  }
+
+  // Results state
+  if (examFinished && results) {
+    return (
+      <div>
+        {/* Score header */}
+        <div className={`text-center p-8 rounded-xl mb-6 ${results.scorePercent >= passingScore ? 'bg-emerald-50 border border-emerald-200' : 'bg-amber-50 border border-amber-200'}`}>
+          <div className={`w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-4 ${results.scorePercent >= passingScore ? 'bg-emerald-100' : 'bg-amber-100'}`}>
+            <span className={`text-3xl font-bold ${results.scorePercent >= passingScore ? 'text-emerald-700' : 'text-amber-700'}`}>
+              {results.scorePercent}%
+            </span>
+          </div>
+          
+          <h3 className="text-xl font-bold mb-2">
+            {results.scorePercent >= passingScore ? 'Congratulations!' : 'Keep Practicing!'}
+          </h3>
+          <p className="text-[var(--foreground-muted)]">
+            You scored {results.earnedPoints} out of {results.totalPoints} points.
+            {results.scorePercent < passingScore && ` You need ${passingScore}% to pass.`}
+          </p>
+        </div>
+
+        {/* Topic breakdown */}
+        <div className="bg-white border border-slate-200 rounded-xl p-6 mb-6">
+          <h4 className="font-semibold text-slate-800 mb-4">Performance by Topic</h4>
+          <div className="space-y-3">
+            {Object.entries(results.topicBreakdown).map(([topic, stats]) => {
+              const percent = Math.round((stats.correct / stats.total) * 100);
+              return (
+                <div key={topic}>
+                  <div className="flex items-center justify-between text-sm mb-1">
+                    <span className="text-slate-700">{topic}</span>
+                    <span className={`font-medium ${percent >= 70 ? 'text-emerald-600' : percent >= 50 ? 'text-amber-600' : 'text-red-600'}`}>
+                      {stats.correct}/{stats.total} ({percent}%)
+                    </span>
+                  </div>
+                  <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full transition-all ${percent >= 70 ? 'bg-emerald-500' : percent >= 50 ? 'bg-amber-500' : 'bg-red-500'}`}
+                      style={{ width: `${percent}%` }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Question review */}
+        <div className="bg-white border border-slate-200 rounded-xl p-6">
+          <h4 className="font-semibold text-slate-800 mb-4">Question Review</h4>
+          <div className="space-y-4">
+            {sections.map((section, sIdx) => (
+              <div key={section.id}>
+                <h5 className="text-sm font-medium text-slate-500 mb-2">{section.title}</h5>
+                <div className="space-y-3">
+                  {section.questions.map((q, qIdx) => {
+                    const result = results.questionResults.find(r => r.questionId === q.id);
+                    return (
+                      <div
+                        key={q.id}
+                        className={`p-4 rounded-lg border ${result?.isCorrect ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <span className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${result?.isCorrect ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                            {getGlobalIndex(sIdx, qIdx) + 1}
+                          </span>
+                          <div className="flex-1">
+                            <p className="text-sm text-slate-800 mb-2">{q.question}</p>
+                            <div className="text-xs space-y-1">
+                              <p className={result?.isCorrect ? 'text-emerald-700' : 'text-red-700'}>
+                                Your answer: {String(result?.userAnswer) || '(no answer)'}
+                              </p>
+                              {!result?.isCorrect && (
+                                <p className="text-emerald-700">
+                                  Correct answer: {String(q.correctAnswer)}
+                                </p>
+                              )}
+                              <p className="text-slate-600 mt-2">{q.explanation}</p>
+                            </div>
+                          </div>
+                          <span className="text-xs text-slate-500">{q.points} pts</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Review state before submit
+  if (showReview) {
+    return (
+      <div>
+        {/* Timer */}
+        <div className={`flex items-center justify-between mb-6 p-4 rounded-xl ${timeRemaining <= 300 ? 'bg-red-50 border border-red-200' : 'bg-slate-50 border border-slate-200'}`}>
+          <span className="text-sm text-slate-600">Time Remaining</span>
+          <span className={`text-2xl font-mono font-bold ${timeRemaining <= 300 ? 'text-red-600' : 'text-slate-800'}`}>
+            {formatTime(timeRemaining)}
+          </span>
+        </div>
+
+        <h3 className="text-xl font-bold mb-4">Review Your Answers</h3>
+        <p className="text-[var(--foreground-muted)] mb-6">
+          Review your answers before submitting. Click on any question to go back and change your answer.
+        </p>
+
+        <div className="space-y-4 mb-6">
+          {sections.map((section, sIdx) => (
+            <div key={section.id} className="bg-white border border-slate-200 rounded-xl p-4">
+              <h4 className="font-medium text-slate-700 mb-3">{section.title}</h4>
+              <div className="grid grid-cols-5 gap-2">
+                {section.questions.map((q, qIdx) => {
+                  const answered = isQuestionAnswered(q.id);
+                  return (
+                    <button
+                      key={q.id}
+                      onClick={() => navigateToQuestion(sIdx, qIdx)}
+                      className={`
+                        w-10 h-10 rounded-lg font-medium text-sm transition-colors
+                        ${answered 
+                          ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' 
+                          : 'bg-amber-100 text-amber-700 hover:bg-amber-200'
+                        }
+                      `}
+                    >
+                      {getGlobalIndex(sIdx, qIdx) + 1}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div className="text-sm text-slate-600">
+            <span className="inline-flex items-center gap-1">
+              <span className="w-3 h-3 rounded bg-emerald-100"></span> Answered
+            </span>
+            <span className="inline-flex items-center gap-1 ml-4">
+              <span className="w-3 h-3 rounded bg-amber-100"></span> Unanswered
+            </span>
+          </div>
+          
+          <div className="flex gap-3">
+            <button
+              onClick={() => setShowReview(false)}
+              className="px-6 py-3 border border-slate-300 text-slate-700 font-medium rounded-xl hover:bg-slate-50 transition-colors"
+            >
+              Back to Questions
+            </button>
+            <button
+              onClick={handleSubmitExam}
+              className="px-6 py-3 bg-violet-600 text-white font-medium rounded-xl hover:bg-violet-700 transition-colors"
+            >
+              Submit Exam
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Active exam state
+  if (!currentQuestion) {
+    return <div className="text-center py-8 text-slate-500">No questions available.</div>;
+  }
+
+  return (
+    <div>
+      {/* Timer and progress */}
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-4">
+          <span className="text-sm text-slate-600">
+            Question {globalQuestionIndex + 1} of {totalQuestions}
+          </span>
+          <span className="text-xs px-2 py-1 bg-slate-100 rounded-full text-slate-600">
+            {currentSection.title}
+          </span>
+        </div>
+        <div className={`flex items-center gap-2 px-4 py-2 rounded-xl ${timeRemaining <= 300 ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-700'}`}>
+          <span className="text-sm">Time:</span>
+          <span className="font-mono font-bold">{formatTime(timeRemaining)}</span>
+        </div>
+      </div>
+
+      {/* Progress bar */}
+      <div className="h-2 bg-slate-100 rounded-full mb-6 overflow-hidden">
+        <div
+          className="h-full bg-violet-500 transition-all"
+          style={{ width: `${((globalQuestionIndex + 1) / totalQuestions) * 100}%` }}
+        />
+      </div>
+
+      {/* Question */}
+      <div className="bg-white border border-slate-200 rounded-xl p-6 mb-6">
+        <div className="flex items-start justify-between mb-4">
+          <span className="text-xs px-2 py-1 bg-violet-100 text-violet-700 rounded-full">
+            {currentQuestion.topic}
+          </span>
+          <span className="text-sm text-slate-500">{currentQuestion.points} points</span>
+        </div>
+
+        <p className="text-lg text-slate-800 mb-6">{currentQuestion.question}</p>
+
+        {/* MCQ options */}
+        {currentQuestion.type === 'mcq' && currentQuestion.options && (
+          <div className="space-y-3">
+            {currentQuestion.options.map((option, idx) => (
+              <button
+                key={idx}
+                onClick={() => handleAnswerChange(currentQuestion.id, option)}
+                className={`
+                  w-full text-left p-4 rounded-xl border-2 transition-all
+                  ${answers[currentQuestion.id] === option 
+                    ? 'border-violet-500 bg-violet-50' 
+                    : 'border-slate-200 hover:border-violet-300'
+                  }
+                `}
+              >
+                <span className="flex items-center gap-3">
+                  <span className={`
+                    w-6 h-6 rounded-full border-2 flex items-center justify-center text-xs font-medium
+                    ${answers[currentQuestion.id] === option 
+                      ? 'border-violet-500 bg-violet-500 text-white' 
+                      : 'border-slate-300'
+                    }
+                  `}>
+                    {String.fromCharCode(65 + idx)}
+                  </span>
+                  <span className="text-slate-700">{option}</span>
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Calculation/short answer input */}
+        {(currentQuestion.type === 'calculation' || currentQuestion.type === 'short-answer') && (
+          <div>
+            <input
+              type={currentQuestion.type === 'calculation' ? 'number' : 'text'}
+              value={answers[currentQuestion.id] || ''}
+              onChange={(e) => handleAnswerChange(currentQuestion.id, e.target.value)}
+              placeholder={currentQuestion.type === 'calculation' ? 'Enter your calculated answer...' : 'Enter your answer...'}
+              className="w-full px-4 py-3 border-2 border-slate-200 rounded-xl focus:outline-none focus:border-violet-500"
+            />
+            {currentQuestion.hint && (
+              <p className="text-sm text-slate-500 mt-2">Hint: {currentQuestion.hint}</p>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Navigation */}
+      <div className="flex items-center justify-between">
+        <button
+          onClick={handlePrevious}
+          disabled={globalQuestionIndex === 0}
+          className="px-6 py-3 border border-slate-300 text-slate-700 font-medium rounded-xl hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          Previous
+        </button>
+
+        <div className="text-sm text-slate-500">
+          {answeredCount}/{totalQuestions} answered
+        </div>
+
+        <button
+          onClick={handleNext}
+          className="flex items-center gap-2 px-6 py-3 bg-violet-600 text-white font-medium rounded-xl hover:bg-violet-700 transition-colors"
+        >
+          {globalQuestionIndex === totalQuestions - 1 ? 'Review Answers' : 'Next'}
+          <ArrowRight className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* Quick navigation */}
+      <div className="mt-6 pt-6 border-t border-slate-200">
+        <p className="text-xs text-slate-500 mb-2">Quick Navigation</p>
+        <div className="flex flex-wrap gap-1">
+          {sections.map((section, sIdx) => 
+            section.questions.map((q, qIdx) => {
+              const gIdx = getGlobalIndex(sIdx, qIdx);
+              const answered = isQuestionAnswered(q.id);
+              const isCurrent = gIdx === globalQuestionIndex;
+              
+              return (
+                <button
+                  key={q.id}
+                  onClick={() => navigateToQuestion(sIdx, qIdx)}
+                  className={`
+                    w-8 h-8 rounded text-xs font-medium transition-colors
+                    ${isCurrent 
+                      ? 'bg-violet-600 text-white' 
+                      : answered 
+                        ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' 
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }
+                  `}
+                >
+                  {gIdx + 1}
+                </button>
+              );
+            })
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Inventory Calculator Component
+interface InventoryCalculatorProps {
+  content: Record<string, unknown> | null;
+  onComplete: () => void;
+  completed: boolean;
+}
+
+interface InventoryTransaction {
+  transaction: string;
+  date: string;
+  units: number;
+  unit_cost: number;
+}
+
+interface InventoryQuestion {
+  id: string;
+  question: string;
+  answer_type: string;
+  correct_answer: number;
+  tolerance?: number;
+  hint?: string;
+  explanation: string;
+}
+
+function InventoryCalculator({ content, onComplete, completed }: InventoryCalculatorProps) {
+  const title = (content?.title as string) || "Inventory Costing Exercise";
+  const description = (content?.description as string) || "";
+  const companyBackground = (content?.company_background as string) || "";
+  const inventoryData = (content?.inventory_data as InventoryTransaction[]) || [];
+  const unitsSold = (content?.units_sold as number) || 0;
+  const questions = (content?.questions as InventoryQuestion[]) || [];
+  const passingScore = (content?.passing_score as number) || 70;
+  
+  const [userAnswers, setUserAnswers] = useState<Record<string, string>>({});
+  const [showResults, setShowResults] = useState(false);
+  const [score, setScore] = useState(0);
+  
+  // Calculate totals for reference
+  const totalUnits = inventoryData.reduce((sum, t) => sum + t.units, 0);
+  const totalCost = inventoryData.reduce((sum, t) => sum + (t.units * t.unit_cost), 0);
+  const endingUnits = totalUnits - unitsSold;
+  
+  const handleAnswerChange = (questionId: string, value: string) => {
+    if (showResults || completed) return;
+    setUserAnswers(prev => ({ ...prev, [questionId]: value }));
+  };
+  
+  const checkAnswers = () => {
+    let correctCount = 0;
+    questions.forEach(q => {
+      const userValue = parseFloat(userAnswers[q.id] || '0');
+      const tolerance = q.tolerance || 0;
+      if (Math.abs(userValue - q.correct_answer) <= tolerance) {
+        correctCount++;
+      }
+    });
+    
+    const scorePercent = Math.round((correctCount / questions.length) * 100);
+    setScore(scorePercent);
+    setShowResults(true);
+    
+    if (scorePercent >= passingScore) {
+      onComplete();
+    }
+  };
+  
+  const isCorrect = (q: InventoryQuestion): boolean => {
+    const userValue = parseFloat(userAnswers[q.id] || '0');
+    const tolerance = q.tolerance || 0;
+    return Math.abs(userValue - q.correct_answer) <= tolerance;
+  };
+  
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('de-CH', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(amount);
+  };
+
+  if (questions.length === 0) {
+    return <div className="text-center text-[var(--foreground-muted)]">No questions available.</div>;
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Title and Description */}
+      <div>
+        <h2 className="text-xl font-bold text-slate-800 mb-2">{title}</h2>
+        {description && <p className="text-slate-600">{description}</p>}
+        {companyBackground && (
+          <p className="text-sm text-slate-500 mt-2 italic">{companyBackground}</p>
+        )}
+      </div>
+
+      {/* Inventory Data Table */}
+      {inventoryData.length > 0 && (
+        <div className="bg-slate-50 border border-slate-200 rounded-xl p-4">
+          <h3 className="font-semibold text-slate-700 mb-3">Inventory Transactions</h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-300">
+                  <th className="text-left py-2 px-3 font-semibold text-slate-600">Transaction</th>
+                  <th className="text-left py-2 px-3 font-semibold text-slate-600">Date</th>
+                  <th className="text-right py-2 px-3 font-semibold text-slate-600">Units</th>
+                  <th className="text-right py-2 px-3 font-semibold text-slate-600">Unit Cost</th>
+                  <th className="text-right py-2 px-3 font-semibold text-slate-600">Total Cost</th>
+                </tr>
+              </thead>
+              <tbody>
+                {inventoryData.map((t, idx) => (
+                  <tr key={idx} className="border-b border-slate-200">
+                    <td className="py-2 px-3 text-slate-700">{t.transaction}</td>
+                    <td className="py-2 px-3 text-slate-500">{t.date}</td>
+                    <td className="py-2 px-3 text-right font-mono text-slate-700">{t.units}</td>
+                    <td className="py-2 px-3 text-right font-mono text-slate-700">CHF {formatCurrency(t.unit_cost)}</td>
+                    <td className="py-2 px-3 text-right font-mono text-slate-700">CHF {formatCurrency(t.units * t.unit_cost)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr className="bg-slate-100 font-semibold">
+                  <td className="py-2 px-3 text-slate-800" colSpan={2}>Total Available</td>
+                  <td className="py-2 px-3 text-right font-mono text-slate-800">{totalUnits}</td>
+                  <td className="py-2 px-3"></td>
+                  <td className="py-2 px-3 text-right font-mono text-slate-800">CHF {formatCurrency(totalCost)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+          
+          {unitsSold > 0 && (
+            <div className="mt-3 pt-3 border-t border-slate-200 flex gap-6 text-sm">
+              <div>
+                <span className="text-slate-500">Units Sold:</span>
+                <span className="font-semibold text-slate-700 ml-2">{unitsSold}</span>
+              </div>
+              <div>
+                <span className="text-slate-500">Ending Units:</span>
+                <span className="font-semibold text-slate-700 ml-2">{endingUnits}</span>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Questions */}
+      <div className="space-y-4">
+        <h3 className="font-semibold text-slate-700">Questions</h3>
+        {questions.map((q, idx) => (
+          <div 
+            key={q.id} 
+            className={`border rounded-xl p-4 transition-colors ${
+              showResults 
+                ? isCorrect(q) 
+                  ? 'bg-emerald-50 border-emerald-200' 
+                  : 'bg-red-50 border-red-200'
+                : 'bg-white border-slate-200'
+            }`}
+          >
+            <div className="flex items-start gap-3">
+              <span className="flex-shrink-0 w-7 h-7 rounded-full bg-violet-100 text-violet-700 flex items-center justify-center text-sm font-medium">
+                {idx + 1}
+              </span>
+              <div className="flex-1">
+                <p className="text-slate-700 mb-3">{q.question}</p>
+                
+                {q.hint && !showResults && (
+                  <p className="text-xs text-slate-500 mb-2 flex items-center gap-1">
+                    <Lightbulb className="w-3 h-3" />
+                    {q.hint}
+                  </p>
+                )}
+                
+                <div className="flex items-center gap-3">
+                  <input
+                    type="number"
+                    value={userAnswers[q.id] || ''}
+                    onChange={(e) => handleAnswerChange(q.id, e.target.value)}
+                    disabled={showResults || completed}
+                    placeholder="Enter your answer"
+                    className="w-48 px-4 py-2 text-right font-mono border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500 disabled:bg-slate-100"
+                    step="any"
+                  />
+                  {showResults && (
+                    <span className={`text-sm font-medium ${isCorrect(q) ? 'text-emerald-600' : 'text-red-600'}`}>
+                      {isCorrect(q) ? 'Correct' : `Correct: ${formatCurrency(q.correct_answer)}`}
+                    </span>
+                  )}
+                </div>
+                
+                {showResults && q.explanation && (
+                  <p className="mt-3 text-sm text-slate-600 bg-white/60 rounded-lg p-2">
+                    {q.explanation}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Submit / Results */}
+      {!showResults ? (
+        <div className="flex justify-center">
+          <button
+            onClick={checkAnswers}
+            disabled={Object.keys(userAnswers).length === 0}
+            className="px-8 py-3 bg-violet-600 text-white font-semibold rounded-xl hover:bg-violet-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Check Answers
+          </button>
+        </div>
+      ) : (
+        <div className={`text-center p-6 rounded-xl ${score >= passingScore ? 'bg-emerald-50' : 'bg-amber-50'}`}>
+          <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 ${score >= passingScore ? 'bg-emerald-100' : 'bg-amber-100'}`}>
+            <span className={`text-2xl font-bold ${score >= passingScore ? 'text-emerald-700' : 'text-amber-700'}`}>{score}%</span>
+          </div>
+          <h3 className="text-xl font-bold mb-2">
+            {score >= passingScore ? 'Great Job!' : 'Keep Practicing!'}
+          </h3>
+          <p className="text-slate-600">
+            You got {Math.round((score / 100) * questions.length)} of {questions.length} correct.
+            {score < passingScore && ` You need ${passingScore}% to pass.`}
+          </p>
+        </div>
+      )}
+    </div>
   );
 }
 

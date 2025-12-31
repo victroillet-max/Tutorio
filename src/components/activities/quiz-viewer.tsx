@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
-import { CheckCircle2, XCircle, HelpCircle, ChevronRight, BookOpen, Lightbulb, MessageCircle } from "lucide-react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { CheckCircle2, XCircle, HelpCircle, ChevronRight, BookOpen, Lightbulb, MessageCircle, Clock, AlertTriangle } from "lucide-react";
 import type { Activity, QuizQuestion } from "@/lib/database.types";
 import { markActivityComplete, trackActivityView, updateActivityProgress } from "@/lib/activities/actions";
 import { useChatContext } from "@/components/chat";
@@ -17,12 +17,106 @@ interface QuizContent {
   questions: QuizQuestion[];
   passing_score: number;
   shuffle_questions?: boolean;
+  shuffle_options?: boolean;
+  timed_mode?: boolean;
+  time_limit_seconds?: number;
 }
 
 export function QuizViewer({ activity, userId, isCompleted }: QuizViewerProps) {
   const content = activity.content as QuizContent | null;
-  const questions = content?.questions || [];
+  const originalQuestions = content?.questions || [];
   const passingScore = content?.passing_score || activity.passing_score || 70;
+  const shuffleQuestions = content?.shuffle_questions ?? false;
+  const shuffleOptions = content?.shuffle_options ?? false;
+  const timedMode = content?.timed_mode ?? false;
+  const timeLimitSeconds = content?.time_limit_seconds || 300; // Default 5 minutes
+
+  // Shuffle questions on client mount (to avoid hydration issues)
+  const [questions, setQuestions] = useState<QuizQuestion[]>(originalQuestions);
+  const [isClient, setIsClient] = useState(false);
+  
+  // Timer state
+  const [timeRemaining, setTimeRemaining] = useState(timeLimitSeconds);
+  const [timerActive, setTimerActive] = useState(false);
+  const [timeExpired, setTimeExpired] = useState(false);
+
+  // Initialize shuffled questions on client
+  useEffect(() => {
+    setIsClient(true);
+    if (originalQuestions.length > 0) {
+      let processedQuestions = [...originalQuestions];
+      
+      // Shuffle questions if enabled
+      if (shuffleQuestions) {
+        processedQuestions = processedQuestions.sort(() => Math.random() - 0.5);
+      }
+      
+      // Shuffle options for each MCQ question if enabled
+      if (shuffleOptions) {
+        processedQuestions = processedQuestions.map(q => {
+          if (q.type === 'mcq' && q.options) {
+            // Create index mapping for shuffling
+            const indices = q.options.map((_, i) => i);
+            const shuffledIndices = indices.sort(() => Math.random() - 0.5);
+            const shuffledOptions = shuffledIndices.map(i => q.options![i]);
+            // Find new position of correct answer
+            const newCorrectIndex = shuffledIndices.indexOf(q.correct as number);
+            return { ...q, options: shuffledOptions, correct: newCorrectIndex };
+          }
+          return q;
+        });
+      }
+      
+      setQuestions(processedQuestions);
+      
+      // Start timer if in timed mode
+      if (timedMode && !isCompleted) {
+        setTimerActive(true);
+      }
+    }
+  }, [originalQuestions, shuffleQuestions, shuffleOptions, timedMode, isCompleted, timeLimitSeconds]);
+
+  // Timer effect
+  useEffect(() => {
+    if (!timerActive || isCompleted || timeExpired) return;
+
+    if (timeRemaining <= 0) {
+      setTimeExpired(true);
+      setTimerActive(false);
+      // Auto-submit when time expires
+      handleTimeExpired();
+      return;
+    }
+
+    const timer = setInterval(() => {
+      setTimeRemaining(prev => prev - 1);
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [timerActive, timeRemaining, isCompleted, timeExpired]);
+
+  const handleTimeExpired = async () => {
+    // Submit with whatever answers they have
+    setIsSubmitting(true);
+    const finalScore = calculateScore();
+    setScore(finalScore);
+    setShowResults(true);
+    
+    try {
+      await saveTimeSpent();
+      await markActivityComplete(activity.id, finalScore);
+    } catch (error) {
+      console.error("Failed to save quiz result:", error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const formatTime = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
 
   // Chat context for struggling detection and current question tracking
   // Extract specific methods to avoid dependency on entire context object (prevents infinite re-renders)
@@ -153,6 +247,32 @@ export function QuizViewer({ activity, userId, isCompleted }: QuizViewerProps) {
     setShowResults(false);
     setScore(null);
     setShowExplanation(null);
+    // Reset timer for timed quizzes
+    if (timedMode) {
+      setTimeRemaining(timeLimitSeconds);
+      setTimeExpired(false);
+      setTimerActive(true);
+    }
+    // Re-shuffle questions if enabled
+    if (shuffleQuestions || shuffleOptions) {
+      let processedQuestions = [...originalQuestions];
+      if (shuffleQuestions) {
+        processedQuestions = processedQuestions.sort(() => Math.random() - 0.5);
+      }
+      if (shuffleOptions) {
+        processedQuestions = processedQuestions.map(q => {
+          if (q.type === 'mcq' && q.options) {
+            const indices = q.options.map((_, i) => i);
+            const shuffledIndices = indices.sort(() => Math.random() - 0.5);
+            const shuffledOptions = shuffledIndices.map(i => q.options![i]);
+            const newCorrectIndex = shuffledIndices.indexOf(q.correct as number);
+            return { ...q, options: shuffledOptions, correct: newCorrectIndex };
+          }
+          return q;
+        });
+      }
+      setQuestions(processedQuestions);
+    }
   };
 
   if (showResults && score !== null) {
@@ -168,6 +288,14 @@ export function QuizViewer({ activity, userId, isCompleted }: QuizViewerProps) {
       
       <div className="bg-white rounded-2xl shadow-sm border border-[var(--border)] overflow-hidden">
         <div className={`p-8 text-center ${passed ? 'bg-emerald-50' : 'bg-red-50'}`}>
+          {/* Time expired warning */}
+          {timeExpired && (
+            <div className="mb-4 p-3 bg-amber-100 border border-amber-200 rounded-lg inline-flex items-center gap-2 text-amber-700">
+              <AlertTriangle className="w-5 h-5" />
+              <span className="text-sm font-medium">Time expired - quiz was auto-submitted</span>
+            </div>
+          )}
+          
           <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 ${passed ? 'bg-emerald-100' : 'bg-red-100'}`}>
             {passed ? (
               <CheckCircle2 className="w-10 h-10 text-emerald-600" />
@@ -258,10 +386,38 @@ export function QuizViewer({ activity, userId, isCompleted }: QuizViewerProps) {
           </div>
         </div>
         
-        <div className="text-sm text-[var(--foreground-muted)]">
-          {answeredCount}/{totalQuestions} answered
+        <div className="flex items-center gap-4">
+          {/* Timer display for timed quizzes */}
+          {timedMode && timerActive && (
+            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg ${
+              timeRemaining <= 60 
+                ? 'bg-red-100 text-red-700' 
+                : timeRemaining <= 120 
+                  ? 'bg-amber-100 text-amber-700' 
+                  : 'bg-slate-100 text-slate-700'
+            }`}>
+              <Clock className="w-4 h-4" />
+              <span className="font-mono font-bold">{formatTime(timeRemaining)}</span>
+            </div>
+          )}
+          
+          <div className="text-sm text-[var(--foreground-muted)]">
+            {answeredCount}/{totalQuestions} answered
+          </div>
         </div>
       </div>
+      
+      {/* Timer progress bar for timed quizzes */}
+      {timedMode && timerActive && (
+        <div className="h-1 bg-slate-100">
+          <div 
+            className={`h-full transition-all duration-1000 ${
+              timeRemaining <= 60 ? 'bg-red-500' : timeRemaining <= 120 ? 'bg-amber-500' : 'bg-purple-500'
+            }`}
+            style={{ width: `${(timeRemaining / timeLimitSeconds) * 100}%` }}
+          />
+        </div>
+      )}
       
       {/* Progress Bar */}
       <div className="h-1 bg-slate-100">

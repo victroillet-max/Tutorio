@@ -1,14 +1,21 @@
 import { createClient } from "@/utils/supabase/server";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { getSiteUrl } from "@/lib/env";
 import { logger } from "@/lib/logging";
+import { applyRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
+import { STRIPE_API_VERSION, StripeSubscriptionWithPeriods } from "@/lib/stripe/types";
 
 const log = logger.child({ module: "api/stripe/change-plan" });
 
+// Service role client for bypassing RLS on subscription updates
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
 // Initialize Stripe
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
-const stripe = stripeSecretKey ? new Stripe(stripeSecretKey, { apiVersion: "2025-12-15.clover" }) : null;
+const stripe = stripeSecretKey ? new Stripe(stripeSecretKey, { apiVersion: STRIPE_API_VERSION }) : null;
 
 // Fallback price IDs from environment
 const FALLBACK_PRICE_IDS: Record<string, string | undefined> = {
@@ -30,6 +37,13 @@ export async function POST(request: NextRequest) {
       { error: "Not authenticated" },
       { status: 401 }
     );
+  }
+
+  // Apply rate limiting
+  const rateLimitResult = await applyRateLimit(request, user.id, "checkout");
+  if (rateLimitResult) {
+    log.warn("Rate limit exceeded for change-plan", { userId: user.id });
+    return createRateLimitResponse(rateLimitResult);
   }
 
   // Check if Stripe is configured
@@ -125,7 +139,7 @@ export async function POST(request: NextRequest) {
 
     try {
       // Retrieve the current Stripe subscription
-      const stripeSubscription = await stripe.subscriptions.retrieve(stripeSubscriptionId);
+      const stripeSubscription = await stripe.subscriptions.retrieve(stripeSubscriptionId) as unknown as StripeSubscriptionWithPeriods;
 
       if (!stripeSubscription.items.data.length) {
         return NextResponse.json(
@@ -137,54 +151,159 @@ export async function POST(request: NextRequest) {
       // Determine if this is an upgrade or downgrade
       const isUpgrade = newTierSlug === 'advanced';
 
-      // Update the subscription in Stripe
-      // For both upgrade and downgrade, we use proration
-      await stripe.subscriptions.update(
-        stripeSubscriptionId,
-        {
-          items: [
-            {
-              id: stripeSubscription.items.data[0].id,
-              price: newPriceId,
+      // Get period end date for response messaging
+      const periodEnd = new Date(stripeSubscription.current_period_end * 1000);
+
+      if (isUpgrade) {
+        // UPGRADE: Charge immediately with proration
+        // User pays the prorated difference right away and gets immediate access
+        const updatedSubscription = await stripe.subscriptions.update(
+          stripeSubscriptionId,
+          {
+            items: [
+              {
+                id: stripeSubscription.items.data[0].id,
+                price: newPriceId,
+              },
+            ],
+            // "always_invoice" creates an invoice immediately for the prorated amount
+            proration_behavior: "always_invoice",
+            metadata: {
+              ...stripeSubscription.metadata,
+              tier: newTierSlug,
             },
-          ],
-          proration_behavior: "create_prorations",
-          metadata: {
-            ...stripeSubscription.metadata,
-            tier: newTierSlug,
-          },
+          }
+        );
+
+        log.info("Subscription upgraded with immediate billing", {
+          subscriptionId: stripeSubscriptionId,
+          latestInvoice: updatedSubscription.latest_invoice,
+        });
+
+        // Update our database immediately for upgrades
+        if (supabaseUrl && supabaseServiceKey) {
+          const serviceClient = createSupabaseClient(supabaseUrl, supabaseServiceKey);
+          
+          const { data: tierData } = await serviceClient
+            .from("subscription_tiers")
+            .select("id")
+            .eq("slug", newTierSlug)
+            .single();
+
+          if (tierData) {
+            await serviceClient
+              .from("subscriptions")
+              .update({
+                tier_id: tierData.id,
+                updated_at: new Date().toISOString(),
+              })
+              .eq("id", subscriptionId);
+
+            log.info("Local subscription tier updated for upgrade", { subscriptionId, newTierSlug });
+          }
         }
-      );
 
-      // Update our database immediately
-      const { data: tierData } = await supabase
-        .from("subscription_tiers")
-        .select("id")
-        .eq("slug", newTierSlug)
-        .single();
+        return NextResponse.json({
+          success: true,
+          message: "Subscription upgraded successfully",
+          newTier: newTierSlug,
+          effectiveImmediately: true,
+        });
+      } else {
+        // DOWNGRADE: Schedule change for end of billing period using Subscription Schedule
+        // No refund - user keeps current tier access until period ends
+        // The new lower tier will take effect at the next billing period
+        
+        // Check if there's already a schedule for this subscription
+        const existingSchedules = await stripe.subscriptionSchedules.list({
+          customer: typeof stripeSubscription.customer === 'string' 
+            ? stripeSubscription.customer 
+            : stripeSubscription.customer.id,
+          limit: 10,
+        });
 
-      if (tierData) {
-        const { error: updateError } = await supabase
-          .from("subscriptions")
-          .update({
-            tier_id: tierData.id,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", subscriptionId);
+        const existingSchedule = existingSchedules.data.find(
+          s => s.subscription === stripeSubscriptionId && s.status === 'active'
+        );
 
-        if (updateError) {
-          log.error("Failed to update local subscription", updateError, { subscriptionId });
-          // Don't fail the request - Stripe webhook will catch this
+        if (existingSchedule) {
+          // Update existing schedule - replace the future phase
+          await stripe.subscriptionSchedules.update(existingSchedule.id, {
+            phases: [
+              {
+                items: [{ price: stripeSubscription.items.data[0].price.id, quantity: 1 }],
+                start_date: existingSchedule.phases[0].start_date,
+                end_date: stripeSubscription.current_period_end,
+              },
+              {
+                items: [{ price: newPriceId, quantity: 1 }],
+                start_date: stripeSubscription.current_period_end,
+                proration_behavior: 'none',
+                metadata: {
+                  ...stripeSubscription.metadata,
+                  tier: newTierSlug,
+                },
+              },
+            ],
+          });
+
+          log.info("Updated existing schedule for downgrade", {
+            scheduleId: existingSchedule.id,
+            subscriptionId: stripeSubscriptionId,
+            effectiveAt: periodEnd.toISOString(),
+          });
+        } else {
+          // Create a new schedule from the subscription
+          const schedule = await stripe.subscriptionSchedules.create({
+            from_subscription: stripeSubscriptionId,
+          });
+
+          // Update the schedule with the downgrade phase
+          await stripe.subscriptionSchedules.update(schedule.id, {
+            end_behavior: 'release',
+            phases: [
+              {
+                items: [{ price: stripeSubscription.items.data[0].price.id, quantity: 1 }],
+                start_date: schedule.phases[0].start_date,
+                end_date: stripeSubscription.current_period_end,
+              },
+              {
+                items: [{ price: newPriceId, quantity: 1 }],
+                start_date: stripeSubscription.current_period_end,
+                proration_behavior: 'none',
+                metadata: {
+                  ...stripeSubscription.metadata,
+                  tier: newTierSlug,
+                },
+              },
+            ],
+          });
+
+          log.info("Created subscription schedule for downgrade", {
+            scheduleId: schedule.id,
+            subscriptionId: stripeSubscriptionId,
+            newTier: newTierSlug,
+            effectiveAt: periodEnd.toISOString(),
+          });
         }
+
+        // NOTE: We don't update the tier in our database yet.
+        // The tier will be updated when the Stripe webhook fires for the subscription update
+        // when the scheduled phase change takes effect.
+        log.info("Downgrade scheduled - tier will be updated via webhook when phase changes", { 
+          subscriptionId, 
+          pendingTier: newTierSlug,
+          effectiveAt: periodEnd.toISOString(),
+        });
+
+        return NextResponse.json({
+          success: true,
+          message: `Plan downgrade scheduled for ${periodEnd.toLocaleDateString()}. You'll keep your current plan access until then.`,
+          newTier: newTierSlug,
+          effectiveAt: periodEnd.toISOString(),
+          effectiveImmediately: false,
+        });
       }
-
-      return NextResponse.json({
-        success: true,
-        message: isUpgrade 
-          ? "Subscription upgraded successfully" 
-          : "Subscription changed successfully",
-        newTier: newTierSlug,
-      });
 
     } catch (stripeError) {
       log.error("Stripe subscription update error", stripeError, { subscriptionId, newTierSlug });

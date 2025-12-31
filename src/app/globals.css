@@ -226,7 +226,13 @@ h1, h2, h3, h4, h5, h6 {
   to { width: 20px; }
 }
 
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}
+
 .animate-fade-in-up { animation: fade-in-up 0.8s ease-out forwards; }
+.animate-shimmer { animation: shimmer 2s infinite; }
 .animate-slide-in-left { animation: slide-in-left 0.8s ease-out forwards; }
 .animate-slide-in-right { animation: slide-in-right 0.8s ease-out forwards; }
 .animate-float { animation: float 4s ease-in-out infinite; }

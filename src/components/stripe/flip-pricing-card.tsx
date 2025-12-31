@@ -9,10 +9,13 @@ import {
   Crown, 
   Sparkles,
   Loader2,
-  X as CloseIcon
+  X as CloseIcon,
+  ArrowUp,
+  ArrowDown
 } from "lucide-react";
 import { toast } from "sonner";
-import type { SubscriptionTier } from "@/lib/database.types";
+import type { SubscriptionTier, UserCourseSubscription } from "@/lib/database.types";
+import { EmbeddedPlanSwitcher } from "./embedded-plan-switcher";
 
 // Features for each tier
 const tierFeatures = {
@@ -36,10 +39,7 @@ interface FlipPricingCardProps {
   tier: SubscriptionTier;
   courseId: string;
   courseName: string;
-  existingSubscription?: {
-    tier_slug: string;
-    tier_name: string;
-  };
+  existingSubscription?: UserCourseSubscription;
   stripeEnabled: boolean;
 }
 
@@ -54,10 +54,20 @@ export function FlipPricingCard({
   const [isLoading, setIsLoading] = useState(false);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [stripePromise, setStripePromise] = useState<Promise<Stripe | null> | null>(null);
+  const [showPlanSwitcher, setShowPlanSwitcher] = useState(false);
 
   const isAdvanced = tier.slug === 'advanced';
   const isCurrentPlan = existingSubscription?.tier_slug === tier.slug;
+  // Can upgrade from basic to advanced
   const canUpgrade = existingSubscription?.tier_slug === 'basic' && tier.slug === 'advanced';
+  // Can downgrade from advanced to basic
+  const canDowngrade = existingSubscription?.tier_slug === 'advanced' && tier.slug === 'basic';
+  // User has any subscription for this course
+  const hasAnySubscription = !!existingSubscription;
+  // Has a Stripe subscription that can be modified
+  const canModifySubscription = hasAnySubscription && existingSubscription?.stripe_subscription_id;
+  // Has a manual subscription (no Stripe link) - can convert by subscribing
+  const isManualSubscription = hasAnySubscription && !existingSubscription?.stripe_subscription_id;
   
   const Icon = isAdvanced ? Crown : Zap;
 
@@ -174,8 +184,32 @@ export function FlipPricingCard({
     }, 400);
   };
 
+  const handlePlanSwitchClick = () => {
+    setShowPlanSwitcher(true);
+  };
+
+  const handlePlanSwitchClose = () => {
+    setShowPlanSwitcher(false);
+  };
+
+  const handlePlanSwitchSuccess = () => {
+    setShowPlanSwitcher(false);
+    // Refresh the page to show updated subscription
+    window.location.reload();
+  };
+
   return (
     <>
+      {/* Plan Switch Modal */}
+      {showPlanSwitcher && existingSubscription && (
+        <EmbeddedPlanSwitcher
+          subscription={existingSubscription}
+          targetTier={tier}
+          onClose={handlePlanSwitchClose}
+          onSuccess={handlePlanSwitchSuccess}
+        />
+      )}
+
       {/* Checkout Modal Overlay */}
       {isFlipped && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -295,13 +329,35 @@ export function FlipPricingCard({
         
         {/* CTA Button */}
         <div className="mt-auto">
-          {isCurrentPlan ? (
+          {isCurrentPlan && !isManualSubscription ? (
+            // Current plan with Stripe subscription
             <button
               disabled
               className="w-full py-3 px-4 bg-slate-100 text-slate-500 font-semibold rounded-xl cursor-not-allowed"
             >
               Current Plan
             </button>
+          ) : isCurrentPlan && isManualSubscription ? (
+            // Current plan but manual subscription - can convert to Stripe
+            <div className="text-center">
+              <button
+                onClick={handleSubscribeClick}
+                disabled={isLoading}
+                className="w-full py-3 px-4 bg-emerald-600 text-white font-semibold rounded-xl hover:bg-emerald-700 transition-all disabled:opacity-50"
+              >
+                {isLoading ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Preparing...
+                  </span>
+                ) : (
+                  "Link to Stripe Billing"
+                )}
+              </button>
+              <p className="text-xs text-slate-500 mt-2">
+                Convert your manual subscription to enable plan management
+              </p>
+            </div>
           ) : !stripeEnabled ? (
             <button
               disabled
@@ -309,22 +365,55 @@ export function FlipPricingCard({
             >
               Coming Soon
             </button>
-          ) : canUpgrade ? (
+          ) : canUpgrade && canModifySubscription ? (
+            // Upgrade from Basic to Advanced (plan switch)
+            <button
+              onClick={handlePlanSwitchClick}
+              disabled={isLoading}
+              className="w-full py-3 px-4 bg-[var(--primary)] text-white font-semibold rounded-xl hover:bg-[var(--primary-dark)] transition-all disabled:opacity-50"
+            >
+              <span className="flex items-center justify-center gap-2">
+                <ArrowUp className="w-4 h-4" />
+                Upgrade to {tier.name}
+              </span>
+            </button>
+          ) : canDowngrade && canModifySubscription ? (
+            // Downgrade from Advanced to Basic (plan switch)
+            <button
+              onClick={handlePlanSwitchClick}
+              disabled={isLoading}
+              className="w-full py-3 px-4 bg-amber-600 text-white font-semibold rounded-xl hover:bg-amber-700 transition-all disabled:opacity-50"
+            >
+              <span className="flex items-center justify-center gap-2">
+                <ArrowDown className="w-4 h-4" />
+                Switch to {tier.name}
+              </span>
+            </button>
+          ) : isManualSubscription && !isCurrentPlan ? (
+            // Has manual subscription but wants different tier - allow new checkout
             <button
               onClick={handleSubscribeClick}
               disabled={isLoading}
-              className="w-full py-3 px-4 bg-[var(--primary)] text-white font-semibold rounded-xl hover:bg-[var(--primary-dark)] transition-all disabled:opacity-50"
+              className={`w-full py-3 px-4 font-semibold rounded-xl transition-all disabled:opacity-50 ${
+                canUpgrade
+                  ? 'bg-[var(--primary)] text-white hover:bg-[var(--primary-dark)] hover:shadow-lg hover:scale-[1.02]'
+                  : 'bg-amber-600 text-white hover:bg-amber-700'
+              }`}
             >
               {isLoading ? (
                 <span className="flex items-center justify-center gap-2">
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  Loading...
+                  Preparing...
                 </span>
               ) : (
-                `Upgrade to ${tier.name}`
+                <span className="flex items-center justify-center gap-2">
+                  {canUpgrade ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />}
+                  {canUpgrade ? `Upgrade to ${tier.name}` : `Switch to ${tier.name}`}
+                </span>
               )}
             </button>
           ) : (
+            // New subscription
             <button
               onClick={handleSubscribeClick}
               disabled={isLoading}

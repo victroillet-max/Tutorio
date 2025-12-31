@@ -96,10 +96,12 @@ Webhooks allow Stripe to notify your application about payment events.
 3. Enter your endpoint URL: `https://yourdomain.com/api/stripe/webhook`
 4. Select events to listen for:
    - `checkout.session.completed`
+   - `customer.subscription.created`
    - `customer.subscription.updated`
    - `customer.subscription.deleted`
    - `invoice.payment_succeeded`
    - `invoice.payment_failed`
+   - `invoice.upcoming` (optional - for renewal reminders)
 5. Copy the **Signing secret** and add to your production environment variables
 
 ## Step 4: Configure Customer Portal
@@ -128,19 +130,48 @@ Before going live, test the following flows:
    - Verify success redirect and toast notification
 
 2. **Subscription Upgrade**
-   - With an active Basic subscription, click "Upgrade"
-   - Verify subscription is upgraded with proration
+   - With an active Basic subscription, click "Upgrade Now"
+   - Verify subscription is upgraded with immediate prorated charge
+   - User should have immediate access to the higher tier
 
-3. **Customer Portal**
+3. **Subscription Downgrade**
+   - With an active Advanced subscription, click "Schedule Downgrade"
+   - Verify downgrade is scheduled for end of billing period
+   - User should retain current tier access until period ends
+   - No refund should be issued
+
+4. **Customer Portal**
    - Go to `/subscriptions`
    - Click "Open Billing Portal"
    - Test payment method update
    - Test subscription cancellation
 
-4. **Webhook Events**
+5. **Subscription Cancellation**
+   - Cancel subscription from subscriptions page
+   - Verify access continues until billing period ends
+   - No refund should be issued
+
+6. **Webhook Events**
    - Verify `checkout.session.completed` creates subscription in database
    - Verify `customer.subscription.updated` updates subscription status
    - Verify `invoice.payment_failed` marks subscription as `past_due`
+
+## Billing Policy
+
+### Upgrades
+- **Immediate effect**: User gets access to the higher tier immediately
+- **Immediate payment**: Prorated amount is charged right away
+- No waiting until the end of the billing period
+
+### Downgrades
+- **Scheduled for period end**: Downgrade takes effect at the end of the current billing period
+- **No refund**: User is not reimbursed for the remaining time on their current plan
+- **Continued access**: User retains current tier benefits until the billing period ends
+
+### Cancellations
+- **Access until period end**: User keeps access until the end of the paid period
+- **No refund**: No reimbursement for the remaining time
+- **Can resubscribe**: User can resubscribe at any time
 
 ### Test Card Numbers
 

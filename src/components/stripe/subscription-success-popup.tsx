@@ -59,6 +59,7 @@ export function SubscriptionSuccessPopup({
     setSyncError(null);
     
     try {
+      // First try to sync with session ID
       const response = await fetch("/api/stripe/sync-subscription", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -67,13 +68,32 @@ export function SubscriptionSuccessPopup({
       
       if (!response.ok) {
         const data = await response.json();
-        // Don't show error if subscription already exists (duplicate sync)
-        if (data.error !== "Session does not belong to this user") {
-          console.error("Subscription sync failed:", data.error);
+        // If session sync fails, try the auto-recovery endpoint
+        console.warn("Session sync failed, trying auto-recovery:", data.error);
+        
+        const recoveryResponse = await fetch("/api/stripe/recover-subscriptions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+        });
+        
+        if (!recoveryResponse.ok) {
+          const recoveryData = await recoveryResponse.json();
+          console.error("Auto-recovery also failed:", recoveryData.error);
+          setSyncError("Your subscription may take a moment to appear. Please refresh the page or check your subscriptions page.");
+        } else {
+          const recoveryData = await recoveryResponse.json();
+          if (recoveryData.recovered > 0) {
+            console.log(`Recovered ${recoveryData.recovered} subscription(s)`);
+            router.refresh();
+          }
         }
+      } else {
+        // Successfully synced - refresh the page data to show the subscription
+        router.refresh();
       }
     } catch (error) {
       console.error("Failed to sync subscription:", error);
+      setSyncError("Network error while syncing. Your subscription should appear shortly.");
     } finally {
       setIsSyncing(false);
     }
@@ -83,9 +103,10 @@ export function SubscriptionSuccessPopup({
     setIsOpen(false);
     setShowConfetti(false);
     
-    // Clean up URL
+    // Clean up URL - remove both checkout and session_id params
     const url = new URL(window.location.href);
     url.searchParams.delete("checkout");
+    url.searchParams.delete("session_id");
     router.replace(url.pathname + url.search, { scroll: false });
   }, [router]);
 
@@ -193,6 +214,19 @@ export function SubscriptionSuccessPopup({
               <div className="flex items-center justify-center gap-2 text-[var(--foreground-muted)] mb-8">
                 <Loader2 className="w-4 h-4 animate-spin" />
                 <span>Please wait a moment...</span>
+              </div>
+            ) : syncError ? (
+              <div className="mb-8">
+                <p className="text-amber-600 text-sm mb-2">
+                  {syncError}
+                </p>
+                <Link 
+                  href="/subscriptions"
+                  className="text-sm text-[var(--primary)] hover:underline"
+                  onClick={handleClose}
+                >
+                  Go to Subscriptions to recover your purchase
+                </Link>
               </div>
             ) : (
               <p className="text-[var(--foreground-muted)] mb-8">

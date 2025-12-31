@@ -14,7 +14,7 @@ const log = logger.child({ module: "middleware" });
  */
 
 // Routes that require authentication
-const protectedRoutes = ["/dashboard", "/courses/learn", "/profile", "/settings"];
+const protectedRoutes = ["/dashboard", "/courses", "/profile", "/settings", "/subscriptions", "/pricing", "/skills", "/foundations"];
 
 // Routes that should redirect authenticated users (auth pages)
 const authRoutes = ["/login", "/signup", "/forgot-password"];

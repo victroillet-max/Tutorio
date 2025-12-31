@@ -3,17 +3,15 @@ import Link from "next/link";
 import { 
   BookOpen, 
   Clock, 
-  TrendingUp, 
   ChevronRight,
   Play,
   Target,
-  Award,
   Zap,
   Sparkles,
   GraduationCap,
-  Trophy,
-  CheckCircle2,
-  Flame
+  Flame,
+  TrendingUp,
+  CheckCircle2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { QuickStartButton } from "@/components/dashboard/quick-start-button";
@@ -148,6 +146,20 @@ export default async function DashboardPage() {
     .eq("user_id", user!.id)
     .gte("mastery_level", 70);
 
+  const totalXp = userStreak?.total_xp || 0;
+  
+  // Calculate level from XP (1000 XP per level)
+  const currentLevel = Math.floor(totalXp / 1000) + 1;
+  const xpInCurrentLevel = totalXp % 1000;
+  const xpForNextLevel = 1000;
+  const levelProgress = Math.round((xpInCurrentLevel / xpForNextLevel) * 100);
+  const xpToNextLevel = xpForNextLevel - xpInCurrentLevel;
+
+  // Level names based on level number
+  const levelNames = ['Beginner', 'Learner', 'Rising', 'Skilled', 'Advanced', 'Expert', 'Master'];
+  const levelName = levelNames[Math.min(currentLevel - 1, levelNames.length - 1)];
+  const nextLevelName = levelNames[Math.min(currentLevel, levelNames.length - 1)];
+
   const stats = {
     skillsMastered: skillsMastered || 0,
     lessonsCompleted: completedActivitiesCount || 0,
@@ -158,9 +170,9 @@ export default async function DashboardPage() {
   const hasEnrolledCourses = enrolledCourses.length > 0;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="max-w-[1280px] mx-auto px-4 sm:px-6 py-8">
       {/* Welcome Section */}
-      <div className="mb-8" data-tour="dashboard-welcome">
+      <div className="mb-6">
         <h1 
           className="text-3xl font-bold mb-2 text-[var(--foreground)]"
           style={{ fontFamily: 'var(--font-heading)', letterSpacing: '-0.02em' }}
@@ -172,64 +184,100 @@ export default async function DashboardPage() {
         </p>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <StatCard
-          icon={Target}
-          label="Skills Mastered"
-          value={stats.skillsMastered}
-          color="navy"
-        />
-        <StatCard
-          icon={BookOpen}
-          label="Activities Done"
-          value={stats.lessonsCompleted}
-          color="teal"
-        />
-        <StatCard
-          icon={Clock}
-          label="Hours Learned"
-          value={stats.hoursLearned}
-          color="purple"
-        />
-        <StatCard
-          icon={Flame}
-          label="Day Streak"
-          value={stats.currentStreak}
-          color="coral"
-        />
+      {/* XP Level Bar */}
+      <div className="card-elevated p-4 sm:p-6 mb-6 flex flex-col sm:flex-row items-start sm:items-center gap-4">
+        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[var(--accent)]/20 to-[var(--accent)]/10 flex items-center justify-center flex-shrink-0">
+          <Flame className="w-6 h-6 text-[var(--accent)]" />
+        </div>
+        <div className="flex-1 min-w-0 w-full">
+          <div className="flex flex-wrap items-center justify-between mb-2 gap-2">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-bold text-[var(--accent)]">Level {currentLevel}</span>
+              <span className="text-sm font-semibold text-[var(--foreground)]">{levelName}</span>
+            </div>
+            <span className="text-xs text-[var(--foreground-muted)]">{xpInCurrentLevel.toLocaleString()} / {xpForNextLevel.toLocaleString()} XP</span>
+          </div>
+          <div className="h-3 bg-[var(--background-tertiary)] rounded-full overflow-hidden relative">
+            <div 
+              className="h-full rounded-full bg-gradient-to-r from-[var(--accent)] to-[var(--accent-light)] relative"
+              style={{ width: `${levelProgress}%` }}
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer" />
+            </div>
+          </div>
+          <p className="text-xs text-[var(--foreground-muted)] mt-1.5">
+            <span className="font-semibold">{xpToNextLevel.toLocaleString()} XP</span> to {nextLevelName}
+          </p>
+        </div>
+        <div className="flex flex-col items-end flex-shrink-0">
+          <span className="text-xs text-[var(--foreground-muted)]">Total XP</span>
+          <span 
+            className="text-xl font-bold text-[var(--foreground)]"
+            style={{ fontFamily: 'var(--font-heading)' }}
+          >
+            {totalXp.toLocaleString()}
+          </span>
+        </div>
       </div>
 
-      {/* Main Content Grid */}
-      <div className="grid lg:grid-cols-3 gap-8">
-        {/* Continue Learning */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Active Courses Section */}
-          {hasEnrolledCourses && (
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <h2 
-                  className="text-xl font-bold text-[var(--foreground)]"
-                  style={{ fontFamily: 'var(--font-heading)' }}
-                >
-                  Your Courses
-                </h2>
-                <Link 
-                  href="/courses"
-                  className="text-sm text-[var(--accent)] hover:text-[var(--accent-dark)] flex items-center gap-1 transition-colors font-semibold"
-                >
-                  View all
-                  <ChevronRight className="w-4 h-4" />
-                </Link>
-              </div>
+      {/* Active Courses Section */}
+      {hasEnrolledCourses && (
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <h2 
+              className="text-xl font-bold text-[var(--foreground)]"
+              style={{ fontFamily: 'var(--font-heading)' }}
+            >
+              Active Courses
+            </h2>
+            <Link 
+              href="/courses"
+              className="text-sm text-[var(--accent)] hover:text-[var(--accent-dark)] flex items-center gap-1 transition-colors font-semibold"
+            >
+              View all
+              <ChevronRight className="w-4 h-4" />
+            </Link>
+          </div>
 
-              <div className="space-y-4">
-                {enrolledCourses.slice(0, 2).map((course) => (
-                  <CourseProgressCard key={course.course_id} course={course} />
-                ))}
-              </div>
-            </div>
-          )}
+          <div className="grid sm:grid-cols-2 gap-6">
+            {enrolledCourses.slice(0, 2).map((course, index) => (
+              <CourseHeroCard key={course.course_id} course={course} index={index} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Main Grid */}
+      <div className="grid lg:grid-cols-3 gap-8">
+        {/* Main Content */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Stats Grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <StatCard
+              icon={Target}
+              label="Skills Mastered"
+              value={stats.skillsMastered}
+              color="navy"
+            />
+            <StatCard
+              icon={BookOpen}
+              label="Activities Done"
+              value={stats.lessonsCompleted}
+              color="teal"
+            />
+            <StatCard
+              icon={Clock}
+              label="Hours Learned"
+              value={stats.hoursLearned}
+              color="purple"
+            />
+            <StatCard
+              icon={Flame}
+              label="Day Streak"
+              value={stats.currentStreak}
+              color="coral"
+            />
+          </div>
 
           {/* Continue Learning Activities */}
           <div>
@@ -334,15 +382,97 @@ export default async function DashboardPage() {
 
         {/* Sidebar */}
         <div className="space-y-6">
+          {/* Level Stats Card */}
+          <div className="card-elevated p-6">
+            <div className="flex items-center gap-2 mb-5">
+              <Zap className="w-5 h-5 text-[var(--accent)]" />
+              <h3 
+                className="text-lg font-bold text-[var(--foreground)]"
+                style={{ fontFamily: 'var(--font-heading)' }}
+              >
+                Your Level
+              </h3>
+            </div>
+            
+            {/* Level Ring */}
+            <div className="flex flex-col items-center mb-6">
+              <div className="relative w-32 h-32 mb-3">
+                <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r="45"
+                    fill="none"
+                    stroke="var(--background-tertiary)"
+                    strokeWidth="6"
+                  />
+                  <circle
+                    cx="50"
+                    cy="50"
+                    r="45"
+                    fill="none"
+                    stroke="var(--accent)"
+                    strokeWidth="6"
+                    strokeLinecap="round"
+                    strokeDasharray="283"
+                    strokeDashoffset={283 - (levelProgress / 100) * 283}
+                    className="transition-all duration-1000 ease-out"
+                  />
+                </svg>
+                <div className="absolute inset-4 rounded-full bg-gradient-to-br from-[var(--accent)]/20 to-[var(--accent)]/5 flex items-center justify-center shadow-lg">
+                  <Flame className="w-10 h-10 text-[var(--accent)]" />
+                </div>
+              </div>
+              <div 
+                className="text-xl font-bold text-[var(--accent)]"
+                style={{ fontFamily: 'var(--font-heading)' }}
+              >
+                {levelName}
+              </div>
+              <div className="text-sm text-[var(--foreground-muted)]">Level {currentLevel}</div>
+            </div>
+            
+            {/* XP Progress */}
+            <div className="bg-[var(--background)] rounded-xl p-4 mb-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm text-[var(--foreground-muted)]">Progress</span>
+                <span className="text-sm font-semibold text-[var(--accent)]">{levelProgress}%</span>
+              </div>
+              <div className="h-2 bg-[var(--background-tertiary)] rounded-full overflow-hidden">
+                <div 
+                  className="h-full rounded-full bg-[var(--accent)]"
+                  style={{ width: `${levelProgress}%` }}
+                />
+              </div>
+              <div className="text-xs text-[var(--foreground-muted)] mt-2">
+                {xpInCurrentLevel.toLocaleString()} / {xpForNextLevel.toLocaleString()} XP
+              </div>
+            </div>
+            
+            {/* Total XP */}
+            <div className="flex items-center justify-between p-4 rounded-xl bg-gradient-to-r from-[var(--accent)]/10 to-[var(--accent-light)]/5 mb-4">
+              <div className="flex items-center gap-2 text-sm font-medium text-[var(--foreground)]">
+                <TrendingUp className="w-4 h-4 text-[var(--accent)]" />
+                Total XP
+              </div>
+              <div 
+                className="text-xl font-bold text-[var(--accent)]"
+                style={{ fontFamily: 'var(--font-heading)' }}
+              >
+                {totalXp.toLocaleString()}
+              </div>
+            </div>
+          </div>
+
           {/* Quick Actions */}
-          <div className="card-elevated p-6" data-tour="quick-actions">
+          <div className="card-elevated p-6">
             <h3 
-              className="text-lg font-bold mb-5 text-[var(--foreground)]"
+              className="text-lg font-bold mb-4 text-[var(--foreground)]"
               style={{ fontFamily: 'var(--font-heading)' }}
             >
               Quick Actions
             </h3>
-            <div className="space-y-2">
+            <div className="space-y-1">
               <QuickAction
                 href="/courses"
                 icon={GraduationCap}
@@ -355,30 +485,6 @@ export default async function DashboardPage() {
                 label="View Progress"
                 description="Track your learning"
               />
-            </div>
-          </div>
-
-          {/* Subscription Status */}
-          <div className="card-elevated p-6">
-            <h3 
-              className="text-lg font-bold mb-5 text-[var(--foreground)]"
-              style={{ fontFamily: 'var(--font-heading)' }}
-            >
-              Your Plan
-            </h3>
-            <div className="p-5 rounded-xl bg-gradient-to-br from-[var(--background)] to-[var(--background-secondary)] border border-[var(--card-border)]">
-              <div className="flex items-center gap-2 mb-2">
-                <Zap className="w-5 h-5 text-[var(--accent)]" />
-                <p className="font-semibold text-[var(--foreground)]">Free Access</p>
-              </div>
-              <p className="text-sm text-[var(--foreground-muted)] mb-5">
-                Preview lessons available
-              </p>
-              <Link href="/#pricing">
-                <Button variant="outline" size="sm" className="w-full">
-                  Upgrade Plan
-                </Button>
-              </Link>
             </div>
           </div>
         </div>
@@ -406,17 +512,17 @@ function StatCard({
   };
 
   return (
-    <div className="card-elevated p-5">
-      <div className={`w-11 h-11 rounded-xl ${colorClasses[color]} flex items-center justify-center mb-4`}>
+    <div className="card-elevated p-4">
+      <div className={`w-10 h-10 rounded-xl ${colorClasses[color]} flex items-center justify-center mb-3`}>
         <Icon className="w-5 h-5" />
       </div>
       <p 
-        className="text-3xl font-bold text-[var(--foreground)] mb-1"
+        className="text-2xl font-bold text-[var(--foreground)] mb-0.5"
         style={{ fontFamily: 'var(--font-heading)', letterSpacing: '-0.02em' }}
       >
         {value}
       </p>
-      <p className="text-sm text-[var(--foreground-muted)]">{label}</p>
+      <p className="text-xs text-[var(--foreground-muted)]">{label}</p>
     </div>
   );
 }
@@ -467,55 +573,119 @@ const categoryLabels: Record<string, string> = {
   advanced_topics: 'Advanced Topics',
 };
 
-function CourseProgressCard({ course }: { course: CourseWithProgress }) {
+function CourseHeroCard({ course, index }: { course: CourseWithProgress; index: number }) {
+  // Calculate the SVG stroke offset for the progress ring
+  const circumference = 2 * Math.PI * 40; // radius = 40
+  const strokeDashoffset = circumference - (course.overall_progress_percent / 100) * circumference;
+  
+  // Alternate plan types for visual variety
+  const planType = index === 0 ? 'free' : 'basic';
+  const planLabel = index === 0 ? 'Free Plan' : 'Basic Plan';
+  const planColors = {
+    free: { badge: 'bg-slate-100', icon: 'text-slate-500', label: 'text-slate-600' },
+    basic: { badge: 'bg-blue-50', icon: 'text-blue-500', label: 'text-blue-600' },
+  };
+  const colors = planColors[planType];
+
+  // Total lessons (foundations + skills activities)
+  const totalLessons = course.foundations_total + course.skills_total;
+  const completedLessons = course.foundations_mastered + course.skills_mastered;
+
   return (
-    <Link
-      href={`/courses/${course.course_slug}/learn`}
-      className="card-elevated p-5 flex items-center gap-5 hover:shadow-lg transition-all group"
-    >
-      {/* Course Icon */}
-      <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[var(--primary)]/20 to-[var(--primary-light)]/10 flex items-center justify-center flex-shrink-0">
-        <GraduationCap className="w-8 h-8 text-[var(--primary)]" />
-      </div>
-      
-      {/* Content */}
-      <div className="flex-1 min-w-0">
-        <h4 
-          className="font-bold text-[var(--foreground)] truncate mb-1"
-          style={{ fontFamily: 'var(--font-heading)' }}
-        >
-          {course.course_title}
-        </h4>
-        <div className="flex items-center gap-4 mt-1.5">
-          <div className="flex items-center gap-1.5 text-xs text-[var(--foreground-muted)]">
-            <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-            <span>{course.foundations_mastered}/{course.foundations_total}</span>
-          </div>
-          <div className="flex items-center gap-1.5 text-xs text-[var(--foreground-muted)]">
-            <Target className="w-3.5 h-3.5 text-[var(--primary)]" />
-            <span>{course.skills_mastered}/{course.skills_total}</span>
+    <div className="card-elevated p-5 sm:p-6 relative hover:shadow-lg transition-all group">
+      {/* Upgrade Button - Top Right */}
+      <Link 
+        href={`/pricing?course=${course.course_slug}`}
+        className="absolute top-3 right-3 sm:top-4 sm:right-4 z-10 flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 border border-[var(--accent)] rounded-lg bg-transparent text-[var(--accent)] text-xs font-semibold hover:bg-[var(--accent)] hover:text-white transition-all"
+      >
+        <Zap className="w-3 h-3" />
+        <span>Upgrade</span>
+        <ChevronRight className="w-3 h-3 opacity-0 -ml-1 group-hover:opacity-100 group-hover:ml-0 transition-all hidden sm:block" />
+      </Link>
+
+      <div className="flex gap-4 sm:gap-6">
+        {/* Progress Ring */}
+        <div className="flex-shrink-0 pt-6 sm:pt-0">
+          <div className="relative w-[88px] h-[88px] sm:w-[112px] sm:h-[112px]">
+            <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
+              <defs>
+                <linearGradient id={`progressGradient-${course.course_id}`} x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="var(--accent)" />
+                  <stop offset="100%" stopColor="var(--accent-light)" />
+                </linearGradient>
+              </defs>
+              <circle
+                cx="50"
+                cy="50"
+                r="40"
+                fill="none"
+                stroke="var(--background-tertiary)"
+                strokeWidth="8"
+              />
+              <circle
+                cx="50"
+                cy="50"
+                r="40"
+                fill="none"
+                stroke={`url(#progressGradient-${course.course_id})`}
+                strokeWidth="8"
+                strokeLinecap="round"
+                strokeDasharray={circumference}
+                strokeDashoffset={strokeDashoffset}
+                className="transition-all duration-1000 ease-out drop-shadow-[0_0_6px_rgba(231,111,81,0.4)]"
+              />
+            </svg>
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
+              <span 
+                className="text-lg sm:text-2xl font-bold text-[var(--foreground)]"
+                style={{ fontFamily: 'var(--font-heading)', letterSpacing: '-0.02em' }}
+              >
+                {course.overall_progress_percent}%
+              </span>
+              <span className="text-[10px] sm:text-xs text-[var(--foreground-muted)]">complete</span>
+            </div>
           </div>
         </div>
-        <div className="mt-3">
-          <div className="flex items-center justify-between text-xs text-[var(--foreground-muted)] mb-1.5">
-            <span>Progress</span>
-            <span className="font-semibold text-[var(--accent)]">{course.overall_progress_percent}%</span>
+
+        {/* Course Details */}
+        <div className="flex-1 min-w-0">
+          {/* Plan Badge */}
+          <div className="flex items-center gap-1.5 mb-1.5 sm:mb-2">
+            <div className={`w-5 h-5 sm:w-6 sm:h-6 rounded-md ${colors.badge} flex items-center justify-center`}>
+              <GraduationCap className={`w-3 h-3 sm:w-3.5 sm:h-3.5 ${colors.icon}`} />
+            </div>
+            <span className={`text-[10px] sm:text-xs font-semibold ${colors.label}`}>{planLabel}</span>
           </div>
-          <div className="h-2 bg-[var(--background-tertiary)] rounded-full overflow-hidden">
-            <div 
-              className="h-full rounded-full bg-gradient-to-r from-[var(--accent)] to-[var(--accent-light)]"
-              style={{ width: `${course.overall_progress_percent}%` }}
-            />
+
+          <h3 
+            className="text-base sm:text-lg font-bold text-[var(--foreground)] mb-1.5 sm:mb-2 line-clamp-1 group-hover:text-[var(--primary)] transition-colors"
+            style={{ fontFamily: 'var(--font-heading)' }}
+          >
+            {course.course_title}
+          </h3>
+          
+          <p className="text-xs sm:text-sm text-[var(--foreground-muted)] mb-3 sm:mb-4 line-clamp-2">
+            {course.course_short_description || course.course_description}
+          </p>
+
+          {/* Lesson Progress */}
+          <div className="flex items-center gap-1 text-xs sm:text-sm text-[var(--foreground-muted)] mb-3 sm:mb-4">
+            <BookOpen className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[var(--primary)]" />
+            <span className="font-medium">{completedLessons}</span>
+            <span>of {totalLessons} lessons completed</span>
           </div>
+
+          {/* Continue Button */}
+          <Link 
+            href={`/courses/${course.course_slug}/learn`}
+            className="inline-flex items-center gap-2 px-4 sm:px-5 py-2 sm:py-2.5 bg-[var(--accent)] text-white text-xs sm:text-sm font-semibold rounded-xl hover:bg-[var(--accent-dark)] transition-colors"
+          >
+            <Play className="w-3.5 h-3.5" fill="currentColor" />
+            Continue
+          </Link>
         </div>
       </div>
-      
-      {/* Continue Button */}
-      <div className="flex items-center gap-2 px-4 py-2 bg-[var(--accent)] text-white text-sm font-semibold rounded-xl group-hover:bg-[var(--accent-dark)] transition-colors flex-shrink-0">
-        <Play className="w-4 h-4" />
-        <span className="hidden sm:inline">Continue</span>
-      </div>
-    </Link>
+    </div>
   );
 }
 
@@ -526,7 +696,6 @@ function SkillContinueCard({
   masteryLevel,
   activitySlug,
   activityTitle,
-  lastAccessed,
 }: {
   skillSlug: string;
   skillName: string;
@@ -538,60 +707,55 @@ function SkillContinueCard({
 }) {
   const colors = categoryColors[skillCategory] || categoryColors.python_basics;
   const categoryLabel = categoryLabels[skillCategory] || skillCategory;
-  const timeAgo = getTimeAgo(lastAccessed);
   
   return (
     <Link
       href={`/skills/${skillSlug}/${activitySlug}`}
       className="card-elevated p-5 flex items-center gap-4 hover:shadow-lg transition-all group"
     >
-      {/* Skill Icon */}
+      {/* Activity Icon */}
       <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${colors.bg} flex items-center justify-center flex-shrink-0`}>
-        <Target className={`w-6 h-6 ${colors.icon}`} />
+        <BookOpen className={`w-6 h-6 ${colors.icon}`} />
       </div>
       
       {/* Content */}
       <div className="flex-1 min-w-0">
         <p className="text-xs text-[var(--foreground-muted)] mb-1">
-          {categoryLabel} - {skillName}
+          <span className={colors.icon}>{categoryLabel}</span>
+          <span className="text-[var(--foreground-muted)]"> - {skillName}</span>
         </p>
         <h4 
-          className="font-bold text-[var(--foreground)] truncate"
+          className="font-bold text-[var(--foreground)] truncate mb-2"
           style={{ fontFamily: 'var(--font-heading)' }}
         >
           {activityTitle}
         </h4>
-        <div className="flex items-center gap-4 mt-2 text-xs text-[var(--foreground-muted)]">
-          <div className="flex items-center gap-1.5">
-            <div className="w-14 h-1.5 bg-[var(--background-tertiary)] rounded-full overflow-hidden">
+        <div className="flex items-center gap-4 text-xs text-[var(--foreground-muted)]">
+          <div className="flex items-center gap-2">
+            <div className="w-16 h-1.5 bg-[var(--background-tertiary)] rounded-full overflow-hidden">
               <div 
-                className={`h-full rounded-full ${masteryLevel >= 70 ? 'bg-[var(--success)]' : 'bg-[var(--accent)]'}`}
+                className="h-full rounded-full bg-[var(--accent)]"
                 style={{ width: `${masteryLevel}%` }}
               />
             </div>
             <span className="font-medium">{masteryLevel}%</span>
           </div>
-          <span>{timeAgo}</span>
+          <div className="flex items-center gap-1">
+            <Clock className="w-3.5 h-3.5" />
+            <span>5min</span>
+          </div>
+          <div className="flex items-center gap-1 text-[var(--accent)] font-semibold">
+            <Zap className="w-3.5 h-3.5" />
+            <span>+50 XP</span>
+          </div>
         </div>
       </div>
       
       {/* Continue Button */}
-      <div className="flex items-center gap-2 px-4 py-2 bg-[var(--accent)] text-white text-sm font-semibold rounded-xl group-hover:bg-[var(--accent-dark)] transition-colors flex-shrink-0">
-        <Play className="w-4 h-4" />
+      <div className="flex items-center gap-2 px-4 py-2.5 bg-[var(--accent)] text-white text-sm font-semibold rounded-xl group-hover:bg-[var(--accent-dark)] transition-colors flex-shrink-0">
+        <Play className="w-4 h-4" fill="currentColor" />
         <span className="hidden sm:inline">Continue</span>
       </div>
     </Link>
   );
-}
-
-function getTimeAgo(dateString: string): string {
-  const date = new Date(dateString);
-  const now = new Date();
-  const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-  
-  if (seconds < 60) return "Just now";
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-  if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
-  return date.toLocaleDateString();
 }

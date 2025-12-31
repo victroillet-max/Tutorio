@@ -10,7 +10,7 @@ import {
   ArrowRight,
   AlertCircle
 } from "lucide-react";
-import type { SubscriptionTier, Course } from "@/lib/database.types";
+import type { SubscriptionTier, Course, UserCourseSubscription } from "@/lib/database.types";
 import { PricingError, FlipPricingCard } from "@/components/stripe";
 
 export const metadata = {
@@ -131,7 +131,7 @@ export default async function PricingPage({
             </h2>
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
               {courses.map((course) => {
-                const existingSub = subscriptions?.find((s: { course_id: string; tier_name: string }) => s.course_id === course.id);
+                const existingSub = subscriptions?.find((s: UserCourseSubscription) => s.course_id === course.id);
                 return (
                   <Link
                     key={course.id}
@@ -173,19 +173,25 @@ export default async function PricingPage({
         {selectedCourse && tiers && (
           <>
             {/* Check if already subscribed */}
-            {subscriptions?.find((s: { course_id: string; tier_name: string }) => s.course_id === selectedCourse.id) && (
-              <div className="mb-8 p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-center">
-                <p className="text-emerald-800 font-medium">
-                  You're already subscribed to this course ({subscriptions.find((s: { course_id: string; tier_name: string }) => s.course_id === selectedCourse.id)?.tier_name})
-                </p>
-                <Link 
-                  href="/subscriptions" 
-                  className="text-sm text-emerald-600 hover:underline mt-1 inline-block"
-                >
-                  Manage your subscription
-                </Link>
-              </div>
-            )}
+            {(() => {
+              const currentSub = subscriptions?.find((s: UserCourseSubscription) => s.course_id === selectedCourse.id);
+              return currentSub ? (
+                <div className="mb-8 p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-center">
+                  <p className="text-emerald-800 font-medium">
+                    You're subscribed to this course ({currentSub.tier_name})
+                  </p>
+                  <p className="text-sm text-emerald-700 mt-1">
+                    You can upgrade or downgrade your plan below, or{' '}
+                    <Link 
+                      href="/subscriptions" 
+                      className="text-emerald-600 hover:underline font-medium"
+                    >
+                      manage your subscription
+                    </Link>
+                  </p>
+                </div>
+              ) : null;
+            })()}
             
             <div className="grid md:grid-cols-2 gap-8 max-w-3xl mx-auto">
               {tiers.map((tier) => (
@@ -194,7 +200,7 @@ export default async function PricingPage({
                   tier={tier as SubscriptionTier} 
                   courseId={selectedCourse.id}
                   courseName={selectedCourse.title}
-                  existingSubscription={subscriptions?.find((s: { course_id: string; tier_slug: string; tier_name: string }) => s.course_id === selectedCourse.id)}
+                  existingSubscription={subscriptions?.find((s: UserCourseSubscription) => s.course_id === selectedCourse.id)}
                   stripeEnabled={stripeConfigured && hasPriceIds}
                 />
               ))}

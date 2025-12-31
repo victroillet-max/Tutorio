@@ -5,10 +5,11 @@ import { getSiteUrl } from "@/lib/env";
 import { checkoutSchema, createValidationErrorResponse } from "@/lib/validation/schemas";
 import { logger, startTimer } from "@/lib/logging";
 import { applyRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
+import { STRIPE_API_VERSION } from "@/lib/stripe/types";
 
 // Initialize Stripe
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
-const stripe = stripeSecretKey ? new Stripe(stripeSecretKey, { apiVersion: "2025-12-15.clover" }) : null;
+const stripe = stripeSecretKey ? new Stripe(stripeSecretKey, { apiVersion: STRIPE_API_VERSION }) : null;
 
 // Fallback price IDs from environment (used if course doesn't have specific prices)
 const FALLBACK_PRICE_IDS: Record<string, string | undefined> = {
@@ -109,7 +110,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check for existing subscription
+    // Check for existing subscription in our database
     const { data: existingSubscription } = await supabase
       .from("subscriptions")
       .select("id, tier:subscription_tiers(slug), stripe_subscription_id")
@@ -117,6 +118,53 @@ export async function POST(request: NextRequest) {
       .eq("course_id", courseId)
       .in("status", ["active", "trialing"])
       .single();
+
+    // Also check Stripe directly for any active subscriptions for this user/course
+    // This handles cases where webhook failed but subscription exists in Stripe
+    let stripeHasSubscription = false;
+    const { data: anySubscription } = await supabase
+      .from("subscriptions")
+      .select("stripe_customer_id")
+      .eq("user_id", user.id)
+      .not("stripe_customer_id", "is", null)
+      .limit(1)
+      .single();
+
+    if (anySubscription?.stripe_customer_id && !existingSubscription) {
+      try {
+        const stripeSubscriptions = await stripe.subscriptions.list({
+          customer: anySubscription.stripe_customer_id,
+          status: "active",
+          limit: 100,
+        });
+
+        const existingStripeSubscription = stripeSubscriptions.data.find(
+          sub => sub.metadata?.course_id === courseId
+        );
+
+        if (existingStripeSubscription) {
+          stripeHasSubscription = true;
+          log.warn("Found existing Stripe subscription not in database", {
+            userId: user.id,
+            courseId,
+            stripeSubscriptionId: existingStripeSubscription.id
+          });
+        }
+      } catch (stripeError) {
+        log.error("Error checking Stripe subscriptions", stripeError);
+      }
+    }
+
+    // Block if subscription exists in Stripe but not in our database
+    if (stripeHasSubscription && !upgrade) {
+      return NextResponse.json(
+        { 
+          error: "You already have an active subscription for this course",
+          message: "Your subscription may not have synced properly. Please check your subscriptions page and use 'Recover Purchase' if needed."
+        },
+        { status: 400 }
+      );
+    }
 
     // If upgrading, handle subscription update via Stripe
     if (upgrade && existingSubscription?.stripe_subscription_id) {
@@ -133,7 +181,7 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        // Update the subscription with the new price (proration by default)
+        // Update the subscription with the new price - charge immediately for upgrades
         await stripe.subscriptions.update(
           existingSubscription.stripe_subscription_id,
           {
@@ -143,7 +191,8 @@ export async function POST(request: NextRequest) {
                 price: priceId,
               },
             ],
-            proration_behavior: "create_prorations",
+            // "always_invoice" creates and immediately charges for the prorated upgrade
+            proration_behavior: "always_invoice",
             metadata: {
               ...stripeSubscription.metadata,
               tier: tier,
@@ -214,7 +263,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     // Check if user already has a Stripe customer ID from any subscription
-    const { data: anySubscription } = await supabase
+    const { data: existingCustomerSub } = await supabase
       .from("subscriptions")
       .select("stripe_customer_id")
       .eq("user_id", user.id)
@@ -222,7 +271,7 @@ export async function POST(request: NextRequest) {
       .limit(1)
       .single();
 
-    let customerId = anySubscription?.stripe_customer_id;
+    let customerId = existingCustomerSub?.stripe_customer_id;
 
     if (!customerId) {
       // Create new Stripe customer
@@ -240,9 +289,10 @@ export async function POST(request: NextRequest) {
     const siteUrl = getSiteUrl();
 
     // Create Checkout session
+    // Note: We don't specify payment_method_types to allow Stripe to dynamically
+    // choose the best payment methods based on customer location and preferences
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
-      payment_method_types: ["card"],
       mode: "subscription",
       line_items: [
         {

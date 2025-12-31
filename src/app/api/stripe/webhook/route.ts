@@ -2,11 +2,16 @@ import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { logger, startTimer } from "@/lib/logging";
+import { 
+  STRIPE_API_VERSION, 
+  StripeSubscriptionWithPeriods, 
+  mapStripeStatus 
+} from "@/lib/stripe/types";
 
 // Initialize Stripe
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-const stripe = stripeSecretKey ? new Stripe(stripeSecretKey, { apiVersion: "2025-12-15.clover" }) : null;
+const stripe = stripeSecretKey ? new Stripe(stripeSecretKey, { apiVersion: STRIPE_API_VERSION }) : null;
 
 // Use service role for webhook processing (bypasses RLS)
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -151,8 +156,15 @@ export async function POST(request: NextRequest) {
         break;
       }
 
+      case "customer.subscription.created": {
+        // Backup handler in case checkout.session.completed fails
+        const subscription = event.data.object as StripeSubscriptionWithPeriods;
+        await handleSubscriptionCreated(supabase, subscription);
+        break;
+      }
+
       case "customer.subscription.updated": {
-        const subscription = event.data.object as Stripe.Subscription & { current_period_start: number; current_period_end: number };
+        const subscription = event.data.object as StripeSubscriptionWithPeriods;
         await handleSubscriptionUpdated(supabase, subscription);
         break;
       }
@@ -172,6 +184,12 @@ export async function POST(request: NextRequest) {
       case "invoice.payment_failed": {
         const invoice = event.data.object as Stripe.Invoice;
         await handlePaymentFailed(supabase, invoice);
+        break;
+      }
+
+      case "invoice.upcoming": {
+        const invoice = event.data.object as Stripe.Invoice;
+        await handleUpcomingInvoice(supabase, invoice);
         break;
       }
 
@@ -269,11 +287,93 @@ async function handleCheckoutCompleted(
 }
 
 /**
+ * Handle new subscription created (backup for checkout.session.completed)
+ * This handles cases where checkout.session.completed fails but the subscription was created
+ */
+async function handleSubscriptionCreated(
+  supabase: SupabaseServiceClient,
+  subscription: StripeSubscriptionWithPeriods
+) {
+  const { supabase_user_id, course_id, tier } = subscription.metadata || {};
+
+  // If metadata is missing, we can't create the subscription properly
+  // This can happen if the subscription was created outside of our checkout flow
+  if (!supabase_user_id || !course_id || !tier) {
+    log.warn("Subscription created without required metadata", { 
+      subscriptionId: subscription.id,
+      hasUserId: !!supabase_user_id,
+      hasCourseId: !!course_id,
+      hasTier: !!tier
+    });
+    return;
+  }
+
+  // Check if subscription already exists in our database
+  const { data: existingSub } = await supabase
+    .from("subscriptions")
+    .select("id")
+    .eq("stripe_subscription_id", subscription.id)
+    .single();
+
+  if (existingSub) {
+    log.debug("Subscription already exists, skipping creation", { 
+      stripeSubscriptionId: subscription.id 
+    });
+    return;
+  }
+
+  // Get the tier ID from our database
+  const { data: tierData, error: tierError } = await supabase
+    .from("subscription_tiers")
+    .select("id")
+    .eq("slug", tier)
+    .single();
+
+  if (tierError || !tierData) {
+    log.error("Failed to find tier for subscription.created", tierError, { tier });
+    return;
+  }
+
+  // Create subscription in our database
+  const { error: subError } = await supabase
+    .from("subscriptions")
+    .upsert({
+      user_id: supabase_user_id,
+      course_id: course_id,
+      tier_id: tierData.id,
+      status: mapStripeStatus(subscription.status),
+      current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
+      current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
+      stripe_subscription_id: subscription.id,
+      stripe_customer_id: typeof subscription.customer === 'string' 
+        ? subscription.customer 
+        : subscription.customer?.id,
+      cancel_at_period_end: subscription.cancel_at_period_end,
+    }, {
+      onConflict: "user_id,course_id",
+    });
+
+  if (subError) {
+    log.error("Failed to create subscription from subscription.created", subError, { 
+      userId: supabase_user_id, 
+      courseId: course_id 
+    });
+    return;
+  }
+
+  log.info("Subscription created from subscription.created event", { 
+    userId: supabase_user_id, 
+    courseId: course_id, 
+    tier 
+  });
+}
+
+/**
  * Handle subscription updates (e.g., plan changes, cancellations)
  */
 async function handleSubscriptionUpdated(
   supabase: SupabaseServiceClient,
-  subscription: Stripe.Subscription & { current_period_start: number; current_period_end: number }
+  subscription: StripeSubscriptionWithPeriods
 ) {
   // Verify subscription exists in our database before updating
   const { data: existingSub } = await supabase
@@ -289,16 +389,7 @@ async function handleSubscriptionUpdated(
     return;
   }
 
-  // Map Stripe status to our status
-  const statusMap: Record<string, string> = {
-    active: "active",
-    trialing: "trialing",
-    past_due: "past_due",
-    canceled: "cancelled",
-    unpaid: "expired",
-  };
-
-  const status = statusMap[subscription.status] || "expired";
+  const status = mapStripeStatus(subscription.status);
 
   // Check if the tier changed (from metadata)
   const newTierSlug = subscription.metadata?.tier;
@@ -396,10 +487,7 @@ async function handlePaymentSucceeded(
   // Get the updated subscription from Stripe with retry logic
   const subscription = await withRetry(() => 
     stripe!.subscriptions.retrieve(subscriptionId)
-  ) as unknown as Stripe.Subscription & {
-    current_period_start: number;
-    current_period_end: number;
-  };
+  ) as unknown as StripeSubscriptionWithPeriods;
 
   // Update the subscription period
   const { error } = await supabase
@@ -453,5 +541,76 @@ async function handlePaymentFailed(
       stripeSubscriptionId: subscriptionId 
     });
   }
+}
+
+/**
+ * Handle upcoming invoice notification
+ * This event fires ~3 days before a subscription renews
+ * Use this to notify users about upcoming charges
+ */
+async function handleUpcomingInvoice(
+  supabase: SupabaseServiceClient,
+  invoice: Stripe.Invoice
+) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const subscriptionData = (invoice as any).subscription;
+  const subscriptionId = typeof subscriptionData === 'string' 
+    ? subscriptionData 
+    : (subscriptionData as { id?: string } | null)?.id;
+  
+  if (!subscriptionId) {
+    log.debug("No subscription in upcoming invoice");
+    return;
+  }
+
+  // Get subscription details from our database
+  const { data: subscription, error } = await supabase
+    .from("subscriptions")
+    .select(`
+      id,
+      user_id,
+      course_id,
+      profiles:user_id (email, full_name),
+      courses:course_id (title)
+    `)
+    .eq("stripe_subscription_id", subscriptionId)
+    .single();
+
+  if (error || !subscription) {
+    log.warn("Could not find subscription for upcoming invoice", { 
+      stripeSubscriptionId: subscriptionId 
+    });
+    return;
+  }
+
+  // Log the upcoming renewal for now
+  // In production, you would send an email notification here
+  // Example: await sendRenewalReminderEmail(subscription.profiles.email, ...)
+  log.info("Upcoming subscription renewal", { 
+    stripeSubscriptionId: subscriptionId,
+    userId: subscription.user_id,
+    courseId: subscription.course_id,
+    amountDue: invoice.amount_due,
+    currency: invoice.currency,
+    nextPaymentDate: invoice.next_payment_attempt 
+      ? new Date(invoice.next_payment_attempt * 1000).toISOString()
+      : undefined
+  });
+
+  // TODO: Implement email notification
+  // You can integrate with your email service here to notify users
+  // about their upcoming renewal. Example:
+  //
+  // await sendEmail({
+  //   to: subscription.profiles.email,
+  //   subject: `Your subscription to ${subscription.courses.title} renews soon`,
+  //   template: 'renewal-reminder',
+  //   data: {
+  //     userName: subscription.profiles.full_name,
+  //     courseTitle: subscription.courses.title,
+  //     amount: formatCurrency(invoice.amount_due, invoice.currency),
+  //     renewalDate: formatDate(invoice.next_payment_attempt),
+  //   }
+  // });
 }
 

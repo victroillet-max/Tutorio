@@ -3,9 +3,11 @@ import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { logger } from "@/lib/logging";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
+import { applyRateLimit, createRateLimitResponse } from "@/lib/rate-limit";
+import { STRIPE_API_VERSION } from "@/lib/stripe/types";
 
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
-const stripe = stripeSecretKey ? new Stripe(stripeSecretKey, { apiVersion: "2025-12-15.clover" }) : null;
+const stripe = stripeSecretKey ? new Stripe(stripeSecretKey, { apiVersion: STRIPE_API_VERSION }) : null;
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -24,6 +26,13 @@ export async function POST(request: NextRequest) {
   
   if (!user) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+  }
+
+  // Apply rate limiting
+  const rateLimitResult = await applyRateLimit(request, user.id, "checkout");
+  if (rateLimitResult) {
+    log.warn("Rate limit exceeded for sync-subscription", { userId: user.id });
+    return createRateLimitResponse(rateLimitResult);
   }
 
   if (!stripe) {
@@ -67,11 +76,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing metadata in session" }, { status: 400 });
     }
 
-    // Get the subscription
-    const stripeSubscription = session.subscription as Stripe.Subscription | null;
+    // Get the subscription - it might be a string ID or an expanded object
+    let stripeSubscription: Stripe.Subscription;
+    const subscriptionData_raw = session.subscription;
     
-    if (!stripeSubscription) {
+    if (!subscriptionData_raw) {
       return NextResponse.json({ error: "No subscription in session" }, { status: 400 });
+    }
+    
+    // If it's a string, retrieve the full subscription
+    if (typeof subscriptionData_raw === 'string') {
+      stripeSubscription = await stripe.subscriptions.retrieve(subscriptionData_raw);
+    } else {
+      stripeSubscription = subscriptionData_raw as Stripe.Subscription;
     }
 
     // Get tier ID
@@ -86,13 +103,27 @@ export async function POST(request: NextRequest) {
     }
 
     // Create or update subscription
+    // Access the period timestamps - they are Unix timestamps (seconds)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const subAny = stripeSubscription as any;
+    const periodStart = subAny.current_period_start;
+    const periodEnd = subAny.current_period_end;
+    
+    // Convert Unix timestamps to ISO strings
+    const currentPeriodStart = typeof periodStart === 'number' 
+      ? new Date(periodStart * 1000).toISOString()
+      : new Date().toISOString();
+    const currentPeriodEnd = typeof periodEnd === 'number'
+      ? new Date(periodEnd * 1000).toISOString()
+      : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(); // Default 30 days
+
     const subscriptionData = {
       user_id: user.id,
       course_id: course_id,
       tier_id: tierData.id,
       status: stripeSubscription.status === "active" ? "active" : "trialing",
-      current_period_start: new Date((stripeSubscription as unknown as { current_period_start: number }).current_period_start * 1000).toISOString(),
-      current_period_end: new Date((stripeSubscription as unknown as { current_period_end: number }).current_period_end * 1000).toISOString(),
+      current_period_start: currentPeriodStart,
+      current_period_end: currentPeriodEnd,
       stripe_subscription_id: stripeSubscription.id,
       stripe_customer_id: session.customer as string,
       cancel_at_period_end: stripeSubscription.cancel_at_period_end,
