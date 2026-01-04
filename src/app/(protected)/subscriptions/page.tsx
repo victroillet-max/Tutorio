@@ -113,7 +113,7 @@ export default async function SubscriptionsPage() {
           </div>
           <h2 className="text-xl font-semibold mb-2">No Active Subscriptions</h2>
           <p className="text-[var(--foreground-muted)] mb-6 max-w-md mx-auto">
-            You don't have any active subscriptions yet. Browse our courses and subscribe to unlock full access.
+            You don&apos;t have any active subscriptions yet. Browse our courses and subscribe to unlock full access.
           </p>
           <Link
             href="/courses"
@@ -307,7 +307,7 @@ function SubscriptionCard({ subscription, tiers, stripeEnabled }: SubscriptionCa
       {subscription.cancel_at_period_end && (
         <div className="p-4 bg-amber-50 border-t border-amber-100">
           <p className="text-sm text-amber-700">
-            Your subscription is set to cancel. You'll retain access until {periodEnd.toLocaleDateString()}.
+            Your subscription is set to cancel. You&apos;ll retain access until {periodEnd.toLocaleDateString()}.
           </p>
           <Link
             href={`/pricing?course=${subscription.course_slug}`}
@@ -323,6 +323,7 @@ function SubscriptionCard({ subscription, tiers, stripeEnabled }: SubscriptionCa
 
 function ExpiredSubscriptionCard({ subscription }: { subscription: UserCourseSubscription }) {
   const periodEnd = new Date(subscription.current_period_end);
+  // Server component - Date.now() runs once per request so it's safe
   const daysRemaining = Math.ceil((periodEnd.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
   
   return (

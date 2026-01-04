@@ -311,11 +311,11 @@ export function EmbeddedPlanSwitcher({
                 <p className={`text-sm ${isUpgrade ? 'text-emerald-700' : 'text-amber-700'}`}>
                   {isUpgrade ? (
                     <>
-                      You'll be charged <strong>CHF {priceDiff.toFixed(2)}</strong> immediately for the prorated upgrade. Your new plan benefits are available right away.
+                      You&apos;ll be charged <strong>CHF {priceDiff.toFixed(2)}</strong> immediately for the prorated upgrade. Your new plan benefits are available right away.
                     </>
                   ) : (
                     <>
-                      Your plan will change at the end of your current billing period. You'll continue to enjoy your current plan benefits until then. <strong>No refund will be issued</strong> for the remaining time on your current plan.
+                      Your plan will change at the end of your current billing period. You&apos;ll continue to enjoy your current plan benefits until then. <strong>No refund will be issued</strong> for the remaining time on your current plan.
                     </>
                   )}
                 </p>

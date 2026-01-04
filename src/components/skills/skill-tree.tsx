@@ -321,7 +321,7 @@ function SkillDetailPanel({
             <div className="bg-zinc-800/50 rounded-lg p-3">
               <p className="text-xs text-zinc-400">Difficulty</p>
               <p className="text-sm font-medium text-white">
-                {"*".repeat(skill.difficulty_level)}{"*".repeat(5 - skill.difficulty_level).split("").map(() => <span key={Math.random()} className="text-zinc-600">*</span>)}
+                {"*".repeat(skill.difficulty_level)}{Array.from({ length: 5 - skill.difficulty_level }).map((_, i) => <span key={`empty-star-${i}`} className="text-zinc-600">*</span>)}
               </p>
             </div>
             <div className="bg-zinc-800/50 rounded-lg p-3">

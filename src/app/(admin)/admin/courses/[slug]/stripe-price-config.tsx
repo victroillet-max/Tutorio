@@ -160,8 +160,8 @@ export function StripePriceConfig({
         <p className="font-medium text-[var(--foreground)] mb-1">How to get Price IDs:</p>
         <ol className="list-decimal list-inside space-y-1">
           <li>Go to Stripe Dashboard → Products</li>
-          <li>Find "{courseName}" products (Basic and Advanced)</li>
-          <li>Click on each product and copy the Price ID (starts with "price_")</li>
+          <li>Find &quot;{courseName}&quot; products (Basic and Advanced)</li>
+          <li>Click on each product and copy the Price ID (starts with &quot;price_&quot;)</li>
           <li>Paste the IDs above and save</li>
         </ol>
       </div>

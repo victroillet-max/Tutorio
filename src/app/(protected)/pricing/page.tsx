@@ -178,7 +178,7 @@ export default async function PricingPage({
               return currentSub ? (
                 <div className="mb-8 p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-center">
                   <p className="text-emerald-800 font-medium">
-                    You're subscribed to this course ({currentSub.tier_name})
+                    You&apos;re subscribed to this course ({currentSub.tier_name})
                   </p>
                   <p className="text-sm text-emerald-700 mt-1">
                     You can upgrade or downgrade your plan below, or{' '}

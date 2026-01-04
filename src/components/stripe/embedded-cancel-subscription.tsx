@@ -141,7 +141,7 @@ export function EmbeddedCancelSubscription({
                 Are you sure you want to cancel?
               </p>
               <p className="text-sm text-amber-700 mt-1">
-                You'll lose access to premium features when your current billing period ends.
+                You&apos;ll lose access to premium features when your current billing period ends.
               </p>
             </div>
           </div>
@@ -150,7 +150,7 @@ export function EmbeddedCancelSubscription({
           <div className="mb-6">
             <h4 className="font-medium mb-3 flex items-center gap-2 text-red-700">
               <XCircle className="w-4 h-4" />
-              What you'll lose:
+              What you&apos;ll lose:
             </h4>
             <ul className="space-y-2">
               <LossItem>Full course access to {subscription.course_title}</LossItem>
@@ -166,7 +166,7 @@ export function EmbeddedCancelSubscription({
               <Calendar className="w-5 h-5 text-slate-500" />
               <div>
                 <p className="text-sm font-medium text-slate-700">
-                  You'll keep access until
+                  You&apos;ll keep access until
                 </p>
                 <p className="text-lg font-semibold text-slate-900">
                   {periodEnd.toLocaleDateString('en-US', { 

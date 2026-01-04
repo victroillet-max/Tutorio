@@ -91,9 +91,9 @@ export default async function ProfilePage() {
   // Calculate unique courses started from activity progress
   const uniqueCourseIds = new Set<string>();
   typedActivityProgress?.forEach(p => {
-    const activity = Array.isArray(p.activity) ? p.activity[0] : p.activity;
-    const module = activity ? (Array.isArray(activity.module) ? activity.module[0] : activity.module) : null;
-    const course = module ? (Array.isArray(module.course) ? module.course[0] : module.course) : null;
+    const activityData = Array.isArray(p.activity) ? p.activity[0] : p.activity;
+    const moduleData = activityData ? (Array.isArray(activityData.module) ? activityData.module[0] : activityData.module) : null;
+    const course = moduleData ? (Array.isArray(moduleData.course) ? moduleData.course[0] : moduleData.course) : null;
     if (course?.id) {
       uniqueCourseIds.add(course.id);
     }
@@ -121,7 +121,9 @@ export default async function ProfilePage() {
     .toUpperCase()
     .slice(0, 2);
 
-  const memberSince = new Date(user?.created_at || Date.now()).toLocaleDateString("en-US", {
+  // Use a stable date for fallback - server-side so runs once per request
+  const createdAt = user?.created_at ? new Date(user.created_at) : new Date();
+  const memberSince = createdAt.toLocaleDateString("en-US", {
     month: "long",
     year: "numeric",
   });
@@ -195,16 +197,16 @@ export default async function ProfilePage() {
         {recentActivity.length > 0 ? (
           <div className="space-y-3">
             {recentActivity.map((item) => {
-              const activity = Array.isArray(item.activity) ? item.activity[0] : item.activity;
-              if (!activity) return null;
+              const activityData = Array.isArray(item.activity) ? item.activity[0] : item.activity;
+              if (!activityData) return null;
               
-              const module = Array.isArray(activity.module) ? activity.module[0] : activity.module;
-              if (!module) return null;
+              const moduleData = Array.isArray(activityData.module) ? activityData.module[0] : activityData.module;
+              if (!moduleData) return null;
               
-              const course = Array.isArray(module.course) ? module.course[0] : module.course;
+              const course = Array.isArray(moduleData.course) ? moduleData.course[0] : moduleData.course;
               if (!course) return null;
               
-              const activityUrl = `/courses/${course.slug}/${module.slug}/${activity.slug}`;
+              const activityUrl = `/courses/${course.slug}/${moduleData.slug}/${activityData.slug}`;
               const timeAgo = getTimeAgo(item.last_accessed_at);
               
               return (
@@ -226,10 +228,10 @@ export default async function ProfilePage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-[var(--foreground)] truncate">
-                      {activity.title}
+                      {activityData.title}
                     </p>
                     <p className="text-sm text-[var(--foreground-muted)] truncate">
-                      {course.title} - {module.title}
+                      {course.title} - {moduleData.title}
                     </p>
                   </div>
                   <div className="text-right flex-shrink-0">

@@ -90,12 +90,12 @@ export class ActivityService {
 
     // Handle the nested data structure
     const moduleData = data.module as unknown as { slug: string; course: { slug: string } }[] | { slug: string; course: { slug: string } } | null;
-    const module = Array.isArray(moduleData) ? moduleData[0] : moduleData;
+    const moduleInfo = Array.isArray(moduleData) ? moduleData[0] : moduleData;
 
     return {
       id: data.id,
       xp: data.xp,
-      module: module || null,
+      module: moduleInfo || null,
     };
   }
 

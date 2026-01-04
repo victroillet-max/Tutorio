@@ -343,7 +343,6 @@ export function LessonProgress({ currentPart, totalParts, partTitles }: LessonPr
 // Helper function to parse inline markdown (bold, italic, code)
 function parseInlineMarkdown(text: string): ReactNode[] {
   const parts: ReactNode[] = [];
-  let remaining = text;
   let key = 0;
   
   // Pattern to match **bold**, *italic*, and `code`

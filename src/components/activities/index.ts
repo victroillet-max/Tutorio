@@ -15,4 +15,9 @@ export {
   LessonProgress 
 } from './content-blocks';
 export { InteractiveErrorBoundary, withInteractiveErrorBoundary } from './interactive-error-boundary';
-
+export { 
+  InterestCalculator, 
+  PercentageCalculator, 
+  EquationSolver, 
+  GraphInterpretation 
+} from './math-interactives';

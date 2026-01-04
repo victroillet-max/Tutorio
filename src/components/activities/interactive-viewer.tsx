@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { CheckCircle2, Sparkles, RotateCcw, ChevronRight, GripVertical, MousePointerClick, BookOpen, Lightbulb, ArrowRight, X, Plus, Trash2, Calculator, HelpCircle, Check, AlertCircle } from "lucide-react";
 import type { Activity } from "@/lib/database.types";
 import { markActivityComplete, trackActivityView } from "@/lib/activities/actions";
 import { SpreadsheetExerciseViewer } from "./spreadsheet-exercise-viewer";
 import { InteractiveErrorBoundary } from "./interactive-error-boundary";
+import { InterestCalculator, PercentageCalculator, EquationSolver, GraphInterpretation } from "./math-interactives";
 
 interface InteractiveViewerProps {
   activity: Activity;
@@ -74,6 +75,15 @@ export function InteractiveViewer({ activity, userId, isCompleted }: Interactive
       case 'cfs-builder':
       case 'statement-builder':
         return <SpreadsheetExerciseViewer activity={activity} userId={userId} isCompleted={completed} onComplete={handleComplete} />;
+      // Math-specific interactives
+      case 'interest-calculator':
+        return <InterestCalculator content={content} onComplete={handleComplete} completed={completed} />;
+      case 'percentage-calculator':
+        return <PercentageCalculator content={content} onComplete={handleComplete} completed={completed} />;
+      case 'equation-solver':
+        return <EquationSolver content={content} onComplete={handleComplete} completed={completed} />;
+      case 'graph-interpretation':
+        return <GraphInterpretation content={content} onComplete={handleComplete} completed={completed} />;
       default:
         return <PlaceholderInteractive type={interactiveType} onComplete={handleComplete} completed={completed} />;
     }
@@ -934,6 +944,37 @@ function TimedClassification({ content, onComplete, completed }: TimedClassifica
   
   const currentScenario = scenarios[currentIndex];
   
+  const moveToNextRef = useCallback(() => {
+    if (currentIndex >= scenarios.length - 1) {
+      setIsFinished(true);
+      // Timeout means this answer was wrong, so just count existing correct answers
+      setAnswers(prev => {
+        const correctCount = prev.filter(a => a.correct).length;
+        const finalScore = Math.round((correctCount / scenarios.length) * 100);
+        if (finalScore >= 60) {
+          onComplete();
+        }
+        return prev;
+      });
+    } else {
+      setCurrentIndex(prev => prev + 1);
+      setTimeLeft(timePerQuestion);
+      setSelectedAnswer(null);
+      setShowFeedback(false);
+    }
+  }, [currentIndex, scenarios.length, timePerQuestion, onComplete]);
+  
+  const handleTimeout = useCallback(() => {
+    // Time ran out - count as wrong
+    if (!currentScenario) return;
+    setAnswers(prev => [...prev, { correct: false, selected: null, expected: currentScenario.correctPillar }]);
+    setShowFeedback(true);
+    
+    setTimeout(() => {
+      moveToNextRef();
+    }, 2000);
+  }, [currentScenario, moveToNextRef]);
+  
   // Timer effect
   useEffect(() => {
     if (completed || isFinished || showFeedback || !currentScenario) return;
@@ -948,17 +989,7 @@ function TimedClassification({ content, onComplete, completed }: TimedClassifica
     }, 1000);
     
     return () => clearInterval(timer);
-  }, [timeLeft, showFeedback, isFinished, completed, currentScenario]);
-  
-  const handleTimeout = () => {
-    // Time ran out - count as wrong
-    setAnswers(prev => [...prev, { correct: false, selected: null, expected: currentScenario.correctPillar }]);
-    setShowFeedback(true);
-    
-    setTimeout(() => {
-      moveToNext();
-    }, 2000);
-  };
+  }, [timeLeft, showFeedback, isFinished, completed, currentScenario, handleTimeout]);
   
   const handleAnswer = (pillar: string) => {
     if (showFeedback || isFinished) return;
@@ -974,26 +1005,22 @@ function TimedClassification({ content, onComplete, completed }: TimedClassifica
     setShowFeedback(true);
     
     setTimeout(() => {
-      moveToNext();
-    }, 2000);
-  };
-  
-  const moveToNext = () => {
-    if (currentIndex >= scenarios.length - 1) {
-      setIsFinished(true);
-      // Check if passed (60% or more)
-      const finalScore = answers.length > 0 
-        ? Math.round((answers.filter(a => a.correct).length / scenarios.length) * 100)
-        : Math.round((score / scenarios.length) * 100);
-      if (finalScore >= 60) {
-        onComplete();
+      // Move to next question or finish
+      if (currentIndex >= scenarios.length - 1) {
+        setIsFinished(true);
+        // Check if passed (60% or more) - need to include current answer
+        const correctCount = answers.filter(a => a.correct).length + (isCorrect ? 1 : 0);
+        const finalScore = Math.round((correctCount / scenarios.length) * 100);
+        if (finalScore >= 60) {
+          onComplete();
+        }
+      } else {
+        setCurrentIndex(prev => prev + 1);
+        setSelectedAnswer(null);
+        setShowFeedback(false);
+        setTimeLeft(timePerQuestion);
       }
-    } else {
-      setCurrentIndex(prev => prev + 1);
-      setSelectedAnswer(null);
-      setShowFeedback(false);
-      setTimeLeft(timePerQuestion);
-    }
+    }, 2000);
   };
   
   const handleRestart = () => {
@@ -2773,22 +2800,6 @@ function MockExamViewer({ content, onComplete, completed }: MockExamViewerProps)
     topicBreakdown: Record<string, { correct: number; total: number }>;
   } | null>(null);
 
-  // Timer effect
-  useEffect(() => {
-    if (!examStarted || examFinished || completed) return;
-
-    if (timeRemaining <= 0) {
-      handleSubmitExam();
-      return;
-    }
-
-    const timer = setInterval(() => {
-      setTimeRemaining(prev => prev - 1);
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [examStarted, examFinished, timeRemaining, completed]);
-
   // Get all questions flat
   const allQuestions = sections.flatMap(s => s.questions);
   const totalQuestions = allQuestions.length;
@@ -2814,42 +2825,7 @@ function MockExamViewer({ content, onComplete, completed }: MockExamViewerProps)
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const handleStartExam = () => {
-    setExamStarted(true);
-    setTimeRemaining(timeLimitMinutes * 60);
-  };
-
-  const handleAnswerChange = (questionId: string, answer: string | number) => {
-    setAnswers(prev => ({ ...prev, [questionId]: answer }));
-  };
-
-  const navigateToQuestion = (sectionIdx: number, questionIdx: number) => {
-    setCurrentSectionIndex(sectionIdx);
-    setCurrentQuestionIndex(questionIdx);
-    setShowReview(false);
-  };
-
-  const handleNext = () => {
-    if (currentQuestionIndex < currentSection.questions.length - 1) {
-      setCurrentQuestionIndex(prev => prev + 1);
-    } else if (currentSectionIndex < sections.length - 1) {
-      setCurrentSectionIndex(prev => prev + 1);
-      setCurrentQuestionIndex(0);
-    } else {
-      setShowReview(true);
-    }
-  };
-
-  const handlePrevious = () => {
-    if (currentQuestionIndex > 0) {
-      setCurrentQuestionIndex(prev => prev - 1);
-    } else if (currentSectionIndex > 0) {
-      setCurrentSectionIndex(prev => prev - 1);
-      setCurrentQuestionIndex(sections[currentSectionIndex - 1].questions.length - 1);
-    }
-  };
-
-  const handleSubmitExam = () => {
+  const handleSubmitExam = useCallback(() => {
     // Grade the exam
     const questionResults: { questionId: string; isCorrect: boolean; userAnswer: string | number; correctAnswer: string | number }[] = [];
     const topicBreakdown: Record<string, { correct: number; total: number }> = {};
@@ -2899,6 +2875,57 @@ function MockExamViewer({ content, onComplete, completed }: MockExamViewerProps)
 
     if (scorePercent >= passingScore) {
       onComplete();
+    }
+  }, [allQuestions, answers, totalPoints, passingScore, onComplete]);
+
+  // Timer effect
+  useEffect(() => {
+    if (!examStarted || examFinished || completed) return;
+
+    if (timeRemaining <= 0) {
+      handleSubmitExam();
+      return;
+    }
+
+    const timer = setInterval(() => {
+      setTimeRemaining(prev => prev - 1);
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [examStarted, examFinished, timeRemaining, completed, handleSubmitExam]);
+
+  const handleStartExam = () => {
+    setExamStarted(true);
+    setTimeRemaining(timeLimitMinutes * 60);
+  };
+
+  const handleAnswerChange = (questionId: string, answer: string | number) => {
+    setAnswers(prev => ({ ...prev, [questionId]: answer }));
+  };
+
+  const navigateToQuestion = (sectionIdx: number, questionIdx: number) => {
+    setCurrentSectionIndex(sectionIdx);
+    setCurrentQuestionIndex(questionIdx);
+    setShowReview(false);
+  };
+
+  const handleNext = () => {
+    if (currentQuestionIndex < currentSection.questions.length - 1) {
+      setCurrentQuestionIndex(prev => prev + 1);
+    } else if (currentSectionIndex < sections.length - 1) {
+      setCurrentSectionIndex(prev => prev + 1);
+      setCurrentQuestionIndex(0);
+    } else {
+      setShowReview(true);
+    }
+  };
+
+  const handlePrevious = () => {
+    if (currentQuestionIndex > 0) {
+      setCurrentQuestionIndex(prev => prev - 1);
+    } else if (currentSectionIndex > 0) {
+      setCurrentSectionIndex(prev => prev - 1);
+      setCurrentQuestionIndex(sections[currentSectionIndex - 1].questions.length - 1);
     }
   };
 
