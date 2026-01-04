@@ -16,3 +16,4 @@ SET
   updated_at = NOW()
 WHERE slug = 'financial-accounting';
 
+

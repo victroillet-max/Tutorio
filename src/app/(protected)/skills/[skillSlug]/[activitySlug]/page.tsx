@@ -81,30 +81,26 @@ export default async function SkillActivityPage({ params }: SkillActivityPagePro
     notFound();
   }
 
-  // Get the activity
-  const { data: activity, error: activityError } = await supabase
-    .from("activities")
-    .select("*")
-    .eq("slug", activitySlug)
-    .eq("is_published", true)
-    .single();
-
-  if (activityError || !activity) {
-    notFound();
-  }
-
-  // Verify this activity belongs to this skill
-  const { data: activitySkill } = await supabase
+  // Get the activity that belongs to this skill
+  // We query through activity_skills to handle duplicate slugs across courses
+  const { data: activitySkillData, error: activitySkillError } = await supabase
     .from("activity_skills")
-    .select("*")
-    .eq("activity_id", activity.id)
+    .select(`
+      *,
+      activities!inner (*)
+    `)
     .eq("skill_id", skill.id)
     .eq("is_owner", true)
+    .eq("activities.slug", activitySlug)
+    .eq("activities.is_published", true)
     .single();
 
-  if (!activitySkill) {
+  if (activitySkillError || !activitySkillData) {
     notFound();
   }
+
+  const activity = activitySkillData.activities as Activity;
+  const activitySkill = activitySkillData;
 
   // Check access (admins have full access)
   const hasAccess = isAdmin || checkAccess(activity.required_plan as PlanTier, userPlan);

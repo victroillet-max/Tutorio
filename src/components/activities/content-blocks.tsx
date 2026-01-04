@@ -340,6 +340,45 @@ export function LessonProgress({ currentPart, totalParts, partTitles }: LessonPr
   );
 }
 
+// Helper function to parse inline markdown (bold, italic, code)
+function parseInlineMarkdown(text: string): ReactNode[] {
+  const parts: ReactNode[] = [];
+  let remaining = text;
+  let key = 0;
+  
+  // Pattern to match **bold**, *italic*, and `code`
+  const pattern = /(\*\*(.+?)\*\*)|(\*(.+?)\*)|(`(.+?)`)/g;
+  let lastIndex = 0;
+  let match;
+  
+  while ((match = pattern.exec(text)) !== null) {
+    // Add text before the match
+    if (match.index > lastIndex) {
+      parts.push(text.slice(lastIndex, match.index));
+    }
+    
+    if (match[1]) {
+      // Bold text **...**
+      parts.push(<strong key={key++} className="font-semibold text-slate-900">{match[2]}</strong>);
+    } else if (match[3]) {
+      // Italic text *...*
+      parts.push(<em key={key++} className="italic">{match[4]}</em>);
+    } else if (match[5]) {
+      // Code text `...`
+      parts.push(<code key={key++} className="px-1.5 py-0.5 bg-slate-100 text-slate-800 rounded text-sm font-mono">{match[6]}</code>);
+    }
+    
+    lastIndex = pattern.lastIndex;
+  }
+  
+  // Add remaining text
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex));
+  }
+  
+  return parts.length > 0 ? parts : [text];
+}
+
 // Key takeaways summary component
 interface KeyTakeawaysProps {
   takeaways: string[];
@@ -366,7 +405,7 @@ export function KeyTakeaways({ takeaways }: KeyTakeawaysProps) {
               <div className="w-6 h-6 rounded-full bg-emerald-200 flex items-center justify-center flex-shrink-0 mt-0.5">
                 <CheckCircle2 className="w-4 h-4 text-emerald-700" />
               </div>
-              <span className="text-slate-700">{takeaway}</span>
+              <span className="text-slate-700">{parseInlineMarkdown(takeaway)}</span>
             </li>
           ))}
         </ul>

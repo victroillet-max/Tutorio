@@ -14,4 +14,5 @@ export {
   KeyTakeaways, 
   LessonProgress 
 } from './content-blocks';
+export { InteractiveErrorBoundary, withInteractiveErrorBoundary } from './interactive-error-boundary';
 

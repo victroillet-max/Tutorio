@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Bell, Shield, CreditCard, User, BookOpen, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { ActiveSessions } from "@/components/auth/active-sessions";
 import type { UserCourseSubscription } from "@/lib/database.types";
 
 export const metadata = {
@@ -114,7 +115,7 @@ export default async function SettingsPage() {
           title="Security"
           description="Protect your account"
         >
-          <div className="space-y-4">
+          <div className="space-y-6">
             <SettingRow
               label="Two-factor authentication"
               value="Not enabled"
@@ -124,15 +125,10 @@ export default async function SettingsPage() {
                 </Button>
               }
             />
-            <SettingRow
-              label="Active sessions"
-              value="1 active session"
-              action={
-                <Button variant="outline" size="sm" disabled>
-                  Manage
-                </Button>
-              }
-            />
+            <div>
+              <h4 className="font-medium text-[var(--foreground)] mb-3">Active Sessions</h4>
+              <ActiveSessionsLoader userId={user!.id} />
+            </div>
           </div>
         </SettingsSection>
 
@@ -316,5 +312,42 @@ async function SubscriptionSummary({ userId }: { userId: string }) {
         </Link>
       </div>
     </div>
+  );
+}
+
+async function ActiveSessionsLoader({ userId }: { userId: string }) {
+  const supabase = await createClient();
+  
+  // Get the current session to identify which one is current
+  const { data: { session } } = await supabase.auth.getSession();
+  
+  // Get all active sessions for the user
+  const { data: sessions, error } = await supabase.rpc("get_user_sessions", {
+    p_user_id: userId,
+  });
+
+  if (error) {
+    return (
+      <div className="p-4 rounded-xl bg-amber-50 border border-amber-200">
+        <p className="text-sm text-amber-700">
+          Unable to load session information. Session tracking may not be set up yet.
+        </p>
+      </div>
+    );
+  }
+
+  // Create a hash of the current token to identify the current session
+  // Note: This is a simplified approach - in production you'd want to store the session ID
+  let currentTokenHash = "";
+  if (session?.access_token) {
+    const { createHash } = await import("crypto");
+    currentTokenHash = createHash("sha256").update(session.access_token).digest("hex");
+  }
+
+  return (
+    <ActiveSessions 
+      sessions={sessions || []} 
+      currentTokenHash={currentTokenHash}
+    />
   );
 }

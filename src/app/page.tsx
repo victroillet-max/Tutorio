@@ -8,7 +8,6 @@ import {
   ArrowRight,
   Sparkles,
   Clock,
-  Shield,
   Star,
   Menu,
   X,
@@ -20,7 +19,6 @@ import {
   Trophy,
   Flame,
   Check,
-  Bot,
   BarChart3,
   CreditCard,
 } from "lucide-react";
@@ -365,25 +363,54 @@ function HeroSection() {
               </Link>
             </div>
 
-            {/* Trust Badges */}
-            <div className="flex flex-wrap gap-8 justify-center lg:justify-start">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-[var(--background-secondary)] flex items-center justify-center text-[var(--primary)]">
-                  <Shield className="w-[18px] h-[18px]" />
+            {/* Social Proof & Trust Badges */}
+            <div className="flex flex-col gap-6">
+              {/* Student Avatars Widget */}
+              <div className="flex items-center gap-3 justify-center lg:justify-start">
+                <div className="flex">
+                  <div className="w-9 h-9 rounded-full bg-[var(--primary)] text-white flex items-center justify-center text-sm font-semibold border-2 border-white">
+                    M
+                  </div>
+                  <div className="w-9 h-9 rounded-full bg-[var(--success)] text-white flex items-center justify-center text-sm font-semibold border-2 border-white -ml-2.5">
+                    S
+                  </div>
+                  <div className="w-9 h-9 rounded-full bg-[var(--accent)] text-white flex items-center justify-center text-sm font-semibold border-2 border-white -ml-2.5">
+                    L
+                  </div>
+                  <div className="w-9 h-9 rounded-full bg-[#7c3aed] text-white flex items-center justify-center text-sm font-semibold border-2 border-white -ml-2.5">
+                    A
+                  </div>
                 </div>
-                <span className="text-sm text-[var(--foreground-muted)]">Secure Payments</span>
+                <span className="text-sm text-[var(--foreground-muted)]">
+                  <strong className="text-[var(--foreground)]">50+</strong> students learning
+                </span>
               </div>
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-[var(--background-secondary)] flex items-center justify-center text-[var(--primary)]">
-                  <Clock className="w-[18px] h-[18px]" />
+              
+              {/* Trust Badges */}
+              <div className="flex flex-wrap gap-6 justify-center lg:justify-start">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-[var(--background-secondary)] flex items-center justify-center text-[var(--primary)]">
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                    </svg>
+                  </div>
+                  <span className="text-sm text-[var(--foreground-muted)]">Secure Payments</span>
                 </div>
-                <span className="text-sm text-[var(--foreground-muted)]">Learn at Your Pace</span>
-              </div>
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-[var(--background-secondary)] flex items-center justify-center text-[var(--primary)]">
-                  <Bot className="w-[18px] h-[18px]" />
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-[var(--background-secondary)] flex items-center justify-center text-[var(--primary)]">
+                    <Clock className="w-4 h-4" />
+                  </div>
+                  <span className="text-sm text-[var(--foreground-muted)]">Learn at Your Pace</span>
                 </div>
-                <span className="text-sm text-[var(--foreground-muted)]">AI Tutor Included</span>
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-[var(--background-secondary)] flex items-center justify-center text-[var(--primary)]">
+                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <rect x="3" y="11" width="18" height="10" rx="2"/>
+                      <circle cx="12" cy="5" r="3"/>
+                    </svg>
+                  </div>
+                  <span className="text-sm text-[var(--foreground-muted)]">AI Tutor Included</span>
+                </div>
               </div>
             </div>
           </div>

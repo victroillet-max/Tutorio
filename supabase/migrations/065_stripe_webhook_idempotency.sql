@@ -43,3 +43,4 @@ $$;
 COMMENT ON FUNCTION cleanup_old_stripe_events IS 
   'Removes Stripe webhook events older than 30 days. Can be called periodically to prevent table bloat.';
 
+

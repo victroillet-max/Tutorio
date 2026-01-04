@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { CheckCircle2, Sparkles, RotateCcw, ChevronRight, GripVertical, MousePointerClick, BookOpen, Lightbulb, ArrowRight, X, Plus, Trash2 } from "lucide-react";
+import { CheckCircle2, Sparkles, RotateCcw, ChevronRight, GripVertical, MousePointerClick, BookOpen, Lightbulb, ArrowRight, X, Plus, Trash2, Calculator, HelpCircle, Check, AlertCircle } from "lucide-react";
 import type { Activity } from "@/lib/database.types";
 import { markActivityComplete, trackActivityView } from "@/lib/activities/actions";
 import { SpreadsheetExerciseViewer } from "./spreadsheet-exercise-viewer";
+import { InteractiveErrorBoundary } from "./interactive-error-boundary";
 
 interface InteractiveViewerProps {
   activity: Activity;
@@ -66,6 +67,8 @@ export function InteractiveViewer({ activity, userId, isCompleted }: Interactive
         return <InventoryCalculator content={content} onComplete={handleComplete} completed={completed} />;
       case 'mock-exam':
         return <MockExamViewer content={content} onComplete={handleComplete} completed={completed} />;
+      case 'review-calculator':
+        return <ReviewCalculator content={content} onComplete={handleComplete} completed={completed} />;
       case 'google-sheets':
       case 'spreadsheet':
       case 'cfs-builder':
@@ -104,7 +107,9 @@ export function InteractiveViewer({ activity, userId, isCompleted }: Interactive
       
       {/* Content */}
       <div className="p-6 sm:p-8">
-        {renderInteractive()}
+        <InteractiveErrorBoundary interactiveType={interactiveType}>
+          {renderInteractive()}
+        </InteractiveErrorBoundary>
       </div>
       
       {/* Footer - Single action button */}
@@ -1138,6 +1143,7 @@ function TimedClassification({ content, onComplete, completed }: TimedClassifica
 
 // ============================================
 // Journal Entry Builder Component (FA Course)
+// Supports both full journal entry format and quiz-style format
 // ============================================
 interface JournalEntryBuilderProps {
   content: Record<string, unknown> | null;
@@ -1145,12 +1151,28 @@ interface JournalEntryBuilderProps {
   completed: boolean;
 }
 
-interface JournalTransaction {
+interface JournalTransactionWithSolution {
   id: string;
   date: string;
   description: string;
   solution: { account: string; type: string; debit: number; credit: number }[];
   hint?: string;
+}
+
+interface SimpleTransaction {
+  date: string;
+  description: string;
+}
+
+interface JournalQuizQuestion {
+  id: string;
+  question: string;
+  answer_type: 'choice' | 'numeric';
+  options?: string[];
+  correct_answer: string | number;
+  tolerance?: number;
+  hint?: string;
+  explanation: string;
 }
 
 interface AccountOption {
@@ -1165,12 +1187,24 @@ interface JournalEntry {
 }
 
 function JournalEntryBuilder({ content, onComplete, completed }: JournalEntryBuilderProps) {
-  const scenario = (content?.scenario as string) || "Build journal entries for the following transactions.";
-  const companyName = (content?.company_name as string) || "Company";
-  const transactions = (content?.transactions as JournalTransaction[]) || [];
+  const scenario = (content?.scenario as string) || (content?.description as string) || "Build journal entries for the following transactions.";
+  const companyName = (content?.company_name as string) || (content?.title as string) || "Company";
+  const companyBackground = (content?.company_background as string) || "";
+  const rawTransactions = (content?.transactions as (JournalTransactionWithSolution | SimpleTransaction)[]) || [];
   const accountOptions = (content?.account_options as AccountOption[]) || [];
+  const questions = (content?.questions as JournalQuizQuestion[]) || [];
   const passingScore = (content?.passing_score as number) || 80;
 
+  // Determine if we have the full format (with solutions) or quiz format
+  const hasFullFormat = rawTransactions.length > 0 && 
+    rawTransactions.some(tx => 'solution' in tx && Array.isArray((tx as JournalTransactionWithSolution).solution));
+  const hasQuizFormat = questions.length > 0;
+  
+  // Cast transactions to the appropriate type
+  const transactions = hasFullFormat ? (rawTransactions as JournalTransactionWithSolution[]) : [];
+  const simpleTransactions = !hasFullFormat ? (rawTransactions as SimpleTransaction[]) : [];
+
+  // State for full journal entry builder mode
   const [currentTxIndex, setCurrentTxIndex] = useState(0);
   const [entries, setEntries] = useState<JournalEntry[]>([
     { account: "", debit: 0, credit: 0 },
@@ -1180,384 +1214,613 @@ function JournalEntryBuilder({ content, onComplete, completed }: JournalEntryBui
   const [showFeedback, setShowFeedback] = useState(false);
   const [txResults, setTxResults] = useState<{ correct: boolean; feedback: string }[]>([]);
   const [isFinished, setIsFinished] = useState(false);
+  
+  // State for quiz-style mode
+  const [selectedAnswer, setSelectedAnswer] = useState<string | number | null>(null);
+  const [numericAnswer, setNumericAnswer] = useState('');
+  const [quizScore, setQuizScore] = useState(0);
 
-  const currentTx = transactions[currentTxIndex];
+  // Reset state when switching questions
+  useEffect(() => {
+    setSelectedAnswer(null);
+    setNumericAnswer('');
+    setShowFeedback(false);
+    setShowHint(false);
+  }, [currentTxIndex]);
 
-  const addEntry = () => {
-    setEntries([...entries, { account: "", debit: 0, credit: 0 }]);
-  };
+  // FULL JOURNAL ENTRY BUILDER MODE
+  if (hasFullFormat && accountOptions.length > 0) {
+    const currentTx = transactions[currentTxIndex];
 
-  const removeEntry = (index: number) => {
-    if (entries.length <= 2) return;
-    setEntries(entries.filter((_, i) => i !== index));
-  };
+    const addEntry = () => {
+      setEntries([...entries, { account: "", debit: 0, credit: 0 }]);
+    };
 
-  const updateEntry = (index: number, field: keyof JournalEntry, value: string | number) => {
-    const updated = [...entries];
-    if (field === 'account') {
-      updated[index].account = value as string;
-    } else if (field === 'debit') {
-      updated[index].debit = Number(value) || 0;
-      // Clear credit if entering debit
-      if (Number(value) > 0) updated[index].credit = 0;
-    } else if (field === 'credit') {
-      updated[index].credit = Number(value) || 0;
-      // Clear debit if entering credit
-      if (Number(value) > 0) updated[index].debit = 0;
-    }
-    setEntries(updated);
-  };
+    const removeEntry = (index: number) => {
+      if (entries.length <= 2) return;
+      setEntries(entries.filter((_, i) => i !== index));
+    };
 
-  const checkAnswer = () => {
-    if (!currentTx) return;
+    const updateEntry = (index: number, field: keyof JournalEntry, value: string | number) => {
+      const updated = [...entries];
+      if (field === 'account') {
+        updated[index].account = value as string;
+      } else if (field === 'debit') {
+        updated[index].debit = Number(value) || 0;
+        if (Number(value) > 0) updated[index].credit = 0;
+      } else if (field === 'credit') {
+        updated[index].credit = Number(value) || 0;
+        if (Number(value) > 0) updated[index].debit = 0;
+      }
+      setEntries(updated);
+    };
 
-    const solution = currentTx.solution;
-    let isCorrect = true;
-    let feedback = "";
+    const checkAnswer = () => {
+      if (!currentTx) return;
 
-    // Check if debits = credits
-    const totalDebits = entries.reduce((sum, e) => sum + e.debit, 0);
-    const totalCredits = entries.reduce((sum, e) => sum + e.credit, 0);
+      const solution = currentTx.solution;
+      let isCorrect = true;
+      let feedback = "";
 
-    if (totalDebits !== totalCredits) {
-      isCorrect = false;
-      feedback = `Debits (${totalDebits.toLocaleString()}) must equal Credits (${totalCredits.toLocaleString()}).`;
-    } else {
-      // Check each solution entry is present
-      const matchedEntries = new Set<number>();
-      
-      for (const sol of solution) {
-        const matchIndex = entries.findIndex((e, idx) => 
-          !matchedEntries.has(idx) &&
-          e.account === sol.account &&
-          e.debit === sol.debit &&
-          e.credit === sol.credit
-        );
+      const totalDebits = entries.reduce((sum, e) => sum + e.debit, 0);
+      const totalCredits = entries.reduce((sum, e) => sum + e.credit, 0);
+
+      if (totalDebits !== totalCredits) {
+        isCorrect = false;
+        feedback = `Debits (${totalDebits.toLocaleString()}) must equal Credits (${totalCredits.toLocaleString()}).`;
+      } else {
+        const matchedEntries = new Set<number>();
         
-        if (matchIndex === -1) {
+        for (const sol of solution) {
+          const matchIndex = entries.findIndex((e, idx) => 
+            !matchedEntries.has(idx) &&
+            e.account === sol.account &&
+            e.debit === sol.debit &&
+            e.credit === sol.credit
+          );
+          
+          if (matchIndex === -1) {
+            isCorrect = false;
+          } else {
+            matchedEntries.add(matchIndex);
+          }
+        }
+
+        if (!isCorrect) {
+          feedback = "Some entries don't match. Check your accounts and amounts.";
+        } else if (entries.filter(e => e.account).length > solution.length) {
           isCorrect = false;
+          feedback = "You have extra entries that aren't needed.";
         } else {
-          matchedEntries.add(matchIndex);
+          feedback = "Correct! Great job!";
         }
       }
 
-      if (!isCorrect) {
-        feedback = "Some entries don't match. Check your accounts and amounts.";
-      } else if (entries.filter(e => e.account).length > solution.length) {
-        // Extra entries that shouldn't be there
-        isCorrect = false;
-        feedback = "You have extra entries that aren't needed.";
+      setTxResults([...txResults, { correct: isCorrect, feedback }]);
+      setShowFeedback(true);
+    };
+
+    const nextTransaction = () => {
+      if (currentTxIndex >= transactions.length - 1) {
+        setIsFinished(true);
+        const correctCount = txResults.filter(r => r.correct).length;
+        const scorePercent = Math.round((correctCount / transactions.length) * 100);
+        if (scorePercent >= passingScore) {
+          onComplete();
+        }
       } else {
-        feedback = "Correct! Great job!";
+        setCurrentTxIndex(currentTxIndex + 1);
+        setEntries([
+          { account: "", debit: 0, credit: 0 },
+          { account: "", debit: 0, credit: 0 },
+        ]);
+        setShowFeedback(false);
+        setShowHint(false);
       }
-    }
+    };
 
-    setTxResults([...txResults, { correct: isCorrect, feedback }]);
-    setShowFeedback(true);
-  };
-
-  const nextTransaction = () => {
-    if (currentTxIndex >= transactions.length - 1) {
-      // Calculate final score
-      setIsFinished(true);
-      const correctCount = txResults.filter(r => r.correct).length + (txResults.length < transactions.length ? 0 : 0);
-      const scorePercent = Math.round((correctCount / transactions.length) * 100);
-      if (scorePercent >= passingScore) {
-        onComplete();
-      }
-    } else {
-      setCurrentTxIndex(currentTxIndex + 1);
+    const handleReset = () => {
+      setCurrentTxIndex(0);
       setEntries([
         { account: "", debit: 0, credit: 0 },
         { account: "", debit: 0, credit: 0 },
       ]);
+      setTxResults([]);
       setShowFeedback(false);
       setShowHint(false);
+      setIsFinished(false);
+    };
+
+    const correctCount = txResults.filter(r => r.correct).length;
+    const finalScore = Math.round((correctCount / transactions.length) * 100);
+
+    // Finished state for full format
+    if (isFinished) {
+      return (
+        <div className="text-center">
+          <div className={`w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-4 ${finalScore >= passingScore ? 'bg-emerald-100' : 'bg-amber-100'}`}>
+            <span className={`text-3xl font-bold ${finalScore >= passingScore ? 'text-emerald-700' : 'text-amber-700'}`}>
+              {finalScore}%
+            </span>
+          </div>
+          
+          <h3 className="text-xl font-bold mb-2" style={{ fontFamily: 'var(--font-heading)' }}>
+            {finalScore >= passingScore ? 'Excellent Work!' : 'Keep Practicing!'}
+          </h3>
+          <p className="text-[var(--foreground-muted)] mb-6">
+            You got {correctCount} of {transactions.length} transactions correct.
+            {finalScore < passingScore && ` You need ${passingScore}% to pass.`}
+          </p>
+
+          <div className="text-left max-w-xl mx-auto mb-6 space-y-2">
+            {transactions.map((tx, idx) => {
+              const result = txResults[idx];
+              return (
+                <div
+                  key={tx.id}
+                  className={`p-3 rounded-lg border ${result?.correct ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}
+                >
+                  <p className="text-sm font-medium text-slate-700">{tx.date}: {tx.description.substring(0, 60)}...</p>
+                  <p className="text-xs mt-1">
+                    {result?.correct ? (
+                      <span className="text-emerald-700 flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3" /> Correct
+                      </span>
+                    ) : (
+                      <span className="text-red-700">{result?.feedback || 'Incorrect'}</span>
+                    )}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+
+          {finalScore < passingScore && (
+            <button
+              onClick={handleReset}
+              className="flex items-center gap-2 px-6 py-3 bg-violet-600 text-white font-medium rounded-xl hover:bg-violet-700 transition-colors mx-auto"
+            >
+              <RotateCcw className="w-4 h-4" />
+              Try Again
+            </button>
+          )}
+        </div>
+      );
     }
-  };
 
-  const handleReset = () => {
-    setCurrentTxIndex(0);
-    setEntries([
-      { account: "", debit: 0, credit: 0 },
-      { account: "", debit: 0, credit: 0 },
-    ]);
-    setTxResults([]);
-    setShowFeedback(false);
-    setShowHint(false);
-    setIsFinished(false);
-  };
-
-  if (transactions.length === 0) {
-    return <div className="text-center text-[var(--foreground-muted)]">No transactions available.</div>;
-  }
-
-  const correctCount = txResults.filter(r => r.correct).length;
-  const finalScore = Math.round((correctCount / transactions.length) * 100);
-
-  // Finished state
-  if (isFinished) {
     return (
-      <div className="text-center">
-        <div className={`w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-4 ${finalScore >= passingScore ? 'bg-emerald-100' : 'bg-amber-100'}`}>
-          <span className={`text-3xl font-bold ${finalScore >= passingScore ? 'text-emerald-700' : 'text-amber-700'}`}>
-            {finalScore}%
-          </span>
+      <div>
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
+          <div className="flex items-start gap-3">
+            <BookOpen className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <h3 className="font-semibold text-blue-800">{companyName}</h3>
+              <p className="text-sm text-blue-700 mt-1">{scenario}</p>
+            </div>
+          </div>
         </div>
-        
-        <h3 className="text-xl font-bold mb-2" style={{ fontFamily: 'var(--font-heading)' }}>
-          {finalScore >= passingScore ? 'Excellent Work!' : 'Keep Practicing!'}
-        </h3>
-        <p className="text-[var(--foreground-muted)] mb-6">
-          You got {correctCount} of {transactions.length} transactions correct.
-          {finalScore < passingScore && ` You need ${passingScore}% to pass.`}
-        </p>
 
-        {/* Results summary */}
-        <div className="text-left max-w-xl mx-auto mb-6 space-y-2">
-          {transactions.map((tx, idx) => {
-            const result = txResults[idx];
-            return (
+        <div className="flex items-center justify-between mb-6">
+          <p className="text-sm text-[var(--foreground-muted)]">
+            Transaction {currentTxIndex + 1} of {transactions.length}
+          </p>
+          <div className="flex gap-1">
+            {transactions.map((_, idx) => (
               <div
-                key={tx.id}
-                className={`p-3 rounded-lg border ${result?.correct ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}
-              >
-                <p className="text-sm font-medium text-slate-700">{tx.date}: {tx.description.substring(0, 60)}...</p>
-                <p className="text-xs mt-1">
-                  {result?.correct ? (
-                    <span className="text-emerald-700 flex items-center gap-1">
-                      <CheckCircle2 className="w-3 h-3" /> Correct
-                    </span>
-                  ) : (
-                    <span className="text-red-700">{result?.feedback || 'Incorrect'}</span>
-                  )}
-                </p>
-              </div>
-            );
-          })}
+                key={idx}
+                className={`w-3 h-3 rounded-full ${
+                  idx < currentTxIndex ? (txResults[idx]?.correct ? 'bg-emerald-500' : 'bg-red-400') :
+                  idx === currentTxIndex ? 'bg-violet-500' : 'bg-slate-200'
+                }`}
+              />
+            ))}
+          </div>
         </div>
 
-        {finalScore < passingScore && (
+        <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-6">
+          <div className="flex items-center gap-2 text-sm text-[var(--foreground-muted)] mb-2">
+            <span className="font-semibold text-violet-600">{currentTx.date}</span>
+          </div>
+          <p className="text-slate-800">{currentTx.description}</p>
+        </div>
+
+        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden mb-4">
+          <div className="bg-slate-100 px-4 py-2 border-b border-slate-200">
+            <div className="grid grid-cols-12 gap-2 text-xs font-semibold text-slate-600 uppercase">
+              <div className="col-span-5">Account</div>
+              <div className="col-span-3 text-right">Debit (CHF)</div>
+              <div className="col-span-3 text-right">Credit (CHF)</div>
+              <div className="col-span-1"></div>
+            </div>
+          </div>
+          
+          <div className="p-4 space-y-3">
+            {entries.map((entry, idx) => (
+              <div key={idx} className="grid grid-cols-12 gap-2 items-center">
+                <div className="col-span-5">
+                  <select
+                    value={entry.account}
+                    onChange={(e) => updateEntry(idx, 'account', e.target.value)}
+                    disabled={showFeedback}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 disabled:bg-slate-100"
+                  >
+                    <option value="">Select account...</option>
+                    {accountOptions.map((opt) => (
+                      <option key={opt.name} value={opt.name}>
+                        {opt.name} ({opt.type})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="col-span-3">
+                  <input
+                    type="number"
+                    value={entry.debit || ''}
+                    onChange={(e) => updateEntry(idx, 'debit', e.target.value)}
+                    disabled={showFeedback}
+                    placeholder="0"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-right focus:outline-none focus:ring-2 focus:ring-violet-500 disabled:bg-slate-100"
+                  />
+                </div>
+                <div className="col-span-3">
+                  <input
+                    type="number"
+                    value={entry.credit || ''}
+                    onChange={(e) => updateEntry(idx, 'credit', e.target.value)}
+                    disabled={showFeedback}
+                    placeholder="0"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-right focus:outline-none focus:ring-2 focus:ring-violet-500 disabled:bg-slate-100"
+                  />
+                </div>
+                <div className="col-span-1 flex justify-center">
+                  {entries.length > 2 && !showFeedback && (
+                    <button
+                      onClick={() => removeEntry(idx)}
+                      className="p-1 text-slate-400 hover:text-red-500 transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="bg-slate-50 px-4 py-3 border-t border-slate-200">
+            <div className="grid grid-cols-12 gap-2 items-center">
+              <div className="col-span-5 text-sm font-semibold text-slate-600">Totals</div>
+              <div className="col-span-3 text-right font-mono font-semibold text-slate-800">
+                {entries.reduce((sum, e) => sum + e.debit, 0).toLocaleString()}
+              </div>
+              <div className="col-span-3 text-right font-mono font-semibold text-slate-800">
+                {entries.reduce((sum, e) => sum + e.credit, 0).toLocaleString()}
+              </div>
+              <div className="col-span-1"></div>
+            </div>
+          </div>
+        </div>
+
+        {!showFeedback && (
           <button
-            onClick={handleReset}
-            className="flex items-center gap-2 px-6 py-3 bg-violet-600 text-white font-medium rounded-xl hover:bg-violet-700 transition-colors mx-auto"
+            onClick={addEntry}
+            className="flex items-center gap-2 text-sm text-violet-600 hover:text-violet-700 mb-6"
           >
-            <RotateCcw className="w-4 h-4" />
-            Try Again
+            <Plus className="w-4 h-4" />
+            Add another line
           </button>
         )}
+
+        {currentTx.hint && !showFeedback && (
+          <div className="mb-6">
+            {showHint ? (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                <div className="flex items-start gap-3">
+                  <Lightbulb className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                  <p className="text-sm text-amber-800">{currentTx.hint}</p>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowHint(true)}
+                className="text-sm text-amber-600 hover:text-amber-700 flex items-center gap-1"
+              >
+                <Lightbulb className="w-4 h-4" />
+                Need a hint?
+              </button>
+            )}
+          </div>
+        )}
+
+        {showFeedback && txResults[currentTxIndex] && (
+          <div className={`mb-6 p-4 rounded-xl border ${txResults[currentTxIndex].correct ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
+            <div className="flex items-center gap-2 mb-2">
+              {txResults[currentTxIndex].correct ? (
+                <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+              ) : (
+                <X className="w-5 h-5 text-red-600" />
+              )}
+              <span className={`font-semibold ${txResults[currentTxIndex].correct ? 'text-emerald-700' : 'text-red-700'}`}>
+                {txResults[currentTxIndex].correct ? 'Correct!' : 'Not quite right'}
+              </span>
+            </div>
+            <p className="text-sm text-slate-600">{txResults[currentTxIndex].feedback}</p>
+            
+            {!txResults[currentTxIndex].correct && (
+              <div className="mt-3 pt-3 border-t border-red-200">
+                <p className="text-xs font-semibold text-slate-600 mb-2">Correct entry:</p>
+                <div className="space-y-1">
+                  {currentTx.solution.map((sol, idx) => (
+                    <div key={idx} className="text-xs text-slate-700 font-mono">
+                      {sol.account}: {sol.debit > 0 ? `Dr ${sol.debit.toLocaleString()}` : `Cr ${sol.credit.toLocaleString()}`}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="flex justify-end gap-3">
+          {!showFeedback ? (
+            <button
+              onClick={checkAnswer}
+              disabled={entries.every(e => !e.account) || entries.reduce((sum, e) => sum + e.debit + e.credit, 0) === 0}
+              className="flex items-center gap-2 px-6 py-3 bg-violet-600 text-white font-medium rounded-xl hover:bg-violet-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Check Entry
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          ) : (
+            <button
+              onClick={nextTransaction}
+              className="flex items-center gap-2 px-6 py-3 bg-violet-600 text-white font-medium rounded-xl hover:bg-violet-700 transition-colors"
+            >
+              {currentTxIndex >= transactions.length - 1 ? 'See Results' : 'Next Transaction'}
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          )}
+        </div>
       </div>
     );
   }
 
-  return (
-    <div>
-      {/* Scenario context */}
-      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
-        <div className="flex items-start gap-3">
-          <BookOpen className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-          <div>
-            <h3 className="font-semibold text-blue-800">{companyName}</h3>
-            <p className="text-sm text-blue-700 mt-1">{scenario}</p>
+  // QUIZ-STYLE MODE (for content with questions array)
+  if (hasQuizFormat) {
+    const currentQuestion = questions[currentTxIndex];
+    
+    // Find corresponding transaction description if available
+    const relatedTransaction = simpleTransactions.find((_, idx) => 
+      currentQuestion.id.includes(`${idx + 1}`) || currentQuestion.question.includes(simpleTransactions[idx]?.date || '')
+    ) || simpleTransactions[currentTxIndex];
+
+    const checkQuizAnswer = () => {
+      if (!currentQuestion) return;
+      
+      let isCorrect = false;
+      
+      if (currentQuestion.answer_type === 'choice') {
+        isCorrect = selectedAnswer === currentQuestion.correct_answer;
+      } else if (currentQuestion.answer_type === 'numeric') {
+        const userNum = Number(numericAnswer);
+        const correctNum = Number(currentQuestion.correct_answer);
+        const tolerance = currentQuestion.tolerance || 0;
+        isCorrect = Math.abs(userNum - correctNum) <= tolerance;
+      }
+      
+      if (isCorrect) setQuizScore(s => s + 1);
+      setShowFeedback(true);
+    };
+
+    const nextQuestion = () => {
+      if (currentTxIndex >= questions.length - 1) {
+        setIsFinished(true);
+        const finalScore = Math.round((quizScore / questions.length) * 100);
+        if (finalScore >= passingScore) {
+          onComplete();
+        }
+      } else {
+        setCurrentTxIndex(i => i + 1);
+      }
+    };
+    
+    const isCurrentCorrect = () => {
+      if (!currentQuestion) return false;
+      if (currentQuestion.answer_type === 'choice') {
+        return selectedAnswer === currentQuestion.correct_answer;
+      } else if (currentQuestion.answer_type === 'numeric') {
+        const userNum = Number(numericAnswer);
+        const correctNum = Number(currentQuestion.correct_answer);
+        const tolerance = currentQuestion.tolerance || 0;
+        return Math.abs(userNum - correctNum) <= tolerance;
+      }
+      return false;
+    };
+
+    const handleReset = () => {
+      setCurrentTxIndex(0);
+      setQuizScore(0);
+      setIsFinished(false);
+      setShowFeedback(false);
+      setSelectedAnswer(null);
+      setNumericAnswer('');
+    };
+
+    const finalScore = Math.round((quizScore / questions.length) * 100);
+
+    if (isFinished) {
+      return (
+        <div className="text-center">
+          <div className={`w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-4 ${finalScore >= passingScore ? 'bg-emerald-100' : 'bg-amber-100'}`}>
+            <span className={`text-3xl font-bold ${finalScore >= passingScore ? 'text-emerald-700' : 'text-amber-700'}`}>
+              {finalScore}%
+            </span>
           </div>
-        </div>
-      </div>
-
-      {/* Progress */}
-      <div className="flex items-center justify-between mb-6">
-        <p className="text-sm text-[var(--foreground-muted)]">
-          Transaction {currentTxIndex + 1} of {transactions.length}
-        </p>
-        <div className="flex gap-1">
-          {transactions.map((_, idx) => (
-            <div
-              key={idx}
-              className={`w-3 h-3 rounded-full ${
-                idx < currentTxIndex ? (txResults[idx]?.correct ? 'bg-emerald-500' : 'bg-red-400') :
-                idx === currentTxIndex ? 'bg-violet-500' : 'bg-slate-200'
-              }`}
-            />
-          ))}
-        </div>
-      </div>
-
-      {/* Current Transaction */}
-      <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-6">
-        <div className="flex items-center gap-2 text-sm text-[var(--foreground-muted)] mb-2">
-          <span className="font-semibold text-violet-600">{currentTx.date}</span>
-        </div>
-        <p className="text-slate-800">{currentTx.description}</p>
-      </div>
-
-      {/* Journal Entry Builder */}
-      <div className="bg-white border border-slate-200 rounded-xl overflow-hidden mb-4">
-        <div className="bg-slate-100 px-4 py-2 border-b border-slate-200">
-          <div className="grid grid-cols-12 gap-2 text-xs font-semibold text-slate-600 uppercase">
-            <div className="col-span-5">Account</div>
-            <div className="col-span-3 text-right">Debit (CHF)</div>
-            <div className="col-span-3 text-right">Credit (CHF)</div>
-            <div className="col-span-1"></div>
-          </div>
-        </div>
-        
-        <div className="p-4 space-y-3">
-          {entries.map((entry, idx) => (
-            <div key={idx} className="grid grid-cols-12 gap-2 items-center">
-              <div className="col-span-5">
-                <select
-                  value={entry.account}
-                  onChange={(e) => updateEntry(idx, 'account', e.target.value)}
-                  disabled={showFeedback}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 disabled:bg-slate-100"
-                >
-                  <option value="">Select account...</option>
-                  {accountOptions.map((opt) => (
-                    <option key={opt.name} value={opt.name}>
-                      {opt.name} ({opt.type})
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="col-span-3">
-                <input
-                  type="number"
-                  value={entry.debit || ''}
-                  onChange={(e) => updateEntry(idx, 'debit', e.target.value)}
-                  disabled={showFeedback}
-                  placeholder="0"
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-right focus:outline-none focus:ring-2 focus:ring-violet-500 disabled:bg-slate-100"
-                />
-              </div>
-              <div className="col-span-3">
-                <input
-                  type="number"
-                  value={entry.credit || ''}
-                  onChange={(e) => updateEntry(idx, 'credit', e.target.value)}
-                  disabled={showFeedback}
-                  placeholder="0"
-                  className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-right focus:outline-none focus:ring-2 focus:ring-violet-500 disabled:bg-slate-100"
-                />
-              </div>
-              <div className="col-span-1 flex justify-center">
-                {entries.length > 2 && !showFeedback && (
-                  <button
-                    onClick={() => removeEntry(idx)}
-                    className="p-1 text-slate-400 hover:text-red-500 transition-colors"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Totals row */}
-        <div className="bg-slate-50 px-4 py-3 border-t border-slate-200">
-          <div className="grid grid-cols-12 gap-2 items-center">
-            <div className="col-span-5 text-sm font-semibold text-slate-600">Totals</div>
-            <div className="col-span-3 text-right font-mono font-semibold text-slate-800">
-              {entries.reduce((sum, e) => sum + e.debit, 0).toLocaleString()}
-            </div>
-            <div className="col-span-3 text-right font-mono font-semibold text-slate-800">
-              {entries.reduce((sum, e) => sum + e.credit, 0).toLocaleString()}
-            </div>
-            <div className="col-span-1"></div>
-          </div>
-        </div>
-      </div>
-
-      {/* Add entry button */}
-      {!showFeedback && (
-        <button
-          onClick={addEntry}
-          className="flex items-center gap-2 text-sm text-violet-600 hover:text-violet-700 mb-6"
-        >
-          <Plus className="w-4 h-4" />
-          Add another line
-        </button>
-      )}
-
-      {/* Hint */}
-      {currentTx.hint && !showFeedback && (
-        <div className="mb-6">
-          {showHint ? (
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-              <div className="flex items-start gap-3">
-                <Lightbulb className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-                <p className="text-sm text-amber-800">{currentTx.hint}</p>
-              </div>
-            </div>
-          ) : (
+          <h3 className="text-xl font-bold mb-2">{finalScore >= passingScore ? 'Excellent Work!' : 'Keep Practicing!'}</h3>
+          <p className="text-[var(--foreground-muted)] mb-6">
+            You got {quizScore} of {questions.length} questions correct.
+            {finalScore < passingScore && ` You need ${passingScore}% to pass.`}
+          </p>
+          {finalScore < passingScore && (
             <button
-              onClick={() => setShowHint(true)}
-              className="text-sm text-amber-600 hover:text-amber-700 flex items-center gap-1"
+              onClick={handleReset}
+              className="flex items-center gap-2 mx-auto px-6 py-3 bg-violet-600 text-white font-medium rounded-xl hover:bg-violet-700 transition-colors"
             >
-              <Lightbulb className="w-4 h-4" />
-              Need a hint?
+              <RotateCcw className="w-4 h-4" />
+              Try Again
             </button>
           )}
         </div>
-      )}
+      );
+    }
 
-      {/* Feedback */}
-      {showFeedback && txResults[currentTxIndex] && (
-        <div className={`mb-6 p-4 rounded-xl border ${txResults[currentTxIndex].correct ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
-          <div className="flex items-center gap-2 mb-2">
-            {txResults[currentTxIndex].correct ? (
-              <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-            ) : (
-              <X className="w-5 h-5 text-red-600" />
-            )}
-            <span className={`font-semibold ${txResults[currentTxIndex].correct ? 'text-emerald-700' : 'text-red-700'}`}>
-              {txResults[currentTxIndex].correct ? 'Correct!' : 'Not quite right'}
-            </span>
-          </div>
-          <p className="text-sm text-slate-600">{txResults[currentTxIndex].feedback}</p>
-          
-          {/* Show correct answer if wrong */}
-          {!txResults[currentTxIndex].correct && (
-            <div className="mt-3 pt-3 border-t border-red-200">
-              <p className="text-xs font-semibold text-slate-600 mb-2">Correct entry:</p>
-              <div className="space-y-1">
-                {currentTx.solution.map((sol, idx) => (
-                  <div key={idx} className="text-xs text-slate-700 font-mono">
-                    {sol.account}: {sol.debit > 0 ? `Dr ${sol.debit.toLocaleString()}` : `Cr ${sol.credit.toLocaleString()}`}
-                  </div>
-                ))}
+    return (
+      <div>
+        {/* Company Background */}
+        {companyBackground && (
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
+            <div className="flex items-start gap-3">
+              <BookOpen className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <h3 className="font-semibold text-blue-800">{companyName}</h3>
+                <p className="text-sm text-blue-700 mt-1">{companyBackground}</p>
               </div>
             </div>
-          )}
-        </div>
-      )}
+          </div>
+        )}
 
-      {/* Actions */}
-      <div className="flex justify-end gap-3">
-        {!showFeedback ? (
-          <button
-            onClick={checkAnswer}
-            disabled={entries.every(e => !e.account) || entries.reduce((sum, e) => sum + e.debit + e.credit, 0) === 0}
-            className="flex items-center gap-2 px-6 py-3 bg-violet-600 text-white font-medium rounded-xl hover:bg-violet-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Check Entry
-            <ArrowRight className="w-4 h-4" />
-          </button>
+        {/* Normal Balance Reference */}
+        <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 mb-6">
+          <p className="text-xs text-violet-600 font-semibold mb-2">Quick Reference:</p>
+          <div className="grid grid-cols-2 gap-2 text-xs text-violet-800">
+            <div>Assets, Expenses: Debit to increase</div>
+            <div>Liabilities, Equity, Revenue: Credit to increase</div>
+          </div>
+        </div>
+
+        <p className="text-sm text-[var(--foreground-muted)] mb-4">Question {currentTxIndex + 1} of {questions.length}</p>
+        
+        {/* Related Transaction */}
+        {relatedTransaction && (
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-4">
+            <p className="text-sm text-slate-600 mb-1">Transaction:</p>
+            <p className="text-slate-800">{relatedTransaction.date && `${relatedTransaction.date}: `}{relatedTransaction.description}</p>
+          </div>
+        )}
+        
+        {/* Question */}
+        <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-6">
+          <p className="text-slate-800 font-medium">{currentQuestion.question}</p>
+        </div>
+
+        {/* Answer Input */}
+        {currentQuestion.answer_type === 'choice' && currentQuestion.options ? (
+          <div className="space-y-3 mb-6">
+            {currentQuestion.options.map((option, idx) => (
+              <button
+                key={idx}
+                onClick={() => !showFeedback && setSelectedAnswer(option)}
+                disabled={showFeedback}
+                className={`w-full text-left px-4 py-3 rounded-xl border transition-all ${
+                  showFeedback
+                    ? option === currentQuestion.correct_answer
+                      ? 'bg-emerald-50 border-emerald-300 text-emerald-800'
+                      : selectedAnswer === option
+                        ? 'bg-red-50 border-red-300 text-red-800'
+                        : 'bg-slate-50 border-slate-200 text-slate-600'
+                    : selectedAnswer === option
+                      ? 'bg-violet-100 border-violet-300 text-violet-800'
+                      : 'bg-white border-slate-200 hover:border-violet-300'
+                }`}
+              >
+                {option}
+              </button>
+            ))}
+          </div>
         ) : (
+          <div className="mb-6">
+            <input
+              type="number"
+              value={numericAnswer}
+              onChange={(e) => setNumericAnswer(e.target.value)}
+              disabled={showFeedback}
+              placeholder="Enter your answer"
+              className={`w-full px-4 py-3 text-lg font-mono border rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500 disabled:bg-slate-100 ${
+                showFeedback
+                  ? isCurrentCorrect()
+                    ? 'border-emerald-300 bg-emerald-50'
+                    : 'border-red-300 bg-red-50'
+                  : 'border-slate-200'
+              }`}
+            />
+            {showFeedback && !isCurrentCorrect() && (
+              <p className="text-sm text-slate-600 mt-2">
+                Correct answer: {currentQuestion.correct_answer.toLocaleString()}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Hint */}
+        {currentQuestion.hint && !showFeedback && (
           <button
-            onClick={nextTransaction}
-            className="flex items-center gap-2 px-6 py-3 bg-violet-600 text-white font-medium rounded-xl hover:bg-violet-700 transition-colors"
+            onClick={() => setShowHint(!showHint)}
+            className="text-sm text-violet-600 hover:text-violet-700 mb-4 flex items-center gap-1"
           >
-            {currentTxIndex >= transactions.length - 1 ? 'See Results' : 'Next Transaction'}
-            <ArrowRight className="w-4 h-4" />
+            <Lightbulb className="w-4 h-4" />
+            {showHint ? 'Hide Hint' : 'Show Hint'}
           </button>
         )}
+        
+        {showHint && currentQuestion.hint && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
+            <p className="text-sm text-amber-800">{currentQuestion.hint}</p>
+          </div>
+        )}
+
+        {/* Feedback */}
+        {showFeedback && (
+          <div className={`mb-6 p-4 rounded-xl ${isCurrentCorrect() ? 'bg-emerald-50 border border-emerald-200' : 'bg-amber-50 border border-amber-200'}`}>
+            <div className="flex items-center gap-2 mb-2">
+              {isCurrentCorrect() ? (
+                <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+              ) : (
+                <X className="w-5 h-5 text-amber-600" />
+              )}
+              <span className={`font-semibold ${isCurrentCorrect() ? 'text-emerald-700' : 'text-amber-700'}`}>
+                {isCurrentCorrect() ? 'Correct!' : 'Not quite'}
+              </span>
+            </div>
+            <p className="text-sm text-slate-700">{currentQuestion.explanation}</p>
+          </div>
+        )}
+
+        <div className="flex justify-end">
+          {!showFeedback ? (
+            <button 
+              onClick={checkQuizAnswer} 
+              disabled={currentQuestion.answer_type === 'choice' ? !selectedAnswer : !numericAnswer}
+              className="px-6 py-3 bg-violet-600 text-white font-medium rounded-xl hover:bg-violet-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Check Answer
+            </button>
+          ) : (
+            <button onClick={nextQuestion} className="px-6 py-3 bg-violet-600 text-white font-medium rounded-xl hover:bg-violet-700 transition-colors flex items-center gap-2">
+              {currentTxIndex >= questions.length - 1 ? 'See Results' : 'Next Question'}
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          )}
+        </div>
       </div>
-    </div>
-  );
+    );
+  }
+
+  // No valid content
+  return <div className="text-center text-[var(--foreground-muted)]">No journal entry exercises or questions available for this activity.</div>;
 }
 
 // ============================================
 // Equation Analyzer Component (FA Course)
+// Supports both scenario-based format and quiz-based format
 // ============================================
 interface EquationAnalyzerProps {
   content: Record<string, unknown> | null;
@@ -1565,125 +1828,373 @@ interface EquationAnalyzerProps {
   completed: boolean;
 }
 
+// Quiz question format from database
+interface QuizQuestion {
+  id: string;
+  question: string;
+  answer_type: 'choice' | 'numeric';
+  options?: string[];
+  correct_answer: string | number;
+  tolerance?: number;
+  hint?: string;
+  explanation: string;
+}
+
+// Scenario-based format (original)
+interface EquationScenario {
+  description: string;
+  effects: { assets: number; liabilities: number; equity: number };
+  explanation: string;
+}
+
 function EquationAnalyzer({ content, onComplete, completed }: EquationAnalyzerProps) {
-  const instructions = (content?.instructions as string) || "Analyze how each transaction affects the accounting equation.";
-  const scenarios = (content?.scenarios as { description: string; effects: { assets: number; liabilities: number; equity: number }; explanation: string }[]) || [];
+  const instructions = (content?.instructions as string) || (content?.description as string) || "Analyze how each transaction affects the accounting equation.";
+  const scenarios = (content?.scenarios as EquationScenario[]) || [];
+  const questions = (content?.questions as QuizQuestion[]) || [];
+  const transactions = (content?.transactions as { id: string; description: string }[]) || [];
+  const companyBackground = (content?.company_background as string) || "";
+  const passingScore = (content?.passing_score as number) || 60;
   
+  // Determine which format we have
+  const hasScenarios = scenarios.length > 0;
+  const hasQuestions = questions.length > 0;
+  
+  // State for scenario-based mode
   const [currentIndex, setCurrentIndex] = useState(0);
   const [userAnswer, setUserAnswer] = useState({ assets: '', liabilities: '', equity: '' });
   const [showFeedback, setShowFeedback] = useState(false);
   const [score, setScore] = useState(0);
   const [isFinished, setIsFinished] = useState(false);
+  
+  // State for quiz-based mode
+  const [selectedAnswer, setSelectedAnswer] = useState<string | number | null>(null);
+  const [numericAnswer, setNumericAnswer] = useState('');
+  const [showHint, setShowHint] = useState(false);
 
-  const scenario = scenarios[currentIndex];
+  // Reset state when switching questions
+  useEffect(() => {
+    setSelectedAnswer(null);
+    setNumericAnswer('');
+    setShowFeedback(false);
+    setShowHint(false);
+  }, [currentIndex]);
 
-  const checkAnswer = () => {
-    if (!scenario) return;
-    
-    const correct = 
-      Number(userAnswer.assets) === scenario.effects.assets &&
-      Number(userAnswer.liabilities) === scenario.effects.liabilities &&
-      Number(userAnswer.equity) === scenario.effects.equity;
-    
-    if (correct) setScore(s => s + 1);
-    setShowFeedback(true);
-  };
+  // SCENARIO-BASED MODE
+  if (hasScenarios) {
+    const scenario = scenarios[currentIndex];
 
-  const nextScenario = () => {
-    if (currentIndex >= scenarios.length - 1) {
-      setIsFinished(true);
-      if (Math.round((score / scenarios.length) * 100) >= 60) {
-        onComplete();
+    const checkAnswer = () => {
+      if (!scenario) return;
+      
+      const correct = 
+        Number(userAnswer.assets) === scenario.effects.assets &&
+        Number(userAnswer.liabilities) === scenario.effects.liabilities &&
+        Number(userAnswer.equity) === scenario.effects.equity;
+      
+      if (correct) setScore(s => s + 1);
+      setShowFeedback(true);
+    };
+
+    const nextScenario = () => {
+      if (currentIndex >= scenarios.length - 1) {
+        setIsFinished(true);
+        if (Math.round((score / scenarios.length) * 100) >= passingScore) {
+          onComplete();
+        }
+      } else {
+        setCurrentIndex(i => i + 1);
+        setUserAnswer({ assets: '', liabilities: '', equity: '' });
+        setShowFeedback(false);
       }
-    } else {
-      setCurrentIndex(i => i + 1);
-      setUserAnswer({ assets: '', liabilities: '', equity: '' });
-      setShowFeedback(false);
-    }
-  };
+    };
 
-  if (scenarios.length === 0) {
-    return <div className="text-center text-[var(--foreground-muted)]">No scenarios available.</div>;
-  }
+    const finalScore = Math.round((score / scenarios.length) * 100);
 
-  const finalScore = Math.round((score / scenarios.length) * 100);
-
-  if (isFinished) {
-    return (
-      <div className="text-center">
-        <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 ${finalScore >= 60 ? 'bg-emerald-100' : 'bg-amber-100'}`}>
-          <span className={`text-2xl font-bold ${finalScore >= 60 ? 'text-emerald-700' : 'text-amber-700'}`}>{finalScore}%</span>
+    if (isFinished) {
+      return (
+        <div className="text-center">
+          <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 ${finalScore >= passingScore ? 'bg-emerald-100' : 'bg-amber-100'}`}>
+            <span className={`text-2xl font-bold ${finalScore >= passingScore ? 'text-emerald-700' : 'text-amber-700'}`}>{finalScore}%</span>
+          </div>
+          <h3 className="text-xl font-bold mb-2">{finalScore >= passingScore ? 'Great Job!' : 'Keep Practicing!'}</h3>
+          <p className="text-[var(--foreground-muted)]">You got {score} of {scenarios.length} correct.</p>
         </div>
-        <h3 className="text-xl font-bold mb-2">{finalScore >= 60 ? 'Great Job!' : 'Keep Practicing!'}</h3>
-        <p className="text-[var(--foreground-muted)]">You got {score} of {scenarios.length} correct.</p>
+      );
+    }
+
+    return (
+      <div>
+        <p className="text-[var(--foreground-muted)] mb-6">{instructions}</p>
+        
+        <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 mb-6 text-center">
+          <p className="text-lg font-semibold text-violet-800 font-mono">
+            Assets = Liabilities + Equity
+          </p>
+        </div>
+
+        <p className="text-sm text-[var(--foreground-muted)] mb-4">Scenario {currentIndex + 1} of {scenarios.length}</p>
+        
+        <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-6">
+          <p className="text-slate-800">{scenario.description}</p>
+        </div>
+
+        <p className="text-sm font-medium text-slate-600 mb-3">Enter the change for each element (+, -, or 0):</p>
+        
+        <div className="grid grid-cols-3 gap-4 mb-6">
+          {(['assets', 'liabilities', 'equity'] as const).map((field) => (
+            <div key={field} className="text-center">
+              <label className="block text-sm font-medium text-slate-600 mb-2 capitalize">{field}</label>
+              <input
+                type="number"
+                value={userAnswer[field]}
+                onChange={(e) => setUserAnswer({ ...userAnswer, [field]: e.target.value })}
+                disabled={showFeedback}
+                placeholder="0"
+                className="w-full px-4 py-3 text-center text-lg font-mono border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500 disabled:bg-slate-100"
+              />
+            </div>
+          ))}
+        </div>
+
+        {showFeedback && (
+          <div className={`mb-6 p-4 rounded-xl ${
+            Number(userAnswer.assets) === scenario.effects.assets &&
+            Number(userAnswer.liabilities) === scenario.effects.liabilities &&
+            Number(userAnswer.equity) === scenario.effects.equity
+              ? 'bg-emerald-50 border border-emerald-200'
+              : 'bg-amber-50 border border-amber-200'
+          }`}>
+            <p className="text-sm text-slate-700">{scenario.explanation}</p>
+            <p className="text-xs text-slate-500 mt-2 font-mono">
+              A: {scenario.effects.assets > 0 ? '+' : ''}{scenario.effects.assets} | 
+              L: {scenario.effects.liabilities > 0 ? '+' : ''}{scenario.effects.liabilities} | 
+              E: {scenario.effects.equity > 0 ? '+' : ''}{scenario.effects.equity}
+            </p>
+          </div>
+        )}
+
+        <div className="flex justify-end">
+          {!showFeedback ? (
+            <button onClick={checkAnswer} className="px-6 py-3 bg-violet-600 text-white font-medium rounded-xl hover:bg-violet-700 transition-colors">
+              Check Answer
+            </button>
+          ) : (
+            <button onClick={nextScenario} className="px-6 py-3 bg-violet-600 text-white font-medium rounded-xl hover:bg-violet-700 transition-colors">
+              {currentIndex >= scenarios.length - 1 ? 'See Results' : 'Next'}
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+  
+  // QUIZ-BASED MODE (handles questions array format)
+  if (hasQuestions) {
+    const currentQuestion = questions[currentIndex];
+    
+    // Find corresponding transaction description if available
+    const relatedTransaction = transactions.find(t => 
+      currentQuestion.question.includes(t.id) || currentQuestion.id.includes(t.id.toLowerCase())
+    );
+
+    const checkQuizAnswer = () => {
+      if (!currentQuestion) return;
+      
+      let isCorrect = false;
+      
+      if (currentQuestion.answer_type === 'choice') {
+        isCorrect = selectedAnswer === currentQuestion.correct_answer;
+      } else if (currentQuestion.answer_type === 'numeric') {
+        const userNum = Number(numericAnswer);
+        const correctNum = Number(currentQuestion.correct_answer);
+        const tolerance = currentQuestion.tolerance || 0;
+        isCorrect = Math.abs(userNum - correctNum) <= tolerance;
+      }
+      
+      if (isCorrect) setScore(s => s + 1);
+      setShowFeedback(true);
+    };
+
+    const nextQuestion = () => {
+      if (currentIndex >= questions.length - 1) {
+        setIsFinished(true);
+        const finalScore = Math.round(((score + (showFeedback && isCurrentCorrect() ? 0 : 0)) / questions.length) * 100);
+        if (finalScore >= passingScore) {
+          onComplete();
+        }
+      } else {
+        setCurrentIndex(i => i + 1);
+      }
+    };
+    
+    const isCurrentCorrect = () => {
+      if (!currentQuestion) return false;
+      if (currentQuestion.answer_type === 'choice') {
+        return selectedAnswer === currentQuestion.correct_answer;
+      } else if (currentQuestion.answer_type === 'numeric') {
+        const userNum = Number(numericAnswer);
+        const correctNum = Number(currentQuestion.correct_answer);
+        const tolerance = currentQuestion.tolerance || 0;
+        return Math.abs(userNum - correctNum) <= tolerance;
+      }
+      return false;
+    };
+
+    const finalScore = Math.round((score / questions.length) * 100);
+
+    if (isFinished) {
+      return (
+        <div className="text-center">
+          <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 ${finalScore >= passingScore ? 'bg-emerald-100' : 'bg-amber-100'}`}>
+            <span className={`text-2xl font-bold ${finalScore >= passingScore ? 'text-emerald-700' : 'text-amber-700'}`}>{finalScore}%</span>
+          </div>
+          <h3 className="text-xl font-bold mb-2">{finalScore >= passingScore ? 'Great Job!' : 'Keep Practicing!'}</h3>
+          <p className="text-[var(--foreground-muted)]">You got {score} of {questions.length} correct.</p>
+          {finalScore < passingScore && (
+            <button
+              onClick={() => {
+                setCurrentIndex(0);
+                setScore(0);
+                setIsFinished(false);
+                setShowFeedback(false);
+                setSelectedAnswer(null);
+                setNumericAnswer('');
+              }}
+              className="mt-4 flex items-center gap-2 mx-auto px-6 py-3 bg-violet-600 text-white font-medium rounded-xl hover:bg-violet-700 transition-colors"
+            >
+              <RotateCcw className="w-4 h-4" />
+              Try Again
+            </button>
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <div>
+        {/* Company Background */}
+        {companyBackground && (
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6">
+            <p className="text-sm text-blue-800">{companyBackground}</p>
+          </div>
+        )}
+        
+        {/* Accounting Equation Reference */}
+        <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 mb-6 text-center">
+          <p className="text-lg font-semibold text-violet-800 font-mono">
+            Assets = Liabilities + Equity
+          </p>
+        </div>
+
+        <p className="text-sm text-[var(--foreground-muted)] mb-4">Question {currentIndex + 1} of {questions.length}</p>
+        
+        {/* Related Transaction Description */}
+        {relatedTransaction && (
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-4">
+            <p className="text-sm text-slate-600 mb-1">Transaction:</p>
+            <p className="text-slate-800">{relatedTransaction.description}</p>
+          </div>
+        )}
+        
+        {/* Question */}
+        <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-6">
+          <p className="text-slate-800 font-medium">{currentQuestion.question}</p>
+        </div>
+
+        {/* Answer Input - Choice or Numeric */}
+        {currentQuestion.answer_type === 'choice' && currentQuestion.options ? (
+          <div className="space-y-3 mb-6">
+            {currentQuestion.options.map((option, idx) => (
+              <button
+                key={idx}
+                onClick={() => !showFeedback && setSelectedAnswer(option)}
+                disabled={showFeedback}
+                className={`w-full text-left px-4 py-3 rounded-xl border transition-all ${
+                  showFeedback
+                    ? option === currentQuestion.correct_answer
+                      ? 'bg-emerald-50 border-emerald-300 text-emerald-800'
+                      : selectedAnswer === option
+                        ? 'bg-red-50 border-red-300 text-red-800'
+                        : 'bg-slate-50 border-slate-200 text-slate-600'
+                    : selectedAnswer === option
+                      ? 'bg-violet-100 border-violet-300 text-violet-800'
+                      : 'bg-white border-slate-200 hover:border-violet-300'
+                }`}
+              >
+                {option}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="mb-6">
+            <input
+              type="number"
+              value={numericAnswer}
+              onChange={(e) => setNumericAnswer(e.target.value)}
+              disabled={showFeedback}
+              placeholder="Enter your answer"
+              className={`w-full px-4 py-3 text-lg font-mono border rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500 disabled:bg-slate-100 ${
+                showFeedback
+                  ? isCurrentCorrect()
+                    ? 'border-emerald-300 bg-emerald-50'
+                    : 'border-red-300 bg-red-50'
+                  : 'border-slate-200'
+              }`}
+            />
+            {showFeedback && !isCurrentCorrect() && (
+              <p className="text-sm text-slate-600 mt-2">
+                Correct answer: {currentQuestion.correct_answer.toLocaleString()}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* Hint Button */}
+        {currentQuestion.hint && !showFeedback && (
+          <button
+            onClick={() => setShowHint(!showHint)}
+            className="text-sm text-violet-600 hover:text-violet-700 mb-4 flex items-center gap-1"
+          >
+            <Lightbulb className="w-4 h-4" />
+            {showHint ? 'Hide Hint' : 'Show Hint'}
+          </button>
+        )}
+        
+        {showHint && currentQuestion.hint && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
+            <p className="text-sm text-amber-800">{currentQuestion.hint}</p>
+          </div>
+        )}
+
+        {/* Feedback */}
+        {showFeedback && (
+          <div className={`mb-6 p-4 rounded-xl ${isCurrentCorrect() ? 'bg-emerald-50 border border-emerald-200' : 'bg-amber-50 border border-amber-200'}`}>
+            <p className="text-sm text-slate-700">{currentQuestion.explanation}</p>
+          </div>
+        )}
+
+        <div className="flex justify-end">
+          {!showFeedback ? (
+            <button 
+              onClick={checkQuizAnswer} 
+              disabled={currentQuestion.answer_type === 'choice' ? !selectedAnswer : !numericAnswer}
+              className="px-6 py-3 bg-violet-600 text-white font-medium rounded-xl hover:bg-violet-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Check Answer
+            </button>
+          ) : (
+            <button onClick={nextQuestion} className="px-6 py-3 bg-violet-600 text-white font-medium rounded-xl hover:bg-violet-700 transition-colors flex items-center gap-2">
+              {currentIndex >= questions.length - 1 ? 'See Results' : 'Next Question'}
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          )}
+        </div>
       </div>
     );
   }
 
-  return (
-    <div>
-      <p className="text-[var(--foreground-muted)] mb-6">{instructions}</p>
-      
-      <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 mb-6 text-center">
-        <p className="text-lg font-semibold text-violet-800 font-mono">
-          Assets = Liabilities + Equity
-        </p>
-      </div>
-
-      <p className="text-sm text-[var(--foreground-muted)] mb-4">Scenario {currentIndex + 1} of {scenarios.length}</p>
-      
-      <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-6">
-        <p className="text-slate-800">{scenario.description}</p>
-      </div>
-
-      <p className="text-sm font-medium text-slate-600 mb-3">Enter the change for each element (+, -, or 0):</p>
-      
-      <div className="grid grid-cols-3 gap-4 mb-6">
-        {(['assets', 'liabilities', 'equity'] as const).map((field) => (
-          <div key={field} className="text-center">
-            <label className="block text-sm font-medium text-slate-600 mb-2 capitalize">{field}</label>
-            <input
-              type="number"
-              value={userAnswer[field]}
-              onChange={(e) => setUserAnswer({ ...userAnswer, [field]: e.target.value })}
-              disabled={showFeedback}
-              placeholder="0"
-              className="w-full px-4 py-3 text-center text-lg font-mono border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-violet-500 disabled:bg-slate-100"
-            />
-          </div>
-        ))}
-      </div>
-
-      {showFeedback && (
-        <div className={`mb-6 p-4 rounded-xl ${
-          Number(userAnswer.assets) === scenario.effects.assets &&
-          Number(userAnswer.liabilities) === scenario.effects.liabilities &&
-          Number(userAnswer.equity) === scenario.effects.equity
-            ? 'bg-emerald-50 border border-emerald-200'
-            : 'bg-amber-50 border border-amber-200'
-        }`}>
-          <p className="text-sm text-slate-700">{scenario.explanation}</p>
-          <p className="text-xs text-slate-500 mt-2 font-mono">
-            A: {scenario.effects.assets > 0 ? '+' : ''}{scenario.effects.assets} | 
-            L: {scenario.effects.liabilities > 0 ? '+' : ''}{scenario.effects.liabilities} | 
-            E: {scenario.effects.equity > 0 ? '+' : ''}{scenario.effects.equity}
-          </p>
-        </div>
-      )}
-
-      <div className="flex justify-end">
-        {!showFeedback ? (
-          <button onClick={checkAnswer} className="px-6 py-3 bg-violet-600 text-white font-medium rounded-xl hover:bg-violet-700 transition-colors">
-            Check Answer
-          </button>
-        ) : (
-          <button onClick={nextScenario} className="px-6 py-3 bg-violet-600 text-white font-medium rounded-xl hover:bg-violet-700 transition-colors">
-            {currentIndex >= scenarios.length - 1 ? 'See Results' : 'Next'}
-          </button>
-        )}
-      </div>
-    </div>
-  );
+  // No valid content
+  return <div className="text-center text-[var(--foreground-muted)]">No scenarios or questions available for this activity.</div>;
 }
 
 // ============================================
@@ -1842,7 +2353,7 @@ function AdjustingEntriesBuilder({ content, onComplete, completed }: AdjustingEn
   // This is similar to JournalEntryBuilder but with adjusting entries context
   const scenario = (content?.scenario as string) || "Prepare adjusting entries for the following period-end adjustments.";
   const companyName = (content?.company_name as string) || "Company";
-  const adjustments = (content?.adjustments as JournalTransaction[]) || [];
+  const adjustments = (content?.adjustments as JournalTransactionWithSolution[]) || [];
   const accountOptions = (content?.account_options as AccountOption[]) || [];
   const passingScore = (content?.passing_score as number) || 80;
 
@@ -2996,6 +3507,385 @@ function InventoryCalculator({ content, onComplete, completed }: InventoryCalcul
           </p>
         </div>
       )}
+    </div>
+  );
+}
+
+// ============================================
+// Review Calculator Component
+// Handles question-based review exercises with numeric, choice, and text inputs
+// ============================================
+interface ReviewCalculatorProps {
+  content: Record<string, unknown> | null;
+  onComplete: () => void;
+  completed: boolean;
+}
+
+interface ReviewQuestion {
+  id: string;
+  question: string;
+  answer_type: 'numeric' | 'choice' | 'text';
+  correct_answer: string | number;
+  tolerance?: number;
+  options?: string[];
+  hint?: string;
+  explanation: string;
+}
+
+function ReviewCalculator({ content, onComplete, completed }: ReviewCalculatorProps) {
+  const title = (content?.title as string) || "Review Practice";
+  const description = (content?.description as string) || "Practice and review key concepts.";
+  const topicsCovered = (content?.topics_covered as string[]) || [];
+  const questions = (content?.questions as ReviewQuestion[]) || [];
+  const passingScore = (content?.passing_score as number) || 70;
+
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [answers, setAnswers] = useState<Record<string, string | number>>({});
+  const [showResults, setShowResults] = useState(false);
+  const [showHint, setShowHint] = useState(false);
+  const [questionResults, setQuestionResults] = useState<Record<string, boolean>>({});
+  const [showExplanation, setShowExplanation] = useState<Record<string, boolean>>({});
+
+  const currentQuestion = questions[currentIndex];
+  const answeredCount = Object.keys(answers).length;
+  const totalQuestions = questions.length;
+
+  if (questions.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <Calculator className="w-8 h-8 text-amber-600" />
+        </div>
+        <h3 className="text-lg font-semibold mb-2">{title}</h3>
+        <p className="text-[var(--foreground-muted)]">{description}</p>
+        <p className="text-sm text-amber-600 mt-4">
+          No questions available for this review exercise.
+        </p>
+      </div>
+    );
+  }
+
+  const checkAnswer = (questionId: string): boolean => {
+    const question = questions.find(q => q.id === questionId);
+    if (!question) return false;
+    
+    const userAnswer = answers[questionId];
+    if (userAnswer === undefined || userAnswer === '') return false;
+
+    switch (question.answer_type) {
+      case 'numeric': {
+        const numAnswer = typeof userAnswer === 'string' ? parseFloat(userAnswer.replace(/,/g, '')) : userAnswer;
+        const correctNum = typeof question.correct_answer === 'string' 
+          ? parseFloat(question.correct_answer) 
+          : question.correct_answer;
+        const tolerance = question.tolerance || 0;
+        return Math.abs(numAnswer - correctNum) <= tolerance;
+      }
+      case 'choice':
+      case 'text':
+        return String(userAnswer).toLowerCase().trim() === String(question.correct_answer).toLowerCase().trim();
+      default:
+        return false;
+    }
+  };
+
+  const handleSubmitQuestion = () => {
+    if (!currentQuestion || answers[currentQuestion.id] === undefined) return;
+    
+    const isCorrect = checkAnswer(currentQuestion.id);
+    setQuestionResults(prev => ({ ...prev, [currentQuestion.id]: isCorrect }));
+    setShowExplanation(prev => ({ ...prev, [currentQuestion.id]: true }));
+  };
+
+  const handleNext = () => {
+    setShowHint(false);
+    if (currentIndex < questions.length - 1) {
+      setCurrentIndex(prev => prev + 1);
+    } else {
+      // Calculate final results
+      const results: Record<string, boolean> = {};
+      questions.forEach(q => {
+        results[q.id] = checkAnswer(q.id);
+      });
+      setQuestionResults(results);
+      setShowResults(true);
+      
+      // Auto-complete if passing
+      const correctCount = Object.values(results).filter(Boolean).length;
+      const scorePercent = (correctCount / questions.length) * 100;
+      if (scorePercent >= passingScore && !completed) {
+        onComplete();
+      }
+    }
+  };
+
+  const handlePrevious = () => {
+    setShowHint(false);
+    if (currentIndex > 0) {
+      setCurrentIndex(prev => prev - 1);
+    }
+  };
+
+  const handleAnswerChange = (value: string | number) => {
+    if (!currentQuestion) return;
+    setAnswers(prev => ({ ...prev, [currentQuestion.id]: value }));
+  };
+
+  const handleRetry = () => {
+    setAnswers({});
+    setQuestionResults({});
+    setShowExplanation({});
+    setShowResults(false);
+    setShowHint(false);
+    setCurrentIndex(0);
+  };
+
+  // Results view
+  if (showResults) {
+    const correctCount = Object.values(questionResults).filter(Boolean).length;
+    const scorePercent = Math.round((correctCount / totalQuestions) * 100);
+    const passed = scorePercent >= passingScore;
+
+    return (
+      <div className="space-y-6">
+        {/* Score Summary */}
+        <div className={`p-6 rounded-xl text-center ${passed ? 'bg-emerald-50 border border-emerald-200' : 'bg-amber-50 border border-amber-200'}`}>
+          <div className={`text-4xl font-bold mb-2 ${passed ? 'text-emerald-600' : 'text-amber-600'}`}>
+            {scorePercent}%
+          </div>
+          <p className={`font-medium ${passed ? 'text-emerald-700' : 'text-amber-700'}`}>
+            {correctCount} of {totalQuestions} correct
+          </p>
+          <p className={`text-sm mt-1 ${passed ? 'text-emerald-600' : 'text-amber-600'}`}>
+            {passed ? 'Great job! You passed this review.' : `You need ${passingScore}% to pass.`}
+          </p>
+        </div>
+
+        {/* Question Review */}
+        <div className="space-y-4">
+          <h4 className="font-semibold text-[var(--foreground)]">Question Review</h4>
+          {questions.map((q, idx) => {
+            const isCorrect = questionResults[q.id];
+            const userAnswer = answers[q.id];
+            
+            return (
+              <div key={q.id} className={`p-4 rounded-lg border ${isCorrect ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
+                <div className="flex items-start gap-3">
+                  <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${isCorrect ? 'bg-emerald-500' : 'bg-red-500'}`}>
+                    {isCorrect ? (
+                      <Check className="w-4 h-4 text-white" />
+                    ) : (
+                      <X className="w-4 h-4 text-white" />
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-[var(--foreground)] mb-1">
+                      {idx + 1}. {q.question}
+                    </p>
+                    <p className={`text-sm ${isCorrect ? 'text-emerald-700' : 'text-red-700'}`}>
+                      Your answer: {userAnswer !== undefined ? String(userAnswer) : 'No answer'}
+                      {!isCorrect && (
+                        <span className="block text-emerald-700 mt-1">
+                          Correct answer: {String(q.correct_answer)}
+                        </span>
+                      )}
+                    </p>
+                    <p className="text-sm text-[var(--foreground-muted)] mt-2 italic">
+                      {q.explanation}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Retry Button */}
+        {!passed && (
+          <button
+            onClick={handleRetry}
+            className="flex items-center gap-2 px-4 py-2 bg-violet-600 text-white font-medium rounded-lg hover:bg-violet-700 transition-colors mx-auto"
+          >
+            <RotateCcw className="w-4 h-4" />
+            Try Again
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  const hasAnswered = currentQuestion && answers[currentQuestion.id] !== undefined && answers[currentQuestion.id] !== '';
+  const questionSubmitted = currentQuestion && showExplanation[currentQuestion.id];
+
+  return (
+    <div className="space-y-6">
+      {/* Header with Topics */}
+      {topicsCovered.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          {topicsCovered.map((topic, idx) => (
+            <span key={idx} className="px-3 py-1 bg-violet-100 text-violet-700 text-sm font-medium rounded-full">
+              {topic}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Progress */}
+      <div className="flex items-center justify-between text-sm text-[var(--foreground-muted)]">
+        <span>Question {currentIndex + 1} of {totalQuestions}</span>
+        <span>{answeredCount} answered</span>
+      </div>
+      <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+        <div 
+          className="h-full bg-violet-500 transition-all duration-300"
+          style={{ width: `${((currentIndex + 1) / totalQuestions) * 100}%` }}
+        />
+      </div>
+
+      {/* Question Card */}
+      {currentQuestion && (
+        <div className="bg-slate-50 rounded-xl p-6">
+          <p className="text-lg font-medium text-[var(--foreground)] mb-6">
+            {currentQuestion.question}
+          </p>
+
+          {/* Answer Input */}
+          {currentQuestion.answer_type === 'choice' && currentQuestion.options ? (
+            <div className="space-y-3">
+              {currentQuestion.options.map((option, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => !questionSubmitted && handleAnswerChange(option)}
+                  disabled={questionSubmitted}
+                  className={`w-full p-4 rounded-lg border text-left transition-all ${
+                    answers[currentQuestion.id] === option
+                      ? questionSubmitted
+                        ? checkAnswer(currentQuestion.id)
+                          ? 'border-emerald-500 bg-emerald-50'
+                          : 'border-red-500 bg-red-50'
+                        : 'border-violet-500 bg-violet-50'
+                      : 'border-slate-200 hover:border-slate-300 bg-white'
+                  } ${questionSubmitted ? 'cursor-default' : ''}`}
+                >
+                  <span className="font-medium">{option}</span>
+                  {questionSubmitted && option === String(currentQuestion.correct_answer) && (
+                    <span className="ml-2 text-emerald-600">(Correct)</span>
+                  )}
+                </button>
+              ))}
+            </div>
+          ) : currentQuestion.answer_type === 'numeric' ? (
+            <div className="flex items-center gap-4">
+              <input
+                type="text"
+                value={answers[currentQuestion.id] ?? ''}
+                onChange={(e) => !questionSubmitted && handleAnswerChange(e.target.value)}
+                disabled={questionSubmitted}
+                placeholder="Enter your answer..."
+                className={`flex-1 px-4 py-3 rounded-lg border text-lg font-mono focus:outline-none focus:ring-2 focus:ring-violet-500 ${
+                  questionSubmitted
+                    ? questionResults[currentQuestion.id]
+                      ? 'border-emerald-500 bg-emerald-50'
+                      : 'border-red-500 bg-red-50'
+                    : 'border-slate-200'
+                }`}
+              />
+              {questionSubmitted && !questionResults[currentQuestion.id] && (
+                <span className="text-emerald-600 font-medium">
+                  = {currentQuestion.correct_answer}
+                </span>
+              )}
+            </div>
+          ) : (
+            <input
+              type="text"
+              value={answers[currentQuestion.id] ?? ''}
+              onChange={(e) => !questionSubmitted && handleAnswerChange(e.target.value)}
+              disabled={questionSubmitted}
+              placeholder="Type your answer..."
+              className={`w-full px-4 py-3 rounded-lg border focus:outline-none focus:ring-2 focus:ring-violet-500 ${
+                questionSubmitted
+                  ? questionResults[currentQuestion.id]
+                    ? 'border-emerald-500 bg-emerald-50'
+                    : 'border-red-500 bg-red-50'
+                  : 'border-slate-200'
+              }`}
+            />
+          )}
+
+          {/* Hint */}
+          {currentQuestion.hint && !questionSubmitted && (
+            <div className="mt-4">
+              {showHint ? (
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-700">
+                  <strong>Hint:</strong> {currentQuestion.hint}
+                </div>
+              ) : (
+                <button
+                  onClick={() => setShowHint(true)}
+                  className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700"
+                >
+                  <HelpCircle className="w-4 h-4" />
+                  Show Hint
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Explanation (after submit) */}
+          {questionSubmitted && (
+            <div className={`mt-4 p-4 rounded-lg ${
+              questionResults[currentQuestion.id] 
+                ? 'bg-emerald-50 border border-emerald-200' 
+                : 'bg-amber-50 border border-amber-200'
+            }`}>
+              <div className="flex items-start gap-2">
+                {questionResults[currentQuestion.id] ? (
+                  <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
+                ) : (
+                  <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                )}
+                <p className={`text-sm ${
+                  questionResults[currentQuestion.id] ? 'text-emerald-700' : 'text-amber-700'
+                }`}>
+                  {currentQuestion.explanation}
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Navigation */}
+      <div className="flex items-center justify-between">
+        <button
+          onClick={handlePrevious}
+          disabled={currentIndex === 0}
+          className="px-4 py-2 text-[var(--foreground-muted)] hover:text-[var(--foreground)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          Previous
+        </button>
+        
+        <div className="flex items-center gap-3">
+          {!questionSubmitted && hasAnswered && (
+            <button
+              onClick={handleSubmitQuestion}
+              className="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Check Answer
+            </button>
+          )}
+          
+          <button
+            onClick={handleNext}
+            disabled={!hasAnswered}
+            className="flex items-center gap-2 px-6 py-2 bg-violet-600 text-white font-medium rounded-lg hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {currentIndex === totalQuestions - 1 ? 'Finish' : 'Next'}
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

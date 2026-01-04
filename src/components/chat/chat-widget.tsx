@@ -155,8 +155,21 @@ export function ChatWidget({
         const errorData = await response.json();
         if (response.status === 429) {
           setError("You've reached your daily message limit. Upgrade your plan for more messages.");
+        } else if (response.status === 400) {
+          // Validation error - provide user-friendly message
+          if (errorData.details) {
+            const firstError = Object.values(errorData.details)[0];
+            const errorMsg = Array.isArray(firstError) ? firstError[0] : errorData.error;
+            setError(errorMsg || "Please check your message and try again.");
+          } else {
+            setError("There was an issue with your message. Please try rephrasing it.");
+          }
+        } else if (response.status === 401) {
+          setError("Please log in again to continue chatting with Bob.");
+        } else if (response.status === 500) {
+          setError("Bob is having some trouble right now. Please try again in a moment.");
         } else {
-          setError(errorData.error || "Failed to send message");
+          setError(errorData.message || errorData.error || "Something went wrong. Please try again.");
         }
         return;
       }

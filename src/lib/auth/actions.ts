@@ -7,6 +7,7 @@ import { headers } from "next/headers";
 import { getSiteUrl } from "@/lib/env";
 import { logger } from "@/lib/logging";
 import { rateLimiters, getIpRateLimitKey } from "@/lib/rate-limit";
+import { registerSession, invalidateSession, invalidateAllSessions } from "@/lib/auth/session-manager";
 
 // Module-level logger
 const log = logger.child({ module: "auth/actions" });
@@ -123,7 +124,7 @@ export async function signIn(formData: FormData): Promise<AuthActionResult> {
   }
 
   try {
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
@@ -131,6 +132,26 @@ export async function signIn(formData: FormData): Promise<AuthActionResult> {
     if (error) {
       log.warn("Login failed", { email, errorMessage: error.message });
       return { error: error.message, email };
+    }
+
+    // Register the session to enforce concurrent login limit
+    if (data.session && data.user) {
+      const sessionResult = await registerSession(
+        data.user.id,
+        data.session.access_token,
+        {
+          ipAddress: ip,
+          deviceInfo: (await headers()).get("user-agent") || undefined,
+          expiresAt: new Date(data.session.expires_at! * 1000),
+        }
+      );
+
+      if (sessionResult.sessionsInvalidated && sessionResult.sessionsInvalidated > 0) {
+        log.info("Previous sessions invalidated due to login limit", {
+          email,
+          invalidatedCount: sessionResult.sessionsInvalidated,
+        });
+      }
     }
   } catch (err) {
     log.error("Sign in exception", err);
@@ -194,6 +215,30 @@ export async function signInWithOAuth(provider: "google" | "github") {
  */
 export async function signOut() {
   const supabase = await createClient();
+  
+  // Get current session to invalidate it in our tracking table
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session?.access_token) {
+    await invalidateSession(session.access_token);
+  }
+  
+  await supabase.auth.signOut();
+  revalidatePath("/", "layout");
+  redirect("/");
+}
+
+/**
+ * Sign out from all devices
+ */
+export async function signOutAllDevices() {
+  const supabase = await createClient();
+  
+  // Get current user
+  const { data: { user } } = await supabase.auth.getUser();
+  if (user) {
+    await invalidateAllSessions(user.id);
+  }
+  
   await supabase.auth.signOut();
   revalidatePath("/", "layout");
   redirect("/");

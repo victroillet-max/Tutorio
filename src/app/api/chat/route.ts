@@ -48,11 +48,36 @@ export async function POST(request: NextRequest) {
     }
 
     // Parse and validate request body
-    const body = await request.json();
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      log.warn("Chat request body parse failed");
+      return new Response(JSON.stringify({ 
+        error: "Invalid request",
+        message: "Could not parse your message. Please try again.",
+      }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    
     const validation = chatMessageSchema.safeParse(body);
     
     if (!validation.success) {
       log.warn("Chat validation failed", { errors: validation.error.flatten() });
+      // Provide more helpful error messages
+      const issues = validation.error.issues;
+      const messageIssue = issues.find(i => i.path[0] === 'message');
+      if (messageIssue) {
+        return new Response(JSON.stringify({ 
+          error: "Message issue",
+          message: messageIssue.message,
+        }), {
+          status: 400,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
       return createValidationErrorResponse(validation.error.issues);
     }
 

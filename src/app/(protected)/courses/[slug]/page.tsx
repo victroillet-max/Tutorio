@@ -31,3 +31,4 @@ export default async function CoursePage({ params, searchParams }: CoursePagePro
   redirect(`/courses/${slug}/learn${queryString}`);
 }
 
+

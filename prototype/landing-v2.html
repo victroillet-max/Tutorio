@@ -1,0 +1,2751 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tutorio - Stop Overpaying for Tutoring | Landing Page V2</title>
+  
+  <!-- Distinctive Typography: Outfit for display, DM Sans for body -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      /* Typography */
+      --font-display: 'Outfit', sans-serif;
+      --font-body: 'DM Sans', sans-serif;
+      
+      /* Swiss Premium Palette */
+      --primary: #1e3a5f;
+      --primary-light: #2d5a8b;
+      --primary-dark: #152a45;
+      
+      --accent: #e76f51;
+      --accent-light: #f4a261;
+      --accent-dark: #d35836;
+      
+      --background: #faf9f7;
+      --background-secondary: #f5f3ef;
+      --background-tertiary: #edeae4;
+      
+      --foreground: #1a1a2e;
+      --foreground-muted: #5a5a6e;
+      --foreground-subtle: #8a8a9e;
+      
+      --card-border: #e8e5df;
+      --success: #2a9d8f;
+      --success-light: #d4ede9;
+      
+      /* Spacing */
+      --section-padding: 7rem;
+    }
+    
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    html {
+      scroll-behavior: smooth;
+    }
+    
+    body {
+      font-family: var(--font-body);
+      background: var(--background);
+      color: var(--foreground);
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+    
+    h1, h2, h3, h4, h5, h6 {
+      font-family: var(--font-display);
+      font-weight: 700;
+      line-height: 1.1;
+    }
+    
+    /* ============================================
+       ANIMATIONS
+       ============================================ */
+    
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+    
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    
+    @keyframes float {
+      0%, 100% { transform: translateY(0px); }
+      50% { transform: translateY(-12px); }
+    }
+    
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+    }
+    
+    @keyframes slideInLeft {
+      from {
+        opacity: 0;
+        transform: translateX(-40px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+    
+    @keyframes slideInRight {
+      from {
+        opacity: 0;
+        transform: translateX(40px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+    
+    .animate-fade-in-up {
+      animation: fadeInUp 0.8s ease forwards;
+    }
+    
+    .animate-slide-left {
+      animation: slideInLeft 0.8s ease forwards;
+    }
+    
+    .animate-slide-right {
+      animation: slideInRight 0.8s ease forwards;
+    }
+    
+    .animate-float {
+      animation: float 4s ease-in-out infinite;
+    }
+    
+    .delay-100 { animation-delay: 0.1s; }
+    .delay-200 { animation-delay: 0.2s; }
+    .delay-300 { animation-delay: 0.3s; }
+    .delay-400 { animation-delay: 0.4s; }
+    .delay-500 { animation-delay: 0.5s; }
+    .delay-600 { animation-delay: 0.6s; }
+    
+    /* Scroll reveal - starts visible, JS adds animation */
+    .reveal {
+      opacity: 1;
+      transform: translateY(0);
+      transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    
+    .reveal.hidden {
+      opacity: 0;
+      transform: translateY(40px);
+    }
+    
+    .reveal.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    
+    /* ============================================
+       NAVIGATION
+       ============================================ */
+    
+    .nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      padding: 1rem 0;
+      transition: all 0.3s ease;
+      background: transparent;
+    }
+    
+    .nav.scrolled {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--card-border);
+      box-shadow: 0 2px 20px rgba(30, 58, 95, 0.08);
+    }
+    
+    .nav-container {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 0 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      text-decoration: none;
+    }
+    
+    .logo-icon {
+      width: 44px;
+      height: 44px;
+      background: linear-gradient(135deg, var(--primary), var(--primary-light));
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: 800;
+      font-size: 1.25rem;
+      font-family: var(--font-display);
+      transition: transform 0.3s ease;
+    }
+    
+    .logo:hover .logo-icon {
+      transform: rotate(-5deg) scale(1.05);
+    }
+    
+    .logo-text {
+      font-family: var(--font-display);
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--foreground);
+      letter-spacing: -0.02em;
+    }
+    
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    
+    .nav-link {
+      padding: 0.625rem 1.125rem;
+      color: var(--foreground-muted);
+      text-decoration: none;
+      font-weight: 500;
+      border-radius: 10px;
+      transition: all 0.2s ease;
+      position: relative;
+    }
+    
+    .nav-link:hover {
+      color: var(--primary);
+      background: var(--background-secondary);
+    }
+    
+    .nav-link::after {
+      content: '';
+      position: absolute;
+      bottom: 4px;
+      left: 50%;
+      width: 0;
+      height: 2px;
+      background: var(--accent);
+      transform: translateX(-50%);
+      transition: width 0.2s ease;
+    }
+    
+    .nav-link:hover::after {
+      width: 20px;
+    }
+    
+    .nav-cta {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: 0.75rem 1.5rem;
+      font-family: var(--font-body);
+      font-weight: 600;
+      font-size: 0.9375rem;
+      border-radius: 12px;
+      text-decoration: none;
+      transition: all 0.3s ease;
+      cursor: pointer;
+      border: none;
+    }
+    
+    .btn-ghost {
+      background: transparent;
+      color: var(--foreground-muted);
+    }
+    
+    .btn-ghost:hover {
+      color: var(--primary);
+      background: var(--background-secondary);
+    }
+    
+    .btn-primary {
+      background: var(--primary);
+      color: white;
+      box-shadow: 0 4px 14px rgba(30, 58, 95, 0.25);
+    }
+    
+    .btn-primary:hover {
+      background: var(--primary-light);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(30, 58, 95, 0.3);
+    }
+    
+    .btn-accent {
+      background: var(--accent);
+      color: white;
+      box-shadow: 0 4px 14px rgba(231, 111, 81, 0.3);
+    }
+    
+    .btn-accent:hover {
+      background: var(--accent-dark);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(231, 111, 81, 0.4);
+    }
+    
+    .btn-lg {
+      padding: 1rem 2rem;
+      font-size: 1.0625rem;
+      border-radius: 14px;
+    }
+    
+    .btn-xl {
+      padding: 1.25rem 2.5rem;
+      font-size: 1.125rem;
+      border-radius: 16px;
+    }
+    
+    .btn-outline {
+      background: white;
+      color: var(--foreground);
+      border: 2px solid var(--card-border);
+    }
+    
+    .btn-outline:hover {
+      border-color: var(--primary);
+      color: var(--primary);
+    }
+    
+    /* ============================================
+       HERO SECTION
+       ============================================ */
+    
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      padding: 8rem 0 6rem;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .hero-bg {
+      position: absolute;
+      inset: 0;
+      z-index: -1;
+      overflow: hidden;
+    }
+    
+    .hero-bg-shape {
+      position: absolute;
+      top: -20%;
+      right: -10%;
+      width: 60%;
+      height: 120%;
+      background: linear-gradient(135deg, var(--background-secondary) 0%, var(--background-tertiary) 100%);
+      border-radius: 0 0 0 50%;
+      opacity: 0.9;
+    }
+    
+    .hero-bg-glow-1 {
+      position: absolute;
+      bottom: 10%;
+      left: -10%;
+      width: 500px;
+      height: 500px;
+      background: var(--accent);
+      opacity: 0.06;
+      border-radius: 50%;
+      filter: blur(100px);
+    }
+    
+    .hero-bg-glow-2 {
+      position: absolute;
+      top: 20%;
+      right: 20%;
+      width: 400px;
+      height: 400px;
+      background: var(--primary);
+      opacity: 0.04;
+      border-radius: 50%;
+      filter: blur(80px);
+    }
+    
+    .hero-container {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 0 1.5rem;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4rem;
+      align-items: center;
+    }
+    
+    .hero-content {
+      animation: slideInLeft 0.8s ease 0.2s both;
+    }
+    
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem;
+      background: var(--success-light);
+      border: 1px solid var(--success);
+      border-radius: 100px;
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--success);
+      margin-bottom: 1.5rem;
+    }
+    
+    .hero-badge svg {
+      width: 16px;
+      height: 16px;
+    }
+    
+    .hero-title {
+      font-size: clamp(2.5rem, 5vw, 4.5rem);
+      font-weight: 800;
+      color: var(--foreground);
+      margin-bottom: 1.5rem;
+      letter-spacing: -0.03em;
+    }
+    
+    .hero-title-word {
+      display: inline-block;
+      animation: fadeInUp 0.6s ease both;
+    }
+    
+    .hero-title-word:nth-child(1) { animation-delay: 0.3s; }
+    .hero-title-word:nth-child(2) { animation-delay: 0.4s; }
+    .hero-title-word:nth-child(3) { animation-delay: 0.5s; }
+    
+    .hero-title-accent {
+      color: var(--accent);
+      position: relative;
+    }
+    
+    .hero-title-accent::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 8px;
+      background: var(--accent);
+      opacity: 0.2;
+      border-radius: 4px;
+      transform: translateY(4px);
+    }
+    
+    .hero-subtitle {
+      font-size: 1.25rem;
+      color: var(--foreground-muted);
+      margin-bottom: 2rem;
+      max-width: 520px;
+      line-height: 1.7;
+      animation: fadeInUp 0.6s ease 0.6s both;
+    }
+    
+    .hero-cta {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 2.5rem;
+      flex-wrap: wrap;
+      animation: fadeInUp 0.6s ease 0.7s both;
+    }
+    
+    .hero-cta .btn-accent {
+      padding: 1rem 2rem;
+      font-size: 1.0625rem;
+    }
+    
+    .hero-cta .btn-accent:hover {
+      transform: translateY(-3px) scale(1.02);
+    }
+    
+    /* Social Proof in Hero */
+    .hero-social-proof {
+      animation: fadeInUp 0.6s ease 0.8s both;
+    }
+    
+    .social-proof-stats {
+      display: flex;
+      align-items: center;
+      gap: 2rem;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+    }
+    
+    .social-proof-item {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    
+    .social-proof-avatars {
+      display: flex;
+    }
+    
+    .social-proof-avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: 2px solid white;
+      margin-left: -10px;
+      background: var(--primary);
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    
+    .social-proof-avatar:first-child {
+      margin-left: 0;
+    }
+    
+    .social-proof-text {
+      font-size: 0.9375rem;
+      color: var(--foreground-muted);
+    }
+    
+    .social-proof-text strong {
+      color: var(--foreground);
+      font-weight: 600;
+    }
+    
+    .social-proof-rating {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    
+    .stars {
+      display: flex;
+      gap: 2px;
+    }
+    
+    .star {
+      width: 18px;
+      height: 18px;
+      color: #f59e0b;
+    }
+    
+    .social-proof-divider {
+      width: 1px;
+      height: 24px;
+      background: var(--card-border);
+    }
+    
+    /* Hero Visual */
+    .hero-visual {
+      position: relative;
+      animation: slideInRight 0.8s ease 0.4s both;
+    }
+    
+    .hero-card {
+      background: white;
+      border-radius: 24px;
+      padding: 2rem;
+      box-shadow: 0 25px 50px rgba(30, 58, 95, 0.12), 0 0 0 1px var(--card-border);
+      position: relative;
+    }
+    
+    .hero-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+      border-radius: 24px;
+      transform: rotate(5deg) translateX(20px) translateY(-10px);
+      z-index: -1;
+      opacity: 0.15;
+    }
+    
+    .hero-card-header {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+    
+    .hero-card-icon {
+      width: 56px;
+      height: 56px;
+      background: linear-gradient(135deg, var(--primary), var(--primary-light));
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+    }
+    
+    .hero-card-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--foreground);
+      margin-bottom: 0.25rem;
+    }
+    
+    .hero-card-subtitle {
+      font-size: 0.875rem;
+      color: var(--foreground-muted);
+    }
+    
+    .hero-card-progress {
+      margin-bottom: 1.5rem;
+    }
+    
+    .progress-header {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 0.5rem;
+      font-size: 0.875rem;
+    }
+    
+    .progress-label {
+      color: var(--foreground-muted);
+    }
+    
+    .progress-value {
+      color: var(--accent);
+      font-weight: 600;
+    }
+    
+    .progress-bar {
+      height: 8px;
+      background: var(--background-tertiary);
+      border-radius: 100px;
+      overflow: hidden;
+    }
+    
+    .progress-fill {
+      height: 100%;
+      width: 68%;
+      background: linear-gradient(90deg, var(--accent), var(--accent-light));
+      border-radius: 100px;
+      transition: width 1.5s ease;
+    }
+    
+    .hero-card-lessons {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    
+    .lesson-item {
+      display: flex;
+      align-items: center;
+      gap: 0.875rem;
+      padding: 0.875rem;
+      background: var(--background);
+      border-radius: 12px;
+      transition: all 0.2s ease;
+    }
+    
+    .lesson-item:hover {
+      background: var(--background-secondary);
+    }
+    
+    .lesson-status {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .lesson-status.completed {
+      background: var(--success);
+      color: white;
+    }
+    
+    .lesson-status.current {
+      background: var(--accent);
+      color: white;
+      animation: pulse 2s infinite;
+    }
+    
+    .lesson-status.locked {
+      background: var(--background-tertiary);
+      border: 2px solid var(--card-border);
+    }
+    
+    .lesson-info {
+      flex: 1;
+    }
+    
+    .lesson-name {
+      font-weight: 600;
+      font-size: 0.9375rem;
+      color: var(--foreground);
+      margin-bottom: 0.125rem;
+    }
+    
+    .lesson-meta {
+      font-size: 0.75rem;
+      color: var(--foreground-muted);
+    }
+    
+    .lesson-duration {
+      font-size: 0.8125rem;
+      color: var(--foreground-subtle);
+      font-weight: 500;
+    }
+    
+    /* Floating badges */
+    .floating-badge {
+      position: absolute;
+      padding: 0.75rem 1rem;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(30, 58, 95, 0.15);
+      display: flex;
+      align-items: center;
+      gap: 0.625rem;
+      font-weight: 600;
+      font-size: 0.875rem;
+    }
+    
+    .floating-badge-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .floating-badge-1 {
+      top: -20px;
+      right: -30px;
+      animation: float 4s ease-in-out infinite;
+    }
+    
+    .floating-badge-1 .floating-badge-icon {
+      background: var(--success-light);
+      color: var(--success);
+    }
+    
+    .floating-badge-2 {
+      bottom: 80px;
+      left: -40px;
+      animation: float 4s ease-in-out infinite 1s;
+    }
+    
+    .floating-badge-2 .floating-badge-icon {
+      background: rgba(231, 111, 81, 0.15);
+      color: var(--accent);
+    }
+    
+    /* ============================================
+       STATS SECTION
+       ============================================ */
+    
+    .stats {
+      background: var(--primary);
+      padding: 5rem 0;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .stats::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      right: -20%;
+      width: 60%;
+      height: 200%;
+      background: linear-gradient(135deg, rgba(255,255,255,0.08), transparent);
+      border-radius: 50%;
+    }
+    
+    .stats::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+    }
+    
+    .stats-container {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 0 1.5rem;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 2rem;
+      position: relative;
+      z-index: 1;
+    }
+    
+    .stat-item {
+      text-align: center;
+    }
+    
+    .stat-value {
+      font-family: var(--font-display);
+      font-size: 3.5rem;
+      font-weight: 800;
+      color: white;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.5rem;
+    }
+    
+    .stat-suffix {
+      color: var(--accent-light);
+    }
+    
+    .stat-label {
+      color: rgba(255, 255, 255, 0.8);
+      font-size: 1rem;
+    }
+    
+    /* Count-up animation */
+    .stat-number {
+      display: inline-block;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Navigation -->
+  <nav class="nav" id="nav">
+    <div class="nav-container">
+      <a href="#" class="logo">
+        <div class="logo-icon">T</div>
+        <span class="logo-text">Tutorio</span>
+      </a>
+      
+      <div class="nav-links">
+        <a href="#courses" class="nav-link">Courses</a>
+        <a href="#features" class="nav-link">Features</a>
+        <a href="#testimonials" class="nav-link">Reviews</a>
+        <a href="#pricing" class="nav-link">Pricing</a>
+        <a href="#faq" class="nav-link">FAQ</a>
+      </div>
+      
+      <div class="nav-cta">
+        <a href="#" class="btn btn-ghost">Sign In</a>
+        <a href="#" class="btn btn-primary">Start Free</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Hero Section -->
+  <section class="hero">
+    <div class="hero-bg">
+      <div class="hero-bg-shape"></div>
+      <div class="hero-bg-glow-1"></div>
+      <div class="hero-bg-glow-2"></div>
+    </div>
+    
+    <div class="hero-container">
+      <div class="hero-content">
+        <div class="hero-badge">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/>
+          </svg>
+          Made by Students, for Students
+        </div>
+        
+        <h1 class="hero-title">
+          <span class="hero-title-word">Stop</span>
+          <span class="hero-title-word">Overpaying</span><br>
+          <span class="hero-title-word hero-title-accent">for Tutoring</span>
+        </h1>
+        
+        <p class="hero-subtitle">
+          Why spend CHF 80+/hour on private tutors? Access quality course summaries, 
+          interactive exercises, and video lessons - all for a fraction of the cost.
+        </p>
+        
+        <div class="hero-cta">
+          <a href="#" class="btn btn-accent btn-xl">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+              <polygon points="5,3 19,12 5,21"/>
+            </svg>
+            Start Learning Free
+          </a>
+          <a href="#courses" class="btn btn-outline btn-lg">
+            Browse Courses
+          </a>
+        </div>
+        
+        <!-- Strong Social Proof -->
+        <div class="hero-social-proof">
+          <div class="social-proof-stats">
+            <div class="social-proof-item">
+              <div class="social-proof-avatars">
+                <div class="social-proof-avatar">M</div>
+                <div class="social-proof-avatar" style="background: var(--accent);">S</div>
+                <div class="social-proof-avatar" style="background: var(--success);">L</div>
+                <div class="social-proof-avatar" style="background: #7c3aed;">A</div>
+              </div>
+              <span class="social-proof-text"><strong>50+</strong> students learning</span>
+            </div>
+            
+            <div class="social-proof-divider"></div>
+            
+            <div class="social-proof-item social-proof-rating">
+              <div class="stars">
+                <svg class="star" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg>
+                <svg class="star" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg>
+                <svg class="star" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg>
+                <svg class="star" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg>
+                <svg class="star" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg>
+              </div>
+              <span class="social-proof-text"><strong>4.9</strong> average rating</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="hero-visual">
+        <div class="hero-card">
+          <div class="hero-card-header">
+            <div class="hero-card-icon">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M22 10v6M2 10l10-5 10 5-10 5z"/>
+                <path d="M6 12v5c3 3 9 3 12 0v-5"/>
+              </svg>
+            </div>
+            <div>
+              <div class="hero-card-title">Computational Thinking</div>
+              <div class="hero-card-subtitle">Module 3: Problem Decomposition</div>
+            </div>
+          </div>
+          
+          <div class="hero-card-progress">
+            <div class="progress-header">
+              <span class="progress-label">Your Progress</span>
+              <span class="progress-value">68%</span>
+            </div>
+            <div class="progress-bar">
+              <div class="progress-fill"></div>
+            </div>
+          </div>
+          
+          <div class="hero-card-lessons">
+            <div class="lesson-item">
+              <div class="lesson-status completed">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                  <polyline points="20,6 9,17 4,12"/>
+                </svg>
+              </div>
+              <div class="lesson-info">
+                <div class="lesson-name">Breaking Down Complex Problems</div>
+                <div class="lesson-meta">Lesson completed</div>
+              </div>
+              <div class="lesson-duration">12 min</div>
+            </div>
+            
+            <div class="lesson-item">
+              <div class="lesson-status current">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                  <polygon points="5,3 19,12 5,21"/>
+                </svg>
+              </div>
+              <div class="lesson-info">
+                <div class="lesson-name">Pattern Recognition</div>
+                <div class="lesson-meta">In progress</div>
+              </div>
+              <div class="lesson-duration">18 min</div>
+            </div>
+            
+            <div class="lesson-item">
+              <div class="lesson-status locked"></div>
+              <div class="lesson-info">
+                <div class="lesson-name">Abstraction Techniques</div>
+                <div class="lesson-meta">Up next</div>
+              </div>
+              <div class="lesson-duration">15 min</div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="floating-badge floating-badge-1">
+          <div class="floating-badge-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+            </svg>
+          </div>
+          <span>5 Day Streak!</span>
+        </div>
+        
+        <div class="floating-badge floating-badge-2">
+          <div class="floating-badge-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/>
+            </svg>
+          </div>
+          <span>+250 XP Today</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Stats Section -->
+  <section class="stats" id="stats">
+    <div class="stats-container">
+      <div class="stat-item reveal">
+        <div class="stat-value"><span class="stat-number" data-target="50">0</span><span class="stat-suffix">+</span></div>
+        <div class="stat-label">Active Students</div>
+      </div>
+      <div class="stat-item reveal" style="transition-delay: 0.1s;">
+        <div class="stat-value"><span class="stat-number" data-target="24">0</span><span class="stat-suffix">/7</span></div>
+        <div class="stat-label">Access Available</div>
+      </div>
+      <div class="stat-item reveal" style="transition-delay: 0.2s;">
+        <div class="stat-value"><span class="stat-number" data-target="100">0</span><span class="stat-suffix">+</span></div>
+        <div class="stat-label">Skills to Master</div>
+      </div>
+      <div class="stat-item reveal" style="transition-delay: 0.3s;">
+        <div class="stat-value">CHF <span class="stat-number" data-target="10">0</span></div>
+        <div class="stat-label">From / month</div>
+      </div>
+    </div>
+  </section>
+
+  <script>
+    // Navigation scroll effect
+    const nav = document.getElementById('nav');
+    window.addEventListener('scroll', () => {
+      if (window.scrollY > 50) {
+        nav.classList.add('scrolled');
+      } else {
+        nav.classList.remove('scrolled');
+      }
+    });
+    
+    // Scroll reveal - initialize as hidden, then reveal on scroll
+    const revealElements = document.querySelectorAll('.reveal');
+    
+    // Add hidden class after a brief delay to allow CSS to load
+    setTimeout(() => {
+      revealElements.forEach(el => {
+        if (el.getBoundingClientRect().top > window.innerHeight - 100) {
+          el.classList.add('hidden');
+        }
+      });
+    }, 100);
+    
+    const revealOnScroll = () => {
+      revealElements.forEach(el => {
+        const rect = el.getBoundingClientRect();
+        if (rect.top < window.innerHeight - 100) {
+          el.classList.remove('hidden');
+          el.classList.add('visible');
+        }
+      });
+    };
+    window.addEventListener('scroll', revealOnScroll);
+    revealOnScroll();
+    
+    // Count-up animation
+    const countUp = (element, target) => {
+      let current = 0;
+      const increment = target / 50;
+      const timer = setInterval(() => {
+        current += increment;
+        if (current >= target) {
+          element.textContent = target;
+          clearInterval(timer);
+        } else {
+          element.textContent = Math.floor(current);
+        }
+      }, 30);
+    };
+    
+    const statsSection = document.getElementById('stats');
+    let counted = false;
+    const startCounting = () => {
+      if (counted) return;
+      const rect = statsSection.getBoundingClientRect();
+      if (rect.top < window.innerHeight - 100) {
+        counted = true;
+        document.querySelectorAll('.stat-number').forEach(el => {
+          countUp(el, parseInt(el.dataset.target));
+        });
+      }
+    };
+    window.addEventListener('scroll', startCounting);
+    startCounting();
+  </script>
+  
+  <!-- Part 2 styles -->
+  <style>
+    /* ============================================
+       COURSES SECTION
+       ============================================ */
+    
+    .courses {
+      padding: var(--section-padding) 0;
+      background: var(--background);
+    }
+    
+    .section-container {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 0 1.5rem;
+    }
+    
+    .section-header {
+      text-align: center;
+      max-width: 640px;
+      margin: 0 auto 4rem;
+    }
+    
+    .section-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.375rem 0.875rem;
+      background: var(--primary);
+      color: white;
+      border-radius: 100px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 1.25rem;
+    }
+    
+    .section-label svg {
+      width: 14px;
+      height: 14px;
+    }
+    
+    .section-title {
+      font-size: clamp(2rem, 4vw, 3rem);
+      font-weight: 800;
+      color: var(--foreground);
+      margin-bottom: 1rem;
+      letter-spacing: -0.02em;
+    }
+    
+    .section-subtitle {
+      font-size: 1.125rem;
+      color: var(--foreground-muted);
+      line-height: 1.7;
+    }
+    
+    .courses-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 2rem;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    
+    .course-card {
+      background: white;
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      padding: 2rem;
+      position: relative;
+      transition: all 0.3s ease;
+      text-decoration: none;
+      display: block;
+      overflow: hidden;
+    }
+    
+    .course-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: var(--course-accent, var(--primary));
+      transform: scaleX(0);
+      transform-origin: left;
+      transition: transform 0.3s ease;
+    }
+    
+    .course-card:hover {
+      transform: translateY(-8px);
+      box-shadow: 0 20px 40px rgba(30, 58, 95, 0.12);
+    }
+    
+    .course-card:hover::before {
+      transform: scaleX(1);
+    }
+    
+    .course-card.coral { --course-accent: #e76f51; }
+    .course-card.teal { --course-accent: #2a9d8f; }
+    
+    .course-badge {
+      position: absolute;
+      top: 1.25rem;
+      right: 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 0.375rem;
+      padding: 0.375rem 0.75rem;
+      background: var(--success-light);
+      color: var(--success);
+      border-radius: 100px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+    
+    .course-badge svg {
+      width: 12px;
+      height: 12px;
+    }
+    
+    .course-icon {
+      width: 52px;
+      height: 52px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 1.25rem;
+      color: white;
+    }
+    
+    .course-icon.coral { background: linear-gradient(135deg, #e76f51, #f4a261); }
+    .course-icon.teal { background: linear-gradient(135deg, #2a9d8f, #40c9b4); }
+    
+    .course-category {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.5rem;
+    }
+    
+    .course-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--foreground);
+      margin-bottom: 0.75rem;
+      transition: color 0.2s ease;
+    }
+    
+    .course-card:hover .course-title {
+      color: var(--primary);
+    }
+    
+    .course-desc {
+      font-size: 0.9375rem;
+      color: var(--foreground-muted);
+      line-height: 1.6;
+      margin-bottom: 1.25rem;
+    }
+    
+    .course-meta {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding-top: 1.25rem;
+      border-top: 1px solid var(--card-border);
+      font-size: 0.875rem;
+      color: var(--foreground-muted);
+    }
+    
+    .course-meta-item {
+      display: flex;
+      align-items: center;
+      gap: 0.375rem;
+    }
+    
+    .course-meta-item svg {
+      width: 14px;
+      height: 14px;
+    }
+    
+    .course-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 1.25rem;
+    }
+    
+    .course-rating {
+      display: flex;
+      align-items: center;
+      gap: 0.375rem;
+    }
+    
+    .course-rating svg {
+      width: 16px;
+      height: 16px;
+      color: #f59e0b;
+    }
+    
+    .course-rating-value {
+      font-weight: 600;
+      color: var(--foreground);
+    }
+    
+    .course-rating-count {
+      color: var(--foreground-muted);
+    }
+    
+    .course-arrow {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: var(--background);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--foreground-muted);
+      transition: all 0.2s ease;
+    }
+    
+    .course-card:hover .course-arrow {
+      background: var(--primary);
+      color: white;
+      transform: translateX(4px);
+    }
+    
+    /* ============================================
+       FEATURES SECTION
+       ============================================ */
+    
+    .features {
+      padding: var(--section-padding) 0;
+      background: var(--background-secondary);
+    }
+    
+    .features-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4rem;
+      align-items: center;
+    }
+    
+    .features-content {
+      padding-right: 2rem;
+    }
+    
+    .features-list {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+      margin-top: 2.5rem;
+    }
+    
+    .feature-item {
+      display: flex;
+      gap: 1.25rem;
+      padding: 1.5rem;
+      background: white;
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      transition: all 0.3s ease;
+      cursor: pointer;
+    }
+    
+    .feature-item:hover {
+      transform: translateX(8px);
+      box-shadow: 0 10px 30px rgba(30, 58, 95, 0.1);
+    }
+    
+    .feature-icon {
+      width: 52px;
+      height: 52px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+    
+    .feature-icon.primary { background: rgba(30, 58, 95, 0.1); color: var(--primary); }
+    .feature-icon.accent { background: rgba(231, 111, 81, 0.1); color: var(--accent); }
+    .feature-icon.success { background: var(--success-light); color: var(--success); }
+    .feature-icon.gold { background: rgba(233, 196, 106, 0.2); color: #b8860b; }
+    
+    .feature-title {
+      font-size: 1.125rem;
+      font-weight: 700;
+      color: var(--foreground);
+      margin-bottom: 0.375rem;
+    }
+    
+    .feature-desc {
+      font-size: 0.9375rem;
+      color: var(--foreground-muted);
+      line-height: 1.5;
+    }
+    
+    .features-visual {
+      position: relative;
+    }
+    
+    .dashboard-preview {
+      background: linear-gradient(135deg, var(--primary), var(--primary-light));
+      border-radius: 24px;
+      padding: 2.5rem;
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .dashboard-preview::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+    }
+    
+    .dashboard-card {
+      background: white;
+      border-radius: 16px;
+      padding: 1.5rem;
+      position: relative;
+      z-index: 1;
+    }
+    
+    .dashboard-user {
+      display: flex;
+      align-items: center;
+      gap: 0.875rem;
+      margin-bottom: 1.25rem;
+    }
+    
+    .dashboard-avatar {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent), var(--accent-light));
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+    }
+    
+    .dashboard-greeting {
+      font-weight: 600;
+      color: var(--foreground);
+      margin-bottom: 0.125rem;
+    }
+    
+    .dashboard-subtext {
+      font-size: 0.8125rem;
+      color: var(--foreground-muted);
+    }
+    
+    .dashboard-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.75rem;
+      margin-bottom: 1.25rem;
+    }
+    
+    .dashboard-stat {
+      background: var(--background);
+      padding: 1rem;
+      border-radius: 12px;
+      text-align: center;
+    }
+    
+    .dashboard-stat-value {
+      font-family: var(--font-display);
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--primary);
+    }
+    
+    .dashboard-stat-label {
+      font-size: 0.75rem;
+      color: var(--foreground-muted);
+    }
+    
+    .dashboard-continue {
+      display: flex;
+      align-items: center;
+      gap: 0.875rem;
+      padding: 0.875rem;
+      background: var(--background);
+      border-radius: 12px;
+    }
+    
+    .dashboard-continue-icon {
+      width: 40px;
+      height: 40px;
+      background: linear-gradient(135deg, var(--success), #40c9b4);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+    }
+    
+    .dashboard-continue-info {
+      flex: 1;
+    }
+    
+    .dashboard-continue-title {
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--foreground);
+      margin-bottom: 0.375rem;
+    }
+    
+    .dashboard-continue-progress {
+      height: 4px;
+      background: var(--card-border);
+      border-radius: 100px;
+      overflow: hidden;
+    }
+    
+    .dashboard-continue-fill {
+      height: 100%;
+      width: 65%;
+      background: var(--success);
+      border-radius: 100px;
+    }
+    
+    /* ============================================
+       TESTIMONIALS SECTION
+       ============================================ */
+    
+    .testimonials {
+      padding: var(--section-padding) 0;
+      background: var(--background);
+    }
+    
+    .testimonials-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.5rem;
+    }
+    
+    .testimonial-card {
+      background: white;
+      border: 1px solid var(--card-border);
+      border-radius: 20px;
+      padding: 2rem;
+      transition: all 0.3s ease;
+    }
+    
+    .testimonial-card:hover {
+      transform: translateY(-6px);
+      box-shadow: 0 15px 35px rgba(30, 58, 95, 0.1);
+    }
+    
+    .testimonial-quote {
+      width: 40px;
+      height: 40px;
+      color: var(--primary);
+      opacity: 0.2;
+      margin-bottom: 1rem;
+    }
+    
+    .testimonial-rating {
+      display: flex;
+      gap: 3px;
+      margin-bottom: 1rem;
+    }
+    
+    .testimonial-rating svg {
+      width: 18px;
+      height: 18px;
+      color: #f59e0b;
+    }
+    
+    .testimonial-text {
+      font-size: 1rem;
+      color: var(--foreground);
+      line-height: 1.7;
+      margin-bottom: 1.5rem;
+    }
+    
+    .testimonial-author {
+      display: flex;
+      align-items: center;
+      gap: 0.875rem;
+      padding-top: 1.25rem;
+      border-top: 1px solid var(--card-border);
+    }
+    
+    .testimonial-avatar {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: var(--primary);
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 600;
+      font-size: 1.125rem;
+    }
+    
+    .testimonial-name {
+      font-weight: 600;
+      color: var(--foreground);
+      margin-bottom: 0.125rem;
+    }
+    
+    .testimonial-role {
+      font-size: 0.8125rem;
+      color: var(--foreground-muted);
+    }
+    
+    /* ============================================
+       FAQ SECTION
+       ============================================ */
+    
+    .faq {
+      padding: var(--section-padding) 0;
+      background: var(--background-secondary);
+    }
+    
+    .faq-container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    
+    .faq-list {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    
+    .faq-item {
+      background: white;
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      overflow: hidden;
+    }
+    
+    .faq-question {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1.5rem;
+      background: none;
+      border: none;
+      cursor: pointer;
+      text-align: left;
+      font-family: var(--font-display);
+      font-size: 1.0625rem;
+      font-weight: 600;
+      color: var(--foreground);
+      transition: all 0.2s ease;
+    }
+    
+    .faq-question:hover {
+      color: var(--primary);
+    }
+    
+    .faq-icon {
+      width: 24px;
+      height: 24px;
+      color: var(--foreground-muted);
+      transition: transform 0.3s ease;
+    }
+    
+    .faq-item.open .faq-icon {
+      transform: rotate(45deg);
+    }
+    
+    .faq-answer {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s ease, padding 0.3s ease;
+    }
+    
+    .faq-item.open .faq-answer {
+      max-height: 300px;
+    }
+    
+    .faq-answer-content {
+      padding: 0 1.5rem 1.5rem;
+      font-size: 1rem;
+      color: var(--foreground-muted);
+      line-height: 1.7;
+    }
+    
+    /* ============================================
+       PRICING SECTION
+       ============================================ */
+    
+    .pricing {
+      padding: var(--section-padding) 0;
+      background: var(--background);
+    }
+    
+    .pricing-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 2rem;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    
+    .pricing-card {
+      background: white;
+      border: 1px solid var(--card-border);
+      border-radius: 24px;
+      padding: 2.5rem;
+      position: relative;
+      transition: all 0.3s ease;
+    }
+    
+    .pricing-card:hover {
+      transform: translateY(-6px);
+    }
+    
+    .pricing-card.featured {
+      border: 2px solid var(--accent);
+      box-shadow: 0 20px 50px rgba(231, 111, 81, 0.15);
+    }
+    
+    .pricing-popular {
+      position: absolute;
+      top: -14px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 0.5rem 1.25rem;
+      background: var(--accent);
+      color: white;
+      font-size: 0.75rem;
+      font-weight: 600;
+      border-radius: 100px;
+    }
+    
+    .pricing-name {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--foreground);
+      margin-bottom: 0.5rem;
+    }
+    
+    .pricing-desc {
+      font-size: 0.9375rem;
+      color: var(--foreground-muted);
+      margin-bottom: 1.5rem;
+    }
+    
+    .pricing-price {
+      display: flex;
+      align-items: baseline;
+      gap: 0.25rem;
+      margin-bottom: 2rem;
+    }
+    
+    .pricing-currency {
+      font-size: 1.25rem;
+      color: var(--foreground-muted);
+    }
+    
+    .pricing-amount {
+      font-family: var(--font-display);
+      font-size: 3.5rem;
+      font-weight: 800;
+      color: var(--foreground);
+      letter-spacing: -0.02em;
+    }
+    
+    .pricing-period {
+      font-size: 1rem;
+      color: var(--foreground-muted);
+    }
+    
+    .pricing-features {
+      display: flex;
+      flex-direction: column;
+      gap: 0.875rem;
+      margin-bottom: 2rem;
+    }
+    
+    .pricing-feature {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-size: 0.9375rem;
+    }
+    
+    .pricing-feature svg {
+      width: 18px;
+      height: 18px;
+      flex-shrink: 0;
+    }
+    
+    .pricing-feature.included svg {
+      color: var(--success);
+    }
+    
+    .pricing-feature.excluded {
+      opacity: 0.5;
+    }
+    
+    .pricing-feature.excluded svg {
+      color: var(--foreground-subtle);
+    }
+    
+    .pricing-cta {
+      display: block;
+      width: 100%;
+      padding: 1rem;
+      text-align: center;
+      border-radius: 14px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.2s ease;
+    }
+    
+    .pricing-card.featured .pricing-cta {
+      background: var(--accent);
+      color: white;
+    }
+    
+    .pricing-card.featured .pricing-cta:hover {
+      background: var(--accent-dark);
+    }
+    
+    .pricing-card:not(.featured) .pricing-cta {
+      background: white;
+      border: 2px solid var(--card-border);
+      color: var(--foreground);
+    }
+    
+    .pricing-card:not(.featured) .pricing-cta:hover {
+      border-color: var(--primary);
+      color: var(--primary);
+    }
+    
+    /* ============================================
+       CTA SECTION
+       ============================================ */
+    
+    .cta {
+      padding: var(--section-padding) 0;
+      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+      position: relative;
+      overflow: hidden;
+    }
+    
+    .cta::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 800px;
+      height: 800px;
+      background: radial-gradient(circle, rgba(231, 111, 81, 0.2), transparent 70%);
+    }
+    
+    .cta-container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 0 1.5rem;
+      text-align: center;
+      position: relative;
+      z-index: 1;
+    }
+    
+    .cta-title {
+      font-size: clamp(2.5rem, 5vw, 3.5rem);
+      font-weight: 800;
+      color: white;
+      margin-bottom: 1rem;
+      letter-spacing: -0.02em;
+    }
+    
+    .cta-subtitle {
+      font-size: 1.25rem;
+      color: rgba(255, 255, 255, 0.8);
+      margin-bottom: 2.5rem;
+      max-width: 560px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    
+    .cta-buttons {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    
+    .cta .btn-white {
+      background: white;
+      color: var(--primary);
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+    }
+    
+    .cta .btn-white:hover {
+      background: var(--background);
+      transform: translateY(-2px);
+    }
+    
+    .cta .btn-outline-white {
+      background: transparent;
+      color: white;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+    }
+    
+    .cta .btn-outline-white:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.5);
+    }
+    
+    /* ============================================
+       FOOTER
+       ============================================ */
+    
+    .footer {
+      padding: 5rem 0 2rem;
+      background: white;
+      border-top: 1px solid var(--card-border);
+    }
+    
+    .footer-grid {
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr 1fr;
+      gap: 3rem;
+      margin-bottom: 4rem;
+    }
+    
+    .footer-brand p {
+      font-size: 0.9375rem;
+      color: var(--foreground-muted);
+      line-height: 1.7;
+      margin-top: 1rem;
+      max-width: 280px;
+    }
+    
+    .footer-title {
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--foreground);
+      margin-bottom: 1.25rem;
+    }
+    
+    .footer-links {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    
+    .footer-link {
+      font-size: 0.9375rem;
+      color: var(--foreground-muted);
+      text-decoration: none;
+      transition: color 0.2s ease;
+    }
+    
+    .footer-link:hover {
+      color: var(--primary);
+    }
+    
+    .footer-newsletter {
+      margin-top: 1.5rem;
+    }
+    
+    .newsletter-form {
+      display: flex;
+      gap: 0.5rem;
+    }
+    
+    .newsletter-input {
+      flex: 1;
+      padding: 0.75rem 1rem;
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      font-size: 0.875rem;
+      font-family: var(--font-body);
+      outline: none;
+      transition: border-color 0.2s ease;
+    }
+    
+    .newsletter-input:focus {
+      border-color: var(--primary);
+    }
+    
+    .newsletter-btn {
+      padding: 0.75rem 1.25rem;
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+    
+    .newsletter-btn:hover {
+      background: var(--primary-light);
+    }
+    
+    .footer-bottom {
+      padding-top: 2rem;
+      border-top: 1px solid var(--card-border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.875rem;
+      color: var(--foreground-muted);
+    }
+    
+    .footer-socials {
+      display: flex;
+      gap: 1rem;
+    }
+    
+    .footer-social {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      background: var(--background-secondary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--foreground-muted);
+      transition: all 0.2s ease;
+    }
+    
+    .footer-social:hover {
+      background: var(--primary);
+      color: white;
+    }
+    
+    /* ============================================
+       RESPONSIVE
+       ============================================ */
+    
+    @media (max-width: 1024px) {
+      .hero-container {
+        grid-template-columns: 1fr;
+        gap: 3rem;
+      }
+      
+      .hero-content {
+        text-align: center;
+      }
+      
+      .hero-subtitle {
+        margin-left: auto;
+        margin-right: auto;
+      }
+      
+      .hero-cta {
+        justify-content: center;
+      }
+      
+      .social-proof-stats {
+        justify-content: center;
+      }
+      
+      .hero-visual {
+        max-width: 500px;
+        margin: 0 auto;
+      }
+      
+      .floating-badge-1 {
+        right: 0;
+      }
+      
+      .floating-badge-2 {
+        left: 0;
+      }
+      
+      .features-grid {
+        grid-template-columns: 1fr;
+      }
+      
+      .features-content {
+        padding-right: 0;
+        text-align: center;
+      }
+      
+      .features-visual {
+        max-width: 500px;
+        margin: 0 auto;
+      }
+      
+      .footer-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+    
+    @media (max-width: 768px) {
+      .nav-links, .nav-cta .btn-ghost {
+        display: none;
+      }
+      
+      .stats-container {
+        grid-template-columns: repeat(2, 1fr);
+      }
+      
+      .courses-grid {
+        grid-template-columns: 1fr;
+      }
+      
+      .testimonials-grid {
+        grid-template-columns: 1fr;
+      }
+      
+      .pricing-grid {
+        grid-template-columns: 1fr;
+      }
+      
+      .footer-grid {
+        grid-template-columns: 1fr;
+        text-align: center;
+      }
+      
+      .footer-brand p {
+        margin-left: auto;
+        margin-right: auto;
+      }
+      
+      .newsletter-form {
+        flex-direction: column;
+      }
+      
+      .footer-bottom {
+        flex-direction: column;
+        gap: 1rem;
+        text-align: center;
+      }
+    }
+  </style>
+
+  <!-- Courses Section -->
+  <section class="courses" id="courses">
+    <div class="section-container">
+      <div class="section-header reveal">
+        <div class="section-label">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+          </svg>
+          Available Courses
+        </div>
+        <h2 class="section-title">Start Learning Today</h2>
+        <p class="section-subtitle">Interactive courses designed for business school students, structured for maximum retention and exam success.</p>
+      </div>
+      
+      <div class="courses-grid">
+        <a href="#" class="course-card coral reveal">
+          <div class="course-badge">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+            Free Preview
+          </div>
+          <div class="course-icon coral">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="12" y1="1" x2="12" y2="23"/>
+              <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+            </svg>
+          </div>
+          <div class="course-category">Business & Accounting</div>
+          <h3 class="course-title">Financial Accounting Fundamentals</h3>
+          <p class="course-desc">Master financial statements, accounting principles, and analysis techniques through interactive exercises.</p>
+          <div class="course-meta">
+            <div class="course-meta-item">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+              45 lessons
+            </div>
+            <div class="course-meta-item">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>
+              45 hours
+            </div>
+          </div>
+          <div class="course-footer">
+            <div class="course-rating">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg>
+              <span class="course-rating-value">4.9</span>
+              <span class="course-rating-count">(1,240)</span>
+            </div>
+            <div class="course-arrow">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12,5 19,12 12,19"/></svg>
+            </div>
+          </div>
+        </a>
+        
+        <a href="#" class="course-card teal reveal" style="transition-delay: 0.1s;">
+          <div class="course-badge">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+            Free Preview
+          </div>
+          <div class="course-icon teal">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 2a4 4 0 0 1 4 4c0 1.95-1.4 3.58-3.25 3.93"/>
+              <path d="M6 10c0-1.1.9-2 2-2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V10z"/>
+              <line x1="12" y1="14" x2="12" y2="18"/>
+            </svg>
+          </div>
+          <div class="course-category">Computer Science</div>
+          <h3 class="course-title">Computational Thinking</h3>
+          <p class="course-desc">Learn problem-solving and Python programming through decomposition, pattern recognition, and abstraction.</p>
+          <div class="course-meta">
+            <div class="course-meta-item">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+              32 lessons
+            </div>
+            <div class="course-meta-item">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg>
+              25 hours
+            </div>
+          </div>
+          <div class="course-footer">
+            <div class="course-rating">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg>
+              <span class="course-rating-value">4.8</span>
+              <span class="course-rating-count">(980)</span>
+            </div>
+            <div class="course-arrow">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12,5 19,12 12,19"/></svg>
+            </div>
+          </div>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features Section -->
+  <section class="features" id="features">
+    <div class="section-container">
+      <div class="features-grid">
+        <div class="features-content reveal">
+          <div class="section-label">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/>
+            </svg>
+            Why Tutorio
+          </div>
+          <h2 class="section-title">Learn Smarter, Not Harder</h2>
+          <p class="section-subtitle">Our AI-powered platform restructures complex business concepts into clear, exam-focused content. No more wading through endless lecture notes.</p>
+          
+          <div class="features-list">
+            <div class="feature-item">
+              <div class="feature-icon primary">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/>
+                </svg>
+              </div>
+              <div>
+                <h4 class="feature-title">AI-Powered Summaries</h4>
+                <p class="feature-desc">Smart condensation of complex topics into digestible, exam-focused content.</p>
+              </div>
+            </div>
+            
+            <div class="feature-item">
+              <div class="feature-icon accent">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"/>
+                  <circle cx="12" cy="12" r="6"/>
+                  <circle cx="12" cy="12" r="2"/>
+                </svg>
+              </div>
+              <div>
+                <h4 class="feature-title">Exam-Focused Content</h4>
+                <p class="feature-desc">Every lesson is structured to maximize your exam performance.</p>
+              </div>
+            </div>
+            
+            <div class="feature-item">
+              <div class="feature-icon success">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"/>
+                  <polyline points="12,6 12,12 16,14"/>
+                </svg>
+              </div>
+              <div>
+                <h4 class="feature-title">Learn at Your Pace</h4>
+                <p class="feature-desc">Access content 24/7, study when and where it suits you best.</p>
+              </div>
+            </div>
+            
+            <div class="feature-item">
+              <div class="feature-icon gold">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="18" y1="20" x2="18" y2="10"/>
+                  <line x1="12" y1="20" x2="12" y2="4"/>
+                  <line x1="6" y1="20" x2="6" y2="14"/>
+                </svg>
+              </div>
+              <div>
+                <h4 class="feature-title">Track Progress</h4>
+                <p class="feature-desc">Monitor your learning journey with detailed analytics and insights.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="features-visual reveal" style="transition-delay: 0.15s;">
+          <div class="dashboard-preview">
+            <div class="dashboard-card">
+              <div class="dashboard-user">
+                <div class="dashboard-avatar">VT</div>
+                <div>
+                  <div class="dashboard-greeting">Good morning, Victor</div>
+                  <div class="dashboard-subtext">Ready to continue learning?</div>
+                </div>
+              </div>
+              
+              <div class="dashboard-stats">
+                <div class="dashboard-stat">
+                  <div class="dashboard-stat-value">12</div>
+                  <div class="dashboard-stat-label">Skills Mastered</div>
+                </div>
+                <div class="dashboard-stat">
+                  <div class="dashboard-stat-value">4.2h</div>
+                  <div class="dashboard-stat-label">Study Time</div>
+                </div>
+                <div class="dashboard-stat">
+                  <div class="dashboard-stat-value">5</div>
+                  <div class="dashboard-stat-label">Day Streak</div>
+                </div>
+              </div>
+              
+              <div class="dashboard-continue">
+                <div class="dashboard-continue-icon">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                  </svg>
+                </div>
+                <div class="dashboard-continue-info">
+                  <div class="dashboard-continue-title">Continue: Balance Sheets</div>
+                  <div class="dashboard-continue-progress">
+                    <div class="dashboard-continue-fill"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Testimonials Section -->
+  <section class="testimonials" id="testimonials">
+    <div class="section-container">
+      <div class="section-header reveal">
+        <div class="section-label">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+          </svg>
+          Student Reviews
+        </div>
+        <h2 class="section-title">What Students Say</h2>
+        <p class="section-subtitle">Real feedback from students who improved their grades with Tutorio.</p>
+      </div>
+      
+      <div class="testimonials-grid">
+        <div class="testimonial-card reveal">
+          <svg class="testimonial-quote" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M14.017 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10h-9.983zm-14.017 0v-7.391c0-5.704 3.748-9.57 9-10.609l.996 2.151c-2.433.917-3.996 3.638-3.996 5.849h3.983v10h-9.983z"/>
+          </svg>
+          <div class="testimonial-rating">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg>
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg>
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg>
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg>
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg>
+          </div>
+          <p class="testimonial-text">"I was struggling with Financial Accounting until I found Tutorio. The AI summaries made complex topics so much easier to understand. My grade went from a C to an A-!"</p>
+          <div class="testimonial-author">
+            <div class="testimonial-avatar">MS</div>
+            <div>
+              <div class="testimonial-name">Marie S.</div>
+              <div class="testimonial-role">Business Student, HEC Lausanne</div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="testimonial-card reveal" style="transition-delay: 0.1s;">
+          <svg class="testimonial-quote" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M14.017 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10h-9.983zm-14.017 0v-7.391c0-5.704 3.748-9.57 9-10.609l.996 2.151c-2.433.917-3.996 3.638-3.996 5.849h3.983v10h-9.983z"/>
+          </svg>
+          <div class="testimonial-rating">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg>
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg>
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg>
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg>
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg>
+          </div>
+          <p class="testimonial-text">"Way cheaper than hiring a tutor, and honestly more effective. I can study at my own pace and revisit difficult concepts as many times as I need."</p>
+          <div class="testimonial-author">
+            <div class="testimonial-avatar" style="background: var(--success);">LB</div>
+            <div>
+              <div class="testimonial-name">Lucas B.</div>
+              <div class="testimonial-role">CS Student, EPFL</div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="testimonial-card reveal" style="transition-delay: 0.2s;">
+          <svg class="testimonial-quote" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M14.017 21v-7.391c0-5.704 3.731-9.57 8.983-10.609l.995 2.151c-2.432.917-3.995 3.638-3.995 5.849h4v10h-9.983zm-14.017 0v-7.391c0-5.704 3.748-9.57 9-10.609l.996 2.151c-2.433.917-3.996 3.638-3.996 5.849h3.983v10h-9.983z"/>
+          </svg>
+          <div class="testimonial-rating">
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg>
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg>
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg>
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg>
+            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"/></svg>
+          </div>
+          <p class="testimonial-text">"The practice exercises are amazing! They're exactly like what appears in exams. I felt so prepared going into my midterms. Highly recommend!"</p>
+          <div class="testimonial-author">
+            <div class="testimonial-avatar" style="background: var(--accent);">AK</div>
+            <div>
+              <div class="testimonial-name">Anna K.</div>
+              <div class="testimonial-role">Business Student, Uni Geneva</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ Section -->
+  <section class="faq" id="faq">
+    <div class="section-container">
+      <div class="section-header reveal">
+        <div class="section-label">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+            <line x1="12" y1="17" x2="12.01" y2="17"/>
+          </svg>
+          FAQ
+        </div>
+        <h2 class="section-title">Frequently Asked Questions</h2>
+        <p class="section-subtitle">Everything you need to know about Tutorio.</p>
+      </div>
+      
+      <div class="faq-container">
+        <div class="faq-list">
+          <div class="faq-item reveal">
+            <button class="faq-question">
+              Is there really free content?
+              <svg class="faq-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="5" x2="12" y2="19"/>
+                <line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+            </button>
+            <div class="faq-answer">
+              <div class="faq-answer-content">Yes! Each course has a free preview section that lets you experience the learning style and content quality before committing. You can access introductory modules and sample exercises completely free.</div>
+            </div>
+          </div>
+          
+          <div class="faq-item reveal" style="transition-delay: 0.05s;">
+            <button class="faq-question">
+              What's included in each subscription plan?
+              <svg class="faq-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="5" x2="12" y2="19"/>
+                <line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+            </button>
+            <div class="faq-answer">
+              <div class="faq-answer-content">Basic (CHF 10/month) includes AI-structured text summaries, practice exercises with solutions, progress tracking, and access to all courses. Premium (CHF 25/month) adds HD video lessons, audio podcasts, downloadable resources, priority support, and exam simulations.</div>
+            </div>
+          </div>
+          
+          <div class="faq-item reveal" style="transition-delay: 0.1s;">
+            <button class="faq-question">
+              Can I cancel my subscription anytime?
+              <svg class="faq-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="5" x2="12" y2="19"/>
+                <line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+            </button>
+            <div class="faq-answer">
+              <div class="faq-answer-content">Absolutely! There are no long-term contracts. You can cancel your subscription at any time, and you'll continue to have access until the end of your billing period. No cancellation fees whatsoever.</div>
+            </div>
+          </div>
+          
+          <div class="faq-item reveal" style="transition-delay: 0.15s;">
+            <button class="faq-question">
+              Who creates the course content?
+              <svg class="faq-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="5" x2="12" y2="19"/>
+                <line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+            </button>
+            <div class="faq-answer">
+              <div class="faq-answer-content">Our content is created by students who have excelled in these courses, reviewed by professors and industry experts. We use AI to structure and optimize the content for learning retention, but the core material comes from real academic experience.</div>
+            </div>
+          </div>
+          
+          <div class="faq-item reveal" style="transition-delay: 0.2s;">
+            <button class="faq-question">
+              How is this different from YouTube tutorials?
+              <svg class="faq-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="5" x2="12" y2="19"/>
+                <line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+            </button>
+            <div class="faq-answer">
+              <div class="faq-answer-content">Tutorio is specifically designed for your university courses with exam-focused content. Unlike generic YouTube videos, our materials are structured for Swiss business school curricula, include interactive exercises with solutions, track your progress, and feature an AI tutor for personalized help.</div>
+            </div>
+          </div>
+          
+          <div class="faq-item reveal" style="transition-delay: 0.25s;">
+            <button class="faq-question">
+              Do you offer refunds?
+              <svg class="faq-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="5" x2="12" y2="19"/>
+                <line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+            </button>
+            <div class="faq-answer">
+              <div class="faq-answer-content">Yes! If you're not satisfied with Tutorio within the first 7 days, contact us for a full refund. We're confident in our content quality and want you to feel secure trying our platform.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Pricing Section -->
+  <section class="pricing" id="pricing">
+    <div class="section-container">
+      <div class="section-header reveal">
+        <div class="section-label">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="1" y="4" width="22" height="16" rx="2" ry="2"/>
+            <line x1="1" y1="10" x2="23" y2="10"/>
+          </svg>
+          Simple Pricing
+        </div>
+        <h2 class="section-title">Choose Your Learning Path</h2>
+        <p class="section-subtitle">Start with a free preview on any course. No credit card required.</p>
+      </div>
+      
+      <div class="pricing-grid">
+        <div class="pricing-card reveal">
+          <h3 class="pricing-name">Basic</h3>
+          <p class="pricing-desc">Perfect for self-starters who prefer reading</p>
+          
+          <div class="pricing-price">
+            <span class="pricing-currency">CHF</span>
+            <span class="pricing-amount">10</span>
+            <span class="pricing-period">/month</span>
+          </div>
+          
+          <div class="pricing-features">
+            <div class="pricing-feature included">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20,6 9,17 4,12"/></svg>
+              <span>AI-structured text summaries</span>
+            </div>
+            <div class="pricing-feature included">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20,6 9,17 4,12"/></svg>
+              <span>Practice exercises with solutions</span>
+            </div>
+            <div class="pricing-feature included">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20,6 9,17 4,12"/></svg>
+              <span>Progress tracking</span>
+            </div>
+            <div class="pricing-feature included">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20,6 9,17 4,12"/></svg>
+              <span>Access to all courses</span>
+            </div>
+            <div class="pricing-feature excluded">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              <span>Video lessons</span>
+            </div>
+            <div class="pricing-feature excluded">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              <span>Audio podcasts</span>
+            </div>
+          </div>
+          
+          <a href="#" class="pricing-cta">Get Started</a>
+        </div>
+        
+        <div class="pricing-card featured reveal" style="transition-delay: 0.1s;">
+          <div class="pricing-popular">Most Popular</div>
+          <h3 class="pricing-name">Premium</h3>
+          <p class="pricing-desc">The complete learning experience</p>
+          
+          <div class="pricing-price">
+            <span class="pricing-currency">CHF</span>
+            <span class="pricing-amount">25</span>
+            <span class="pricing-period">/month</span>
+          </div>
+          
+          <div class="pricing-features">
+            <div class="pricing-feature included">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20,6 9,17 4,12"/></svg>
+              <span>Everything in Basic</span>
+            </div>
+            <div class="pricing-feature included">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20,6 9,17 4,12"/></svg>
+              <span>HD Video lessons</span>
+            </div>
+            <div class="pricing-feature included">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20,6 9,17 4,12"/></svg>
+              <span>Audio podcasts for on-the-go</span>
+            </div>
+            <div class="pricing-feature included">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20,6 9,17 4,12"/></svg>
+              <span>Downloadable resources</span>
+            </div>
+            <div class="pricing-feature included">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20,6 9,17 4,12"/></svg>
+              <span>Priority support</span>
+            </div>
+            <div class="pricing-feature included">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20,6 9,17 4,12"/></svg>
+              <span>Exam simulations</span>
+            </div>
+          </div>
+          
+          <a href="#" class="pricing-cta">Get Started</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Final CTA Section -->
+  <section class="cta reveal">
+    <div class="cta-container">
+      <h2 class="cta-title">Ready to Ace Your Exams?</h2>
+      <p class="cta-subtitle">Join 50+ students already saving money while studying smarter. Start with a free preview today.</p>
+      <div class="cta-buttons">
+        <a href="#" class="btn btn-white btn-xl">
+          Start Learning Free
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12,5 19,12 12,19"/></svg>
+        </a>
+        <a href="#courses" class="btn btn-outline-white btn-lg">View All Courses</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="section-container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <a href="#" class="logo">
+            <div class="logo-icon">T</div>
+            <span class="logo-text">Tutorio</span>
+          </a>
+          <p>Quality tutoring content at a fraction of the cost. Stop overpaying for private lessons.</p>
+          
+          <div class="footer-newsletter">
+            <div class="footer-title">Stay Updated</div>
+            <form class="newsletter-form">
+              <input type="email" class="newsletter-input" placeholder="Your email">
+              <button type="submit" class="newsletter-btn">Subscribe</button>
+            </form>
+          </div>
+        </div>
+        
+        <div>
+          <div class="footer-title">Platform</div>
+          <div class="footer-links">
+            <a href="#courses" class="footer-link">Courses</a>
+            <a href="#pricing" class="footer-link">Pricing</a>
+            <a href="#features" class="footer-link">How It Works</a>
+            <a href="#faq" class="footer-link">FAQ</a>
+          </div>
+        </div>
+        
+        <div>
+          <div class="footer-title">Company</div>
+          <div class="footer-links">
+            <a href="#" class="footer-link">About Us</a>
+            <a href="#" class="footer-link">Careers</a>
+            <a href="#" class="footer-link">Blog</a>
+            <a href="#" class="footer-link">Contact</a>
+          </div>
+        </div>
+        
+        <div>
+          <div class="footer-title">Legal</div>
+          <div class="footer-links">
+            <a href="#" class="footer-link">Privacy Policy</a>
+            <a href="#" class="footer-link">Terms of Service</a>
+            <a href="#" class="footer-link">Cookie Policy</a>
+          </div>
+        </div>
+      </div>
+      
+      <div class="footer-bottom">
+        <p>2025 Tutorio. All rights reserved.</p>
+        <div class="footer-socials">
+          <a href="#" class="footer-social">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M24 4.557c-.883.392-1.832.656-2.828.775 1.017-.609 1.798-1.574 2.165-2.724-.951.564-2.005.974-3.127 1.195-.897-.957-2.178-1.555-3.594-1.555-3.179 0-5.515 2.966-4.797 6.045-4.091-.205-7.719-2.165-10.148-5.144-1.29 2.213-.669 5.108 1.523 6.574-.806-.026-1.566-.247-2.229-.616-.054 2.281 1.581 4.415 3.949 4.89-.693.188-1.452.232-2.224.084.626 1.956 2.444 3.379 4.6 3.419-2.07 1.623-4.678 2.348-7.29 2.04 2.179 1.397 4.768 2.212 7.548 2.212 9.142 0 14.307-7.721 13.995-14.646.962-.695 1.797-1.562 2.457-2.549z"/>
+            </svg>
+          </a>
+          <a href="#" class="footer-social">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"/>
+            </svg>
+          </a>
+          <a href="#" class="footer-social">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+            </svg>
+          </a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Additional JavaScript -->
+  <script>
+    // FAQ Accordion
+    document.querySelectorAll('.faq-question').forEach(button => {
+      button.addEventListener('click', () => {
+        const item = button.parentElement;
+        const isOpen = item.classList.contains('open');
+        
+        // Close all other items
+        document.querySelectorAll('.faq-item').forEach(i => i.classList.remove('open'));
+        
+        // Toggle current item
+        if (!isOpen) {
+          item.classList.add('open');
+        }
+      });
+    });
+    
+    // Smooth scroll for anchor links
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+      anchor.addEventListener('click', function(e) {
+        e.preventDefault();
+        const target = document.querySelector(this.getAttribute('href'));
+        if (target) {
+          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      });
+    });
+  </script>
+</body>
+</html>
+

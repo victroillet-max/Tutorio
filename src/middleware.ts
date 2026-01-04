@@ -5,12 +5,24 @@ import { logger } from "@/lib/logging";
 const log = logger.child({ module: "middleware" });
 
 /**
+ * Hash a session token for validation using Web Crypto API (Edge-compatible)
+ */
+async function hashSessionToken(token: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(token);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+/**
  * Middleware for session management and route protection
  * 
  * Key responsibilities:
  * 1. Refresh session on every request (prevents session expiry)
  * 2. Redirect unauthenticated users from protected routes to login
- * 3. Keep role checks lightweight - defer to page-level for admin checks
+ * 3. Validate session against concurrent login limit
+ * 4. Keep role checks lightweight - defer to page-level for admin checks
  */
 
 // Routes that require authentication
@@ -61,9 +73,13 @@ export async function middleware(request: NextRequest) {
   // This can cause session management issues
 
   let user = null;
+  let session = null;
   try {
-    const { data } = await supabase.auth.getUser();
-    user = data.user;
+    const { data: userData } = await supabase.auth.getUser();
+    user = userData.user;
+    
+    const { data: sessionData } = await supabase.auth.getSession();
+    session = sessionData.session;
   } catch (err) {
     // If getUser fails (e.g., invalid configuration), log and continue
     log.error("Failed to get user", err);
@@ -87,6 +103,41 @@ export async function middleware(request: NextRequest) {
     const redirectUrl = new URL("/login", request.url);
     redirectUrl.searchParams.set("next", pathname);
     return NextResponse.redirect(redirectUrl);
+  }
+
+  // For protected routes with authenticated users, validate session against our tracking table
+  // This ensures users are logged out when their session was invalidated due to login limit
+  if (isProtectedRoute && user && session?.access_token) {
+    try {
+      const tokenHash = await hashSessionToken(session.access_token);
+      
+      // Query the user_sessions table to check if this session is still valid
+      const { data: sessionValid } = await supabase.rpc("validate_session", {
+        p_session_token_hash: tokenHash,
+      });
+
+      // If session is not valid in our tracking table, sign out the user
+      // This happens when they were logged out from another device due to the login limit
+      if (sessionValid === false) {
+        log.info("Session invalidated due to concurrent login limit", { 
+          userId: user.id,
+          pathname 
+        });
+        
+        // Sign out the user
+        await supabase.auth.signOut();
+        
+        // Redirect to login with a message
+        const redirectUrl = new URL("/login", request.url);
+        redirectUrl.searchParams.set("error", "session_expired");
+        redirectUrl.searchParams.set("message", "You were logged out because you signed in from another device.");
+        return NextResponse.redirect(redirectUrl);
+      }
+    } catch (err) {
+      // If validation fails, log but don't block the user
+      // The session tracking is a secondary check, not the primary auth
+      log.warn("Session validation check failed", { error: err });
+    }
   }
 
   // Redirect authenticated users from auth routes to dashboard

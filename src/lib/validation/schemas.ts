@@ -44,6 +44,37 @@ export const paginationSchema = z.object({
 // ============================================
 
 /**
+ * Optional UUID that also accepts empty strings (converts to undefined)
+ */
+const optionalUuid = z.preprocess(
+  (val) => (val === "" || val === null ? undefined : val),
+  uuidSchema.optional()
+);
+
+/**
+ * Optional string that also accepts empty strings (converts to undefined)
+ */
+const optionalString = (maxLen: number) => z.preprocess(
+  (val) => (val === "" || val === null ? undefined : val),
+  z.string().max(maxLen).optional()
+);
+
+/**
+ * Optional number that also accepts empty strings or string numbers (converts appropriately)
+ */
+const optionalNumber = z.preprocess(
+  (val) => {
+    if (val === "" || val === null || val === undefined) return undefined;
+    if (typeof val === "string") {
+      const num = parseInt(val, 10);
+      return isNaN(num) ? undefined : num;
+    }
+    return val;
+  },
+  z.number().int().min(1).max(100).optional()
+);
+
+/**
  * Chat message request schema
  */
 export const chatMessageSchema = z.object({
@@ -51,14 +82,14 @@ export const chatMessageSchema = z.object({
     .string()
     .min(1, "Message is required")
     .max(10000, "Message is too long (max 10,000 characters)"),
-  conversationId: uuidSchema.optional(),
-  activityId: uuidSchema.optional(),
-  skillId: uuidSchema.optional(),
-  courseId: uuidSchema.optional(),
-  studentCode: z.string().max(50000, "Code is too long").optional(),
-  errorMessage: z.string().max(5000, "Error message is too long").optional(),
-  currentQuestionText: z.string().max(2000).optional(),
-  currentQuestionNumber: z.number().int().min(1).max(100).optional(),
+  conversationId: optionalUuid,
+  activityId: optionalUuid,
+  skillId: optionalUuid,
+  courseId: optionalUuid,
+  studentCode: optionalString(50000),
+  errorMessage: optionalString(5000),
+  currentQuestionText: optionalString(2000),
+  currentQuestionNumber: optionalNumber,
 });
 
 export type ChatMessageInput = z.infer<typeof chatMessageSchema>;
