@@ -279,6 +279,26 @@ async function handleCheckoutCompleted(
     return;
   }
 
+  // Also enroll user in the course when they subscribe
+  const { error: enrollError } = await supabase
+    .from("course_enrollments")
+    .upsert({
+      user_id: supabase_user_id,
+      course_id: course_id,
+      enrolled_at: new Date().toISOString(),
+    }, {
+      onConflict: "user_id,course_id",
+    });
+
+  if (enrollError) {
+    log.warn("Failed to enroll user in course after subscription", { 
+      error: enrollError.message,
+      userId: supabase_user_id, 
+      courseId: course_id 
+    });
+    // Don't fail - subscription was created successfully
+  }
+
   log.info("Subscription created/updated", { 
     userId: supabase_user_id, 
     courseId: course_id, 

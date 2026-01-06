@@ -1,5 +1,5 @@
 import { createClient } from "@/utils/supabase/server";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { 
   ChevronLeft, 
@@ -75,6 +75,12 @@ export default async function SkillDetailPage({ params }: SkillPageProps) {
     });
 
   const activities: SkillActivity[] = activitiesData || [];
+
+  // Auto-redirect to activity if skill has exactly one activity
+  // This saves users an extra click
+  if (activities.length === 1) {
+    redirect(`/skills/${skillSlug}/${activities[0].activity_slug}`);
+  }
 
   // Get skill progress summary
   const { data: progressData } = await supabase

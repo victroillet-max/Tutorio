@@ -45,8 +45,15 @@ export function ChatWidget({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   
-  // Get popup state from context
-  const { dismissPopup, markWelcomeSeen } = useChatContext();
+  // Get popup state and pending message from context
+  const { 
+    dismissPopup, 
+    markWelcomeSeen, 
+    pendingMessage, 
+    clearPendingMessage, 
+    shouldOpenChat, 
+    setShouldOpenChat 
+  } = useChatContext();
   
   // Track the skillId for persistence
   const [currentSkillId, setCurrentSkillId] = useState<string | undefined>(skillId);
@@ -118,6 +125,93 @@ export function ChatWidget({
       setTimeout(() => inputRef.current?.focus(), 100);
     }
   }, [isOpen]);
+
+  // Handle shouldOpenChat from context (triggered by "Ask AI Tutor" button)
+  useEffect(() => {
+    if (shouldOpenChat) {
+      setIsOpen(true);
+      setShouldOpenChat(false);
+      markWelcomeSeen();
+    }
+  }, [shouldOpenChat, setShouldOpenChat, markWelcomeSeen]);
+
+  // Send pending message when chat opens and there's a pending message
+  useEffect(() => {
+    if (isOpen && pendingMessage && !isLoading) {
+      // Auto-send the pending message
+      const message = pendingMessage;
+      clearPendingMessage();
+      sendMessageContent(message);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, pendingMessage]);
+
+  // Function to send a specific message content (used for pending messages)
+  const sendMessageContent = async (content: string) => {
+    if (!content.trim() || isLoading) return;
+
+    const userMessage: Message = {
+      id: crypto.randomUUID(),
+      role: "user",
+      content: content.trim(),
+      timestamp: new Date(),
+    };
+
+    setMessages(prev => [...prev, userMessage]);
+    setInput("");
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: userMessage.content,
+          conversationId,
+          activityId,
+          skillId,
+          studentCode,
+          errorMessage,
+          currentQuestionText,
+          currentQuestionNumber,
+          courseId,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        if (response.status === 429) {
+          setError("You've reached your daily message limit. Upgrade your plan for more messages.");
+        } else if (response.status === 500) {
+          setError("Bob is having some trouble right now. Please try again in a moment.");
+        } else {
+          setError(errorData.message || errorData.error || "Something went wrong. Please try again.");
+        }
+        return;
+      }
+
+      const data = await response.json();
+      
+      if (data.conversationId && !conversationId) {
+        setConversationId(data.conversationId);
+      }
+
+      const assistantMessage: Message = {
+        id: crypto.randomUUID(),
+        role: "assistant",
+        content: data.message,
+        timestamp: new Date(),
+      };
+
+      setMessages(prev => [...prev, assistantMessage]);
+    } catch (err) {
+      console.error("Failed to send message:", err);
+      setError("Failed to send message. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const sendMessage = async () => {
     if (!input.trim() || isLoading) return;

@@ -331,29 +331,79 @@ export async function POST(request: NextRequest) {
     }
 
     // Call OpenAI API
-    const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${OPENAI_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: OPENAI_MODEL,
-        messages,
-        temperature: 0.7,
-        max_tokens: 1000,
-        stream: false,
-      }),
-    });
+    let openaiResponse;
+    try {
+      openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${OPENAI_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: OPENAI_MODEL,
+          messages,
+          temperature: 0.7,
+          max_tokens: 1000,
+          stream: false,
+        }),
+      });
+    } catch (fetchError) {
+      log.error("OpenAI API fetch error", fetchError);
+      // Return mock response as fallback when OpenAI is unreachable
+      const mockResponse = getMockResponse(message, context);
+      await supabase.from("chat_messages").insert({
+        conversation_id: convId,
+        role: "assistant",
+        content: mockResponse,
+        tokens_used: 0,
+      });
+      return new Response(JSON.stringify({
+        message: mockResponse,
+        conversationId: convId,
+        mock: true,
+        rateLimit: {
+          tier,
+          limit: tierConfig.messagesPerDay,
+          remaining: Math.max(0, messagesRemaining - 1),
+        },
+      }), {
+        headers: { "Content-Type": "application/json" },
+      });
+    }
 
     if (!openaiResponse.ok) {
-      const errorData = await openaiResponse.json();
-      log.error("OpenAI API error", new Error(errorData.error?.message), { statusCode: openaiResponse.status });
-      return new Response(JSON.stringify({ 
-        error: "AI service error",
-        details: errorData.error?.message || "Unknown error",
+      let errorMessage = "Unknown error";
+      try {
+        const errorData = await openaiResponse.json();
+        errorMessage = errorData.error?.message || "Unknown error";
+      } catch {
+        errorMessage = `HTTP ${openaiResponse.status}`;
+      }
+      log.error("OpenAI API error", new Error(errorMessage), { statusCode: openaiResponse.status });
+      
+      // If it's an auth error (invalid API key), provide clear message
+      if (openaiResponse.status === 401) {
+        log.error("OpenAI API key is invalid or expired");
+      }
+      
+      // Return mock response as fallback when OpenAI fails
+      const mockResponse = getMockResponse(message, context);
+      await supabase.from("chat_messages").insert({
+        conversation_id: convId,
+        role: "assistant",
+        content: mockResponse,
+        tokens_used: 0,
+      });
+      return new Response(JSON.stringify({
+        message: mockResponse,
+        conversationId: convId,
+        mock: true,
+        rateLimit: {
+          tier,
+          limit: tierConfig.messagesPerDay,
+          remaining: Math.max(0, messagesRemaining - 1),
+        },
       }), {
-        status: 500,
         headers: { "Content-Type": "application/json" },
       });
     }

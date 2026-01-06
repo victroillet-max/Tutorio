@@ -112,8 +112,8 @@ export default async function PricingPage({
           
           <p className="text-center text-[var(--foreground-muted)] max-w-2xl mx-auto">
             {selectedCourse 
-              ? "Unlock full access to all course content and AI tutor support."
-              : "Start learning for free, then upgrade to unlock full access when you're ready."
+              ? "Unlock full access to all course content and AI tutor support. Pricing is per course - subscribe only to the courses you need."
+              : "Start learning for free, then upgrade to unlock full access when you're ready. Each course has its own subscription."
             }
           </p>
         </div>

@@ -120,7 +120,7 @@ export function QuizViewer({ activity, userId, isCompleted }: QuizViewerProps) {
 
   // Chat context for struggling detection and current question tracking
   // Extract specific methods to avoid dependency on entire context object (prevents infinite re-renders)
-  const { updateCurrentQuestion, triggerPopup, hasDismissedHelp } = useChatContext();
+  const { updateCurrentQuestion, triggerPopup, hasDismissedHelp, openChatWithMessage } = useChatContext();
   
   // B8: Track time spent on activity for "Hours Learned" stat
   const lastSavedRef = useRef<number>(Date.now());
@@ -319,12 +319,20 @@ export function QuizViewer({ activity, userId, isCompleted }: QuizViewerProps) {
             }
           </p>
           
-          {!passed && (
+          {/* Show retry button: always when failed, or when passed but below 75% (for improvement) */}
+          {!passed ? (
             <button
               onClick={handleRetry}
               className="px-6 py-3 bg-[var(--primary)] text-white font-semibold rounded-xl hover:bg-[var(--primary-hover)] transition-colors"
             >
               Try Again
+            </button>
+          ) : score < 75 && (
+            <button
+              onClick={handleRetry}
+              className="px-6 py-3 bg-slate-600 text-white font-semibold rounded-xl hover:bg-slate-700 transition-colors"
+            >
+              Practice Again for a Better Score
             </button>
           )}
         </div>
@@ -369,6 +377,20 @@ export function QuizViewer({ activity, userId, isCompleted }: QuizViewerProps) {
   }
 
   return (
+    <>
+      {/* Previously Completed Banner - shows when revisiting a completed activity */}
+      {isCompleted && (
+        <div className="mb-4 flex items-center gap-3 px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-xl">
+          <div className="flex-shrink-0 w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center">
+            <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+          </div>
+          <div>
+            <p className="font-medium text-emerald-800">Previously Completed</p>
+            <p className="text-sm text-emerald-600">You&apos;ve already completed this quiz. Feel free to practice again.</p>
+          </div>
+        </div>
+      )}
+    
     <div className="bg-white rounded-2xl shadow-sm border border-[var(--border)] overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)] bg-slate-50">
@@ -560,9 +582,8 @@ export function QuizViewer({ activity, userId, isCompleted }: QuizViewerProps) {
                 </p>
                 <div className="flex flex-wrap gap-2">
                   <button
-                    onClick={() => triggerPopup(
-                      `I got this question wrong and need help understanding: "${question.question}"`,
-                      'struggling'
+                    onClick={() => openChatWithMessage(
+                      `I got this question wrong and need help understanding: "${question.question}"${question.explanation ? `\n\nThe explanation says: "${question.explanation}"` : ''}`
                     )}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-600 text-white text-sm font-medium rounded-lg hover:bg-amber-700 transition-colors"
                   >
@@ -570,17 +591,11 @@ export function QuizViewer({ activity, userId, isCompleted }: QuizViewerProps) {
                     Ask AI Tutor
                   </button>
                   <button
-                    onClick={() => {
-                      // Find previous lesson in this module (simplified approach)
-                      const relatedLessonLink = document.querySelector('a[href*="lesson"]');
-                      if (relatedLessonLink) {
-                        (relatedLessonLink as HTMLAnchorElement).click();
-                      }
-                    }}
+                    onClick={() => window.history.back()}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white text-amber-700 text-sm font-medium rounded-lg border border-amber-300 hover:bg-amber-50 transition-colors"
                   >
                     <BookOpen className="w-4 h-4" />
-                    Review Related Lesson
+                    Go Back to Skill
                   </button>
                 </div>
               </div>
@@ -632,6 +647,7 @@ export function QuizViewer({ activity, userId, isCompleted }: QuizViewerProps) {
         </div>
       </div>
     </div>
+    </>
   );
 }
 

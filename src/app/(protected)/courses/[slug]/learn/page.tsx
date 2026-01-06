@@ -72,13 +72,8 @@ export default async function CourseLearnPage({ params, searchParams }: CourseLe
     notFound();
   }
 
-  // Auto-enroll user in this course
-  if (user) {
-    await supabase.rpc("enroll_user_in_course", {
-      p_user_id: user.id,
-      p_course_id: course.id
-    });
-  }
+  // Note: Enrollment now happens when user starts their first activity in the course
+  // or when they subscribe (handled in activity actions and Stripe webhook)
 
   // Get course skill progress summary
   const { data: progressData } = await supabase

@@ -450,11 +450,13 @@ export class ActivityService {
 
   /**
    * Track activity view (for continue learning)
+   * Also enrolls user in the course if this is their first activity view
    */
   async trackActivityView(activityId: string): Promise<Result<void>> {
     const existing = await this.getProgress(activityId);
 
     if (!existing) {
+      // First time viewing this activity - create progress record
       const { error } = await this.supabase
         .from("activity_progress")
         .insert({
@@ -473,6 +475,9 @@ export class ActivityService {
         this.log.warn("Failed to track activity view", { activityId, error });
         // Don't fail - this is non-critical
       }
+
+      // Enroll user in the course when they start their first activity
+      await this.enrollInCourseFromActivity(activityId);
     } else {
       await this.supabase
         .from("activity_progress")
@@ -482,6 +487,58 @@ export class ActivityService {
     }
 
     return ok(undefined);
+  }
+
+  /**
+   * Enroll user in course based on an activity they're viewing
+   * This is called when user starts their first activity in a course
+   */
+  private async enrollInCourseFromActivity(activityId: string): Promise<void> {
+    try {
+      // Get the course ID from the activity -> module -> course chain
+      const { data: activityData } = await this.supabase
+        .from("activities")
+        .select("module:modules(course_id)")
+        .eq("id", activityId)
+        .single();
+
+      if (!activityData?.module) {
+        this.log.warn("Could not find course for activity", { activityId });
+        return;
+      }
+
+      const moduleData = activityData.module as unknown as { course_id: string }[] | { course_id: string };
+      const courseId = Array.isArray(moduleData) ? moduleData[0]?.course_id : moduleData?.course_id;
+
+      if (!courseId) {
+        this.log.warn("No course_id found for activity", { activityId });
+        return;
+      }
+
+      // Enroll user in the course (upsert to handle duplicates)
+      const { error } = await this.supabase
+        .from("course_enrollments")
+        .upsert({
+          user_id: this.userId,
+          course_id: courseId,
+          enrolled_at: new Date().toISOString(),
+        }, {
+          onConflict: "user_id,course_id",
+        });
+
+      if (error) {
+        this.log.warn("Failed to enroll user in course", { courseId, error });
+      } else {
+        this.log.info("User enrolled in course via activity view", { 
+          userId: this.userId, 
+          courseId, 
+          activityId 
+        });
+      }
+    } catch (error) {
+      // Non-critical - log and continue
+      this.log.warn("Error enrolling user in course", { activityId, error });
+    }
   }
 }
 

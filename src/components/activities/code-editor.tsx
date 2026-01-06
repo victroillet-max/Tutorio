@@ -730,6 +730,20 @@ sys.stdout = StringIO()
   const totalTests = testResults.length;
 
   return (
+    <>
+      {/* Previously Completed Banner - shows when revisiting a completed activity */}
+      {isCompleted && (
+        <div className="mb-4 flex items-center gap-3 px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-xl">
+          <div className="flex-shrink-0 w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center">
+            <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+          </div>
+          <div>
+            <p className="font-medium text-emerald-800">Previously Completed</p>
+            <p className="text-sm text-emerald-600">You&apos;ve already solved this challenge. Feel free to practice again.</p>
+          </div>
+        </div>
+      )}
+    
     <div className="bg-white rounded-2xl shadow-sm border border-[var(--border)] overflow-hidden relative">
       {/* Celebration Overlay */}
       {showCelebration && (
@@ -1289,6 +1303,7 @@ sys.stdout = StringIO()
         </div>
       )}
     </div>
+    </>
   );
 }
 

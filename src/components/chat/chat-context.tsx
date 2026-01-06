@@ -37,6 +37,12 @@ interface ChatContextValue {
   markWelcomeSeen: () => void;
   // Visibility control
   isVisible: boolean;
+  // Open chat with a pending message that will be auto-sent
+  pendingMessage: string | null;
+  openChatWithMessage: (message: string) => void;
+  clearPendingMessage: () => void;
+  shouldOpenChat: boolean;
+  setShouldOpenChat: (open: boolean) => void;
 }
 
 const ChatContext = createContext<ChatContextValue | undefined>(undefined);
@@ -52,6 +58,10 @@ export function ChatContextProvider({ children }: { children: React.ReactNode })
   });
   const [hasSeenWelcome, setHasSeenWelcome] = useState(false);
   const [hasDismissedHelp, setHasDismissedHelp] = useState(false);
+  
+  // Pending message state - for opening chat with a pre-filled message
+  const [pendingMessage, setPendingMessage] = useState<string | null>(null);
+  const [shouldOpenChat, setShouldOpenChat] = useState(false);
 
   const setActivityContext = useCallback((ctx: Partial<ChatActivityContext>) => {
     setContext(prev => ({ ...prev, ...ctx }));
@@ -96,6 +106,17 @@ export function ChatContextProvider({ children }: { children: React.ReactNode })
     setHasSeenWelcome(true);
   }, []);
 
+  // Open chat with a message that will be auto-sent
+  const openChatWithMessage = useCallback((message: string) => {
+    setPendingMessage(message);
+    setShouldOpenChat(true);
+    setHasDismissedHelp(true); // Don't show help popup after using this
+  }, []);
+
+  const clearPendingMessage = useCallback(() => {
+    setPendingMessage(null);
+  }, []);
+
   // Chat is only visible when there's an active activity context
   const isVisible = Boolean(context.activityId || context.skillId);
 
@@ -115,6 +136,11 @@ export function ChatContextProvider({ children }: { children: React.ReactNode })
         dismissPopup,
         markWelcomeSeen,
         isVisible,
+        pendingMessage,
+        openChatWithMessage,
+        clearPendingMessage,
+        shouldOpenChat,
+        setShouldOpenChat,
       }}
     >
       {children}

@@ -304,6 +304,7 @@ export function FlipPricingCard({
             </span>
             <span className="text-[var(--foreground-muted)] text-sm">/month</span>
           </div>
+          <p className="text-xs text-[var(--foreground-muted)] -mt-2 mb-2">per course</p>
           
           {/* AI Limit Badge */}
           <div className="inline-flex items-center gap-1 px-2 py-1 bg-[var(--progress-bg)] rounded-lg">

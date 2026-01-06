@@ -90,6 +90,20 @@ export function InteractiveViewer({ activity, userId, isCompleted }: Interactive
   };
 
   return (
+    <>
+      {/* Previously Completed Banner - shows when revisiting a completed activity */}
+      {isCompleted && (
+        <div className="mb-4 flex items-center gap-3 px-4 py-3 bg-emerald-50 border border-emerald-200 rounded-xl">
+          <div className="flex-shrink-0 w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center">
+            <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+          </div>
+          <div>
+            <p className="font-medium text-emerald-800">Previously Completed</p>
+            <p className="text-sm text-emerald-600">You&apos;ve already completed this exercise. Feel free to practice again.</p>
+          </div>
+        </div>
+      )}
+    
     <div className="bg-white rounded-2xl shadow-sm border border-[var(--border)] overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)] bg-slate-50">
@@ -143,6 +157,7 @@ export function InteractiveViewer({ activity, userId, isCompleted }: Interactive
         </div>
       </div>
     </div>
+    </>
   );
 }
 
@@ -734,7 +749,15 @@ function FilterEssential({ content, onComplete, completed }: FilterEssentialProp
   const [score, setScore] = useState<number | null>(null);
   
   if (!scenario) {
-    return <div className="text-center text-[var(--foreground-muted)]">No scenarios available.</div>;
+    return (
+      <div className="text-center p-6">
+        <AlertCircle className="w-12 h-12 text-amber-500 mx-auto mb-4" />
+        <p className="text-[var(--foreground-muted)] mb-2">No scenarios available for this activity.</p>
+        <p className="text-xs text-slate-400">
+          Content keys: {content ? Object.keys(content).join(', ') : 'none'}
+        </p>
+      </div>
+    );
   }
   
   // Show loading state until client shuffle is complete
@@ -928,9 +951,11 @@ interface ClassificationScenario {
 }
 
 function TimedClassification({ content, onComplete, completed }: TimedClassificationProps) {
-  const scenarios = (content?.scenarios as ClassificationScenario[]) || [];
-  const instructions = (content?.instructions as string) || "Identify the correct CT pillar for each scenario.";
-  const timePerQuestion = (content?.timePerQuestion as number) || 15;
+  // Parse scenarios - handle both array formats and different key names
+  const rawScenarios = content?.scenarios || content?.transactions || content?.questions;
+  const scenarios: ClassificationScenario[] = Array.isArray(rawScenarios) ? rawScenarios : [];
+  const instructions = (content?.instructions as string) || (content?.description as string) || "Identify the correct CT pillar for each scenario.";
+  const timePerQuestion = (content?.timePerQuestion as number) || (content?.time_per_question as number) || 15;
   
   const pillars = ["Decomposition", "Pattern Recognition", "Abstraction", "Algorithm"];
   
@@ -1034,7 +1059,15 @@ function TimedClassification({ content, onComplete, completed }: TimedClassifica
   };
   
   if (scenarios.length === 0) {
-    return <div className="text-center text-[var(--foreground-muted)]">No scenarios available.</div>;
+    return (
+      <div className="text-center p-6">
+        <AlertCircle className="w-12 h-12 text-amber-500 mx-auto mb-4" />
+        <p className="text-[var(--foreground-muted)] mb-2">No scenarios available for this activity.</p>
+        <p className="text-xs text-slate-400">
+          Content keys: {content ? Object.keys(content).join(', ') : 'none'}
+        </p>
+      </div>
+    );
   }
   
   const finalScorePercent = Math.round((score / scenarios.length) * 100);
@@ -1876,15 +1909,29 @@ interface EquationScenario {
 
 function EquationAnalyzer({ content, onComplete, completed }: EquationAnalyzerProps) {
   const instructions = (content?.instructions as string) || (content?.description as string) || "Analyze how each transaction affects the accounting equation.";
-  const scenarios = (content?.scenarios as EquationScenario[]) || [];
-  const questions = (content?.questions as QuizQuestion[]) || [];
+  
+  // Parse scenarios - handle both array and object formats
+  const rawScenarios = content?.scenarios;
+  const scenarios: EquationScenario[] = Array.isArray(rawScenarios) ? rawScenarios : [];
+  
+  // Parse questions - handle both array and object formats, and check nested content
+  const rawQuestions = content?.questions;
+  const questions: QuizQuestion[] = Array.isArray(rawQuestions) ? rawQuestions : [];
+  
   const transactions = (content?.transactions as { id: string; description: string }[]) || [];
-  const companyBackground = (content?.company_background as string) || "";
-  const passingScore = (content?.passing_score as number) || 60;
+  const companyBackground = (content?.company_background as string) || (content?.companyBackground as string) || "";
+  const passingScore = (content?.passing_score as number) || (content?.passingScore as number) || 60;
   
   // Determine which format we have
   const hasScenarios = scenarios.length > 0;
   const hasQuestions = questions.length > 0;
+  
+  // Debug logging for troubleshooting content issues
+  useEffect(() => {
+    if (!hasScenarios && !hasQuestions && content) {
+      console.warn('[EquationAnalyzer] No scenarios or questions found. Content keys:', Object.keys(content));
+    }
+  }, [hasScenarios, hasQuestions, content]);
   
   // State for scenario-based mode
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -2220,8 +2267,16 @@ function EquationAnalyzer({ content, onComplete, completed }: EquationAnalyzerPr
     );
   }
 
-  // No valid content
-  return <div className="text-center text-[var(--foreground-muted)]">No scenarios or questions available for this activity.</div>;
+  // No valid content - show helpful error with content structure hint
+  return (
+    <div className="text-center p-6">
+      <AlertCircle className="w-12 h-12 text-amber-500 mx-auto mb-4" />
+      <p className="text-[var(--foreground-muted)] mb-2">No scenarios or questions available for this activity.</p>
+      <p className="text-xs text-slate-400">
+        Content received: {content ? Object.keys(content).join(', ') : 'none'}
+      </p>
+    </div>
+  );
 }
 
 // ============================================

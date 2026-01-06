@@ -1,6 +1,3 @@
-"use client";
-
-import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   BookOpen,
@@ -9,8 +6,6 @@ import {
   Sparkles,
   Clock,
   Star,
-  Menu,
-  X,
   Zap,
   Target,
   GraduationCap,
@@ -21,39 +16,25 @@ import {
   Check,
   BarChart3,
   CreditCard,
+  TrendingUp,
+  PieChart,
 } from "lucide-react";
+import { LandingNavigation } from "@/components/landing/LandingNavigation";
+import { createClient } from "@/utils/supabase/server";
+import { LucideIcon } from "lucide-react";
 
-// Course data with accent colors - Actual courses in the system
-const courses = [
-  {
-    id: 1,
-    slug: "financial-accounting",
-    title: "Financial Accounting Fundamentals",
-    category: "Business & Accounting",
-    lessons: 45,
-    duration: 45,
-    rating: 4.9,
-    students: 1240,
-    accent: "coral",
-    icon: Calculator,
-    free: true,
-    description: "Master financial statements, accounting principles, and analysis techniques through interactive exercises.",
-  },
-  {
-    id: 2,
-    slug: "computational-thinking",
-    title: "Computational Thinking",
-    category: "Computer Science",
-    lessons: 32,
-    duration: 25,
-    rating: 4.8,
-    students: 980,
-    accent: "teal",
-    icon: Brain,
-    free: true,
-    description: "Learn problem-solving and Python programming through decomposition, pattern recognition, and abstraction.",
-  },
-];
+// Icon mapping for courses - can be extended as new courses are added
+const courseIconMap: Record<string, LucideIcon> = {
+  "financial-accounting": Calculator,
+  "computational-thinking": Brain,
+  "maths": TrendingUp,
+  "managerial-accounting": PieChart,
+  // Default fallback
+  "default": GraduationCap,
+};
+
+// Accent color rotation for courses
+const accentColors = ["coral", "teal", "gold", "navy", "purple", "rose"];
 
 // Stats
 const stats = [
@@ -130,155 +111,6 @@ const featureColorClasses: Record<string, string> = {
   success: "bg-[var(--success-light)] text-[var(--success)]",
   gold: "bg-[#e9c46a]/20 text-[#b8860b]",
 };
-
-// Navigation Component
-function Navigation() {
-  const [isOpen, setIsOpen] = useState(false);
-  const [isScrolled, setIsScrolled] = useState(false);
-
-  useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 50);
-    };
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
-
-  const handleNavClick = () => setIsOpen(false);
-
-  useEffect(() => {
-    if (isOpen) {
-      document.body.classList.add('menu-open');
-    } else {
-      document.body.classList.remove('menu-open');
-    }
-    return () => {
-      document.body.classList.remove('menu-open');
-    };
-  }, [isOpen]);
-
-  return (
-    <>
-      {isOpen && (
-        <div 
-          className="fixed inset-0 bg-black/50 z-40 md:hidden"
-          onClick={() => setIsOpen(false)}
-          aria-hidden="true"
-        />
-      )}
-      
-      <nav className={`fixed top-0 left-0 right-0 z-50 py-4 transition-all duration-300 ${
-        isScrolled 
-          ? "bg-white/95 backdrop-blur-xl border-b border-[var(--card-border)]" 
-          : "bg-[var(--background)]/80 backdrop-blur-xl border-b border-transparent"
-      }`}>
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="flex items-center justify-between">
-            {/* Logo */}
-            <Link href="/" className="flex items-center gap-3 group">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img 
-                src="/logo-cropped.svg" 
-                alt="Tutorio" 
-                className="w-11 h-11 transition-transform duration-300 group-hover:rotate-[-5deg] group-hover:scale-105"
-              />
-              <span 
-                className="text-2xl font-bold tracking-tight text-[var(--foreground)]"
-                style={{ fontFamily: 'var(--font-heading)', letterSpacing: '-0.02em' }}
-              >
-                Tutorio
-              </span>
-            </Link>
-
-            {/* Desktop Navigation */}
-            <div className="hidden md:flex items-center gap-2">
-              <a href="#courses" className="nav-link-animated">
-                Courses
-              </a>
-              <a href="#features" className="nav-link-animated">
-                Features
-              </a>
-              <a href="#pricing" className="nav-link-animated">
-                Pricing
-              </a>
-            </div>
-
-            {/* CTA Buttons */}
-            <div className="hidden md:flex items-center gap-3">
-              <Link 
-                href="/login" 
-                className="px-5 py-2.5 text-sm text-[var(--foreground-muted)] hover:text-[var(--primary)] hover:bg-[var(--background-secondary)] rounded-xl transition-all font-medium"
-              >
-                Sign In
-              </Link>
-              <Link 
-                href="/signup"
-                className="px-6 py-3 text-sm font-semibold bg-[var(--primary)] text-white rounded-xl hover:bg-[var(--primary-light)] transition-all shadow-md shadow-[var(--primary)]/25 hover:shadow-lg hover:-translate-y-0.5"
-              >
-                Start Free
-              </Link>
-            </div>
-
-            {/* Mobile Menu Button */}
-            <button
-              className="md:hidden p-2 text-[var(--foreground)]"
-              onClick={() => setIsOpen(!isOpen)}
-              aria-label={isOpen ? "Close menu" : "Open menu"}
-              aria-expanded={isOpen}
-            >
-              {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-            </button>
-          </div>
-        </div>
-
-        {/* Mobile Menu */}
-        {isOpen && (
-          <div className="md:hidden bg-white border-t border-[var(--card-border)] absolute left-0 right-0 shadow-lg">
-            <div className="px-4 py-4 space-y-4">
-              <a 
-                href="#courses" 
-                className="block text-[var(--foreground-muted)] hover:text-[var(--primary)] font-medium py-2"
-                onClick={handleNavClick}
-              >
-                Courses
-              </a>
-              <a 
-                href="#features" 
-                className="block text-[var(--foreground-muted)] hover:text-[var(--primary)] font-medium py-2"
-                onClick={handleNavClick}
-              >
-                Features
-              </a>
-              <a 
-                href="#pricing" 
-                className="block text-[var(--foreground-muted)] hover:text-[var(--primary)] font-medium py-2"
-                onClick={handleNavClick}
-              >
-                Pricing
-              </a>
-              <div className="pt-4 border-t border-[var(--border)] space-y-3">
-                <Link 
-                  href="/login" 
-                  className="block w-full px-4 py-2.5 text-sm text-center text-[var(--foreground-muted)] hover:text-[var(--primary)] transition-colors font-medium rounded-lg border border-[var(--border)]"
-                  onClick={handleNavClick}
-                >
-                  Sign In
-                </Link>
-                <Link 
-                  href="/signup"
-                  className="block w-full px-4 py-2.5 text-sm font-semibold text-center bg-[var(--primary)] text-white rounded-xl hover:bg-[var(--primary-light)]"
-                  onClick={handleNavClick}
-                >
-                  Start Free
-                </Link>
-              </div>
-            </div>
-          </div>
-        )}
-      </nav>
-    </>
-  );
-}
 
 // Hero Section with Asymmetric Layout
 function HeroSection() {
@@ -510,7 +342,7 @@ function StatsSection() {
     <section className="stats-section py-20 relative z-10">
       <div className="max-w-7xl mx-auto px-6">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8 lg:gap-10 relative z-10">
-          {stats.map((stat, index) => (
+          {stats.map((stat) => (
             <div 
               key={stat.label} 
               className="text-center"
@@ -531,9 +363,20 @@ function StatsSection() {
 }
 
 // Course Card Component
-function CourseCard({ course, index }: { course: typeof courses[0]; index: number }) {
-  const colors = accentClasses[course.accent] || accentClasses.coral;
-  const Icon = course.icon;
+interface CourseData {
+  id: string;
+  slug: string;
+  title: string;
+  short_description: string | null;
+  description: string | null;
+  total_skills: number;
+  duration_hours: number | null;
+}
+
+function CourseCard({ course, index }: { course: CourseData; index: number }) {
+  const accent = accentColors[index % accentColors.length];
+  const colors = accentClasses[accent] || accentClasses.coral;
+  const Icon = courseIconMap[course.slug] || courseIconMap.default;
   
   return (
     <Link
@@ -546,22 +389,15 @@ function CourseCard({ course, index }: { course: typeof courses[0]; index: numbe
       }}
     >
       {/* Free Badge */}
-      {course.free && (
-        <div className="absolute top-5 right-5 flex items-center gap-1 px-3 py-1.5 bg-[var(--success-light)] text-[var(--success)] text-xs font-semibold rounded-full">
-          <Zap className="w-3 h-3" />
-          Free Preview
-        </div>
-      )}
+      <div className="absolute top-5 right-5 flex items-center gap-1 px-3 py-1.5 bg-[var(--success-light)] text-[var(--success)] text-xs font-semibold rounded-full">
+        <Zap className="w-3 h-3" />
+        Free Preview
+      </div>
 
       {/* Icon */}
       <div className={`w-[52px] h-[52px] rounded-[14px] ${colors.icon} flex items-center justify-center mb-5 relative`}>
         <Icon className="w-6 h-6" />
         <div className={`absolute inset-[-4px] rounded-[18px] ${colors.icon} opacity-20 -z-10`} />
-      </div>
-
-      {/* Category */}
-      <div className="text-xs font-semibold text-[var(--accent)] uppercase tracking-[0.05em] mb-2">
-        {course.category}
       </div>
 
       {/* Title */}
@@ -573,28 +409,30 @@ function CourseCard({ course, index }: { course: typeof courses[0]; index: numbe
       </h3>
 
       {/* Description */}
-      <p className="text-sm text-[var(--foreground-muted)] mb-5 leading-relaxed">
-        {course.description}
+      <p className="text-sm text-[var(--foreground-muted)] mb-5 leading-relaxed line-clamp-2">
+        {course.short_description || course.description || "Master this subject through interactive exercises and comprehensive content."}
       </p>
 
       {/* Meta Info */}
       <div className="flex items-center gap-4 text-sm text-[var(--foreground-muted)] mb-5 pt-5 border-t border-[var(--card-border)]">
         <span className="flex items-center gap-1.5">
           <BookOpen className="w-3.5 h-3.5" />
-          {course.lessons} lessons
+          {course.total_skills} skills
         </span>
-        <span className="flex items-center gap-1.5">
-          <Clock className="w-3.5 h-3.5" />
-          {course.duration} hours
-        </span>
+        {course.duration_hours && (
+          <span className="flex items-center gap-1.5">
+            <Clock className="w-3.5 h-3.5" />
+            {course.duration_hours} hours
+          </span>
+        )}
       </div>
 
       {/* Rating & Arrow */}
       <div className="flex items-center justify-between mt-5">
         <div className="flex items-center gap-1.5">
           <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
-          <span className="font-semibold text-[var(--foreground)]">{course.rating}</span>
-          <span className="text-[var(--foreground-muted)]">({course.students.toLocaleString()})</span>
+          <span className="font-semibold text-[var(--foreground)]">4.8</span>
+          <span className="text-[var(--foreground-muted)]">(New)</span>
         </div>
         <div className="w-10 h-10 rounded-full bg-[var(--background)] flex items-center justify-center text-[var(--foreground-muted)] group-hover:bg-[var(--primary)] group-hover:text-white group-hover:translate-x-1 transition-all">
           <ArrowRight className="w-[18px] h-[18px]" />
@@ -605,7 +443,15 @@ function CourseCard({ course, index }: { course: typeof courses[0]; index: numbe
 }
 
 // Courses Section
-function CoursesSection() {
+function CoursesSection({ courses }: { courses: CourseData[] }) {
+  // Determine grid columns based on course count
+  const getGridClass = () => {
+    if (courses.length === 1) return "grid md:grid-cols-1 max-w-md";
+    if (courses.length === 2) return "grid md:grid-cols-2 max-w-4xl";
+    if (courses.length === 3) return "grid md:grid-cols-3 max-w-5xl";
+    return "grid md:grid-cols-2 lg:grid-cols-3 max-w-6xl";
+  };
+
   return (
     <section id="courses" className="py-28 relative bg-[var(--background)]">
       <div className="max-w-7xl mx-auto px-6">
@@ -627,7 +473,7 @@ function CoursesSection() {
         </div>
 
         {/* Course Grid */}
-        <div className="grid md:grid-cols-2 gap-7 max-w-4xl mx-auto">
+        <div className={`${getGridClass()} gap-7 mx-auto`}>
           {courses.map((course, index) => (
             <CourseCard key={course.id} course={course} index={index} />
           ))}
@@ -834,7 +680,7 @@ function PricingSection() {
               </p>
 
               {/* Price */}
-              <div className="flex items-baseline gap-1 mb-8">
+              <div className="flex items-baseline gap-1 mb-2">
                 <span className="text-xl text-[var(--foreground-muted)]">CHF</span>
                 <span 
                   className="text-[3.5rem] font-bold text-[var(--foreground)]"
@@ -844,6 +690,7 @@ function PricingSection() {
                 </span>
                 <span className="text-[var(--foreground-muted)]">/month</span>
               </div>
+              <p className="text-xs text-[var(--foreground-muted)] mb-6">per course</p>
 
               {/* Features */}
               <div className="space-y-3.5 mb-8">
@@ -855,7 +702,7 @@ function PricingSection() {
                     {feature.included ? (
                       <Check className="w-[18px] h-[18px] text-[var(--success)]" />
                     ) : (
-                      <X className="w-[18px] h-[18px] text-[var(--foreground-subtle)]" />
+                      <span className="w-[18px] h-[18px] flex items-center justify-center text-[var(--foreground-subtle)]">—</span>
                     )}
                     <span className={feature.included ? 'text-[var(--foreground)]' : 'text-[var(--foreground-muted)]'}>
                       {feature.text}
@@ -1003,14 +850,46 @@ function Footer() {
   );
 }
 
-// Main Page Component
-export default function Home() {
+// Main Page Component (Server Component)
+export default async function Home() {
+  const supabase = await createClient();
+  
+  // Fetch all published courses from the database
+  const { data: coursesData } = await supabase
+    .from("courses")
+    .select(`
+      id,
+      slug,
+      title,
+      description,
+      short_description,
+      duration_hours
+    `)
+    .eq("is_published", true)
+    .order("sort_order");
+
+  // Count skills for each course
+  const courses: CourseData[] = [];
+  
+  for (const course of (coursesData || [])) {
+    const { count: skillsCount } = await supabase
+      .from("skills")
+      .select("id", { count: "exact", head: true })
+      .eq("course_id", course.id)
+      .eq("is_active", true);
+    
+    courses.push({
+      ...course,
+      total_skills: skillsCount || 0
+    });
+  }
+
   return (
     <main className="min-h-screen bg-[var(--background)]">
-      <Navigation />
+      <LandingNavigation />
       <HeroSection />
       <StatsSection />
-      <CoursesSection />
+      <CoursesSection courses={courses} />
       <FeaturesSection />
       <PricingSection />
       <CTASection />

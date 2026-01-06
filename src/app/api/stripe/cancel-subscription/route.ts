@@ -87,7 +87,10 @@ export async function POST(request: NextRequest) {
 
       if (cancelImmediately) {
         // Cancel immediately - stops access right away
-        cancelledSubscription = await stripe.subscriptions.cancel(stripeSubscriptionId);
+        // prorate: false prevents creating a credit balance for unused time
+        cancelledSubscription = await stripe.subscriptions.cancel(stripeSubscriptionId, {
+          prorate: false,
+        });
         log.info("Subscription cancelled immediately", { subscriptionId: stripeSubscriptionId });
       } else {
         // Cancel at period end - user keeps access until billing period ends
