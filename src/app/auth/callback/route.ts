@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { logger } from "@/lib/logging";
 import { registerSession } from "@/lib/auth/session-manager";
+import { sendWelcomeEmail } from "@/lib/email/actions";
 
 const log = logger.child({ module: "auth/callback" });
 
@@ -70,6 +71,27 @@ export async function GET(request: Request) {
         log.info("Previous sessions invalidated due to login limit (OAuth)", {
           userId: data.user.id,
           invalidatedCount: sessionResult.sessionsInvalidated,
+        });
+      }
+
+      // Check if this is a new user (created within the last minute) to send welcome email
+      const userCreatedAt = new Date(data.user.created_at);
+      const now = new Date();
+      const isNewUser = (now.getTime() - userCreatedAt.getTime()) < 60000; // Within 1 minute
+
+      if (isNewUser && data.user.email) {
+        // Send welcome email for new OAuth users
+        sendWelcomeEmail({
+          to: data.user.email,
+          email: data.user.email,
+          userName: data.user.user_metadata?.full_name || data.user.user_metadata?.name || "",
+        }).catch((err) => {
+          log.error("Failed to send welcome email for OAuth user", err, { userId: data.user.id });
+        });
+
+        log.info("Welcome email triggered for OAuth user", { 
+          userId: data.user.id, 
+          email: data.user.email,
         });
       }
     }

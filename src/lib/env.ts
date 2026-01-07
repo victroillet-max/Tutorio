@@ -31,6 +31,11 @@ const envSchema = z.object({
   GOOGLE_SERVICE_ACCOUNT_EMAIL: z.string().email().optional(),
   GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY: z.string().min(1).optional(),
   GOOGLE_SHEETS_FOLDER_ID: z.string().min(1).optional(), // Folder to store user sheet copies
+  
+  // Resend (server-only - for transactional emails)
+  RESEND_API_KEY: z.string().min(1).optional(),
+  RESEND_FROM_EMAIL: z.string().email().optional(), // e.g., noreply@tutorio.com
+  RESEND_FROM_NAME: z.string().optional(), // e.g., "Tutorio"
 });
 
 /**

@@ -2,6 +2,7 @@ import { createClient } from "@/utils/supabase/server";
 import { type EmailOtpType } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { logger } from "@/lib/logging";
+import { sendWelcomeEmail } from "@/lib/email/actions";
 
 const log = logger.child({ module: "auth/confirm" });
 
@@ -42,7 +43,26 @@ export async function GET(request: Request) {
     return NextResponse.redirect(`${origin}/reset-password`);
   }
 
-  // For email verification, redirect to dashboard
+  // For email verification (signup), send welcome email
+  if (type === "signup" || type === "email") {
+    // Get the current user to send welcome email
+    const { data: { user } } = await supabase.auth.getUser();
+    
+    if (user?.email) {
+      // Send welcome email asynchronously (don't block the redirect)
+      sendWelcomeEmail({
+        to: user.email,
+        email: user.email,
+        userName: user.user_metadata?.full_name || "",
+      }).catch((err) => {
+        log.error("Failed to send welcome email", err, { userId: user.id });
+      });
+      
+      log.info("Welcome email triggered", { userId: user.id, email: user.email });
+    }
+  }
+
+  // Redirect to dashboard
   return NextResponse.redirect(`${origin}${next}`);
 }
 

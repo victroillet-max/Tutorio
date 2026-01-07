@@ -7,6 +7,11 @@ import {
   StripeSubscriptionWithPeriods, 
   mapStripeStatus 
 } from "@/lib/stripe/types";
+import { 
+  sendSubscriptionConfirmedEmail, 
+  sendSubscriptionEndedEmail,
+} from "@/lib/email/actions";
+import { formatCurrency, formatEmailDate } from "@/lib/email/utils";
 
 // Initialize Stripe
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
@@ -299,6 +304,49 @@ async function handleCheckoutCompleted(
     // Don't fail - subscription was created successfully
   }
 
+  // Send subscription confirmation email
+  try {
+    // Get user profile and course details for email
+    const { data: userData } = await supabase
+      .from("profiles")
+      .select("email, full_name")
+      .eq("id", supabase_user_id)
+      .single();
+
+    const { data: courseData } = await supabase
+      .from("courses")
+      .select("title")
+      .eq("id", course_id)
+      .single();
+
+    const { data: tierInfo } = await supabase
+      .from("subscription_tiers")
+      .select("name, price")
+      .eq("slug", tier)
+      .single();
+
+    if (userData?.email && courseData && tierInfo) {
+      await sendSubscriptionConfirmedEmail({
+        to: userData.email,
+        userName: userData.full_name || "",
+        courseName: courseData.title,
+        tierName: tierInfo.name,
+        amount: formatCurrency(tierInfo.price),
+        nextBillingDate: formatEmailDate(stripeSubscription.current_period_end),
+      });
+      
+      log.info("Subscription confirmation email sent", { 
+        userId: supabase_user_id, 
+        email: userData.email 
+      });
+    }
+  } catch (emailError) {
+    log.error("Failed to send subscription confirmation email", emailError, {
+      userId: supabase_user_id,
+    });
+    // Don't fail the webhook - email is not critical
+  }
+
   log.info("Subscription created/updated", { 
     userId: supabase_user_id, 
     courseId: course_id, 
@@ -469,6 +517,18 @@ async function handleSubscriptionDeleted(
   supabase: SupabaseServiceClient,
   subscription: Stripe.Subscription
 ) {
+  // First, get the subscription details before marking as expired
+  const { data: subData } = await supabase
+    .from("subscriptions")
+    .select(`
+      user_id,
+      course_id,
+      profiles:user_id (email, full_name),
+      courses:course_id (title)
+    `)
+    .eq("stripe_subscription_id", subscription.id)
+    .single();
+
   const { error } = await supabase
     .from("subscriptions")
     .update({
@@ -486,6 +546,36 @@ async function handleSubscriptionDeleted(
     log.info("Subscription marked as expired", { 
       stripeSubscriptionId: subscription.id 
     });
+
+    // Send subscription ended email
+    if (subData) {
+      // Supabase joins return arrays, but with single() we expect single records
+      const profileData = subData.profiles as unknown as { email: string; full_name: string } | null;
+      const courseData = subData.courses as unknown as { title: string } | null;
+
+      if (profileData?.email && courseData) {
+        try {
+          await sendSubscriptionEndedEmail({
+            to: profileData.email,
+            userName: profileData.full_name || "",
+            courseName: courseData.title,
+            endDate: formatEmailDate(new Date()),
+            reason: subscription.cancellation_details?.reason === "payment_failed" 
+              ? "payment_failed" 
+              : "cancelled",
+          });
+
+          log.info("Subscription ended email sent", {
+            userId: subData.user_id,
+            email: profileData.email,
+          });
+        } catch (emailError) {
+          log.error("Failed to send subscription ended email", emailError, {
+            userId: subData.user_id,
+          });
+        }
+      }
+    }
   }
 }
 
