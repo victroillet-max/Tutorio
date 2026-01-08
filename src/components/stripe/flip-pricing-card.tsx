@@ -134,6 +134,10 @@ export function FlipPricingCard({
 
       if (!response.ok) {
         console.error("Checkout API error:", data);
+        // Include synced flag in error message if subscription was recovered
+        if (data.synced) {
+          throw new Error(data.message || "Your subscription has been synced. Please refresh the page.");
+        }
         throw new Error(data.error || data.details?.courseId?.[0] || "Failed to create checkout session");
       }
 
@@ -170,8 +174,22 @@ export function FlipPricingCard({
       setIsLoading(false);
     } catch (error) {
       setIsLoading(false);
+      const errorMessage = error instanceof Error ? error.message : "Please try again.";
+      
+      // Check if this was a sync situation - the API may have synced the subscription
+      if (errorMessage.includes("synced") || errorMessage.includes("refresh")) {
+        toast.info("Subscription Found", {
+          description: "Your existing subscription has been recovered. Refreshing page...",
+        });
+        // Refresh the page to show the synced subscription
+        setTimeout(() => {
+          window.location.reload();
+        }, 1500);
+        return;
+      }
+      
       toast.error("Checkout Failed", {
-        description: error instanceof Error ? error.message : "Please try again.",
+        description: errorMessage,
       });
     }
   };

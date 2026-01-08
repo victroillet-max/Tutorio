@@ -20,7 +20,6 @@ import { QuizViewer } from "@/components/activities/quiz-viewer";
 import { CodeEditor } from "@/components/activities/code-editor";
 import { InteractiveViewer } from "@/components/activities/interactive-viewer";
 import { CheckpointViewer } from "@/components/activities/checkpoint-viewer";
-import { ActivityPrerequisiteWarning } from "@/components/activities/prerequisite-warning";
 import { ActivityChatContext } from "@/components/activities/activity-chat-context";
 import { KeyboardNavigation, KeyboardShortcutsHint } from "@/components/activities/keyboard-navigation";
 
@@ -401,11 +400,6 @@ export default async function SkillActivityPage({ params }: SkillActivityPagePro
 
       {/* Content */}
       <div className={`${containerClass} mx-auto px-4 sm:px-6 lg:px-8 py-8`}>
-        {/* Prerequisite Warning - shows only for code/quiz activities with unmet prerequisites */}
-        {(activity.type === 'code' || activity.type === 'quiz' || activity.type === 'challenge') && (
-          <ActivityPrerequisiteWarning activityId={activity.id} />
-        )}
-        
         <ActivityRenderer 
           activity={activity as Activity} 
           userId={user.id}

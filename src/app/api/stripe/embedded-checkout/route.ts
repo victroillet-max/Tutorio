@@ -163,10 +163,70 @@ export async function POST(request: NextRequest) {
             courseId,
             stripeSubscriptionId: existingStripeSubscription.id
           });
+          
+          // Try to sync the subscription to the database
+          const tierSlug = existingStripeSubscription.metadata?.tier;
+          if (tierSlug) {
+            const { data: tierData } = await supabase
+              .from("subscription_tiers")
+              .select("id")
+              .eq("slug", tierSlug)
+              .single();
+
+            if (tierData) {
+              // Get period timestamps
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const subAny = existingStripeSubscription as any;
+              const periodStart = subAny.current_period_start;
+              const periodEnd = subAny.current_period_end;
+
+              const currentPeriodStart = typeof periodStart === 'number'
+                ? new Date(periodStart * 1000).toISOString()
+                : new Date().toISOString();
+              const currentPeriodEnd = typeof periodEnd === 'number'
+                ? new Date(periodEnd * 1000).toISOString()
+                : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
+              // Upsert the subscription using service role
+              const { createClient: createServiceClient } = await import("@supabase/supabase-js");
+              const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+              
+              if (supabaseServiceKey) {
+                const serviceClient = createServiceClient(
+                  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+                  supabaseServiceKey
+                );
+
+                await serviceClient
+                  .from("subscriptions")
+                  .upsert({
+                    user_id: user.id,
+                    course_id: courseId,
+                    tier_id: tierData.id,
+                    status: "active",
+                    current_period_start: currentPeriodStart,
+                    current_period_end: currentPeriodEnd,
+                    stripe_subscription_id: existingStripeSubscription.id,
+                    stripe_customer_id: anySubscription.stripe_customer_id,
+                    cancel_at_period_end: existingStripeSubscription.cancel_at_period_end,
+                  }, {
+                    onConflict: "user_id,course_id",
+                  });
+
+                log.info("Auto-synced Stripe subscription during checkout", {
+                  userId: user.id,
+                  courseId,
+                  stripeSubscriptionId: existingStripeSubscription.id
+                });
+              }
+            }
+          }
+          
           return NextResponse.json(
             { 
               error: "You already have an active subscription for this course",
-              message: "Your subscription may not have synced properly. Please check your subscriptions page and use 'Recover Purchase' if needed."
+              message: "Your subscription has been synced. Please refresh the page to see your current plan.",
+              synced: true
             },
             { status: 400 }
           );

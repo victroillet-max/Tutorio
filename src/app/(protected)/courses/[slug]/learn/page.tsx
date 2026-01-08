@@ -6,19 +6,18 @@ import {
   ChevronLeft, 
   ChevronRight,
   CheckCircle2, 
-  Lock,
   Play,
-  Clock,
   Target,
   Sparkles,
-  BookOpen,
   Trophy,
   TrendingUp,
   Zap,
   Crown,
   ArrowRight,
   Check,
-  MessageCircle
+  MessageCircle,
+  Lock,
+  LockOpen
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SubscriptionSuccessPopup } from "@/components/stripe";
@@ -128,14 +127,23 @@ export default async function CourseLearnPage({ params, searchParams }: CourseLe
 
   // Find next skill to work on
   const allSkills = [...foundationSkills, ...codingSkills];
-  const nextSkill = allSkills.find(s => s.is_available && s.mastery_level < 70);
-  
-  const foundationsComplete = progress.foundations_total > 0 && 
-    progress.foundations_mastered === progress.foundations_total;
+  const nextSkill = allSkills.find(s => s.mastery_level < 70);
 
   // Get user's subscription for this course
   let subscriptionTier: 'free' | 'basic' | 'advanced' = 'free';
   let lockedActivitiesCount = 0;
+  let basicTierPrice = 8; // Default fallback
+  
+  // Fetch the basic tier price
+  const { data: basicTier } = await supabase
+    .from("subscription_tiers")
+    .select("price_monthly")
+    .eq("slug", "basic")
+    .single();
+  
+  if (basicTier?.price_monthly) {
+    basicTierPrice = Number(basicTier.price_monthly);
+  }
   
   if (user) {
     const { data: subscription } = await supabase
@@ -154,15 +162,31 @@ export default async function CourseLearnPage({ params, searchParams }: CourseLe
       }
     }
     
-    // Count locked activities for free users
+    // Count locked activities for this specific course
     if (subscriptionTier === 'free') {
-      const { count } = await supabase
-        .from("activities")
-        .select("id", { count: "exact", head: true })
-        .eq("is_published", true)
-        .neq("required_plan", "free");
+      // First get all skill IDs for this course
+      const { data: courseSkills } = await supabase
+        .from("skills")
+        .select("id")
+        .eq("course_id", course.id)
+        .eq("is_active", true);
       
-      lockedActivitiesCount = count || 0;
+      if (courseSkills && courseSkills.length > 0) {
+        const skillIds = courseSkills.map(s => s.id);
+        
+        // Count activities belonging to these skills that require paid plan
+        const { count } = await supabase
+          .from("activity_skills")
+          .select(`
+            activity:activities!inner(id, is_published, required_plan)
+          `, { count: "exact", head: true })
+          .in("skill_id", skillIds)
+          .eq("is_owner", true)
+          .eq("activity.is_published", true)
+          .neq("activity.required_plan", "free");
+        
+        lockedActivitiesCount = count || 0;
+      }
     }
   }
 
@@ -261,7 +285,7 @@ export default async function CourseLearnPage({ params, searchParams }: CourseLe
                 </div>
                 <div>
                   <p className="font-semibold text-[var(--foreground)]">
-                    Unlock {lockedActivitiesCount}+ premium activities
+                    Unlock {lockedActivitiesCount} premium activities
                   </p>
                   <div className="flex items-center gap-4 text-sm text-[var(--foreground-muted)] mt-1">
                     <span className="flex items-center gap-1">
@@ -279,7 +303,7 @@ export default async function CourseLearnPage({ params, searchParams }: CourseLe
                 href={`/pricing?course=${slug}`}
                 className="flex items-center gap-2 px-5 py-2.5 bg-[var(--accent)] text-white font-semibold rounded-lg hover:bg-[var(--accent-dark)] transition-colors shadow-sm"
               >
-                Subscribe - CHF 8/mo
+                Subscribe - CHF {basicTierPrice}/mo
                 <ArrowRight className="w-4 h-4" />
               </Link>
             </div>
@@ -330,7 +354,6 @@ export default async function CourseLearnPage({ params, searchParams }: CourseLe
               count={progress.skills_total}
               completed={progress.skills_mastered}
               color="blue"
-              locked={!foundationsComplete && progress.foundations_total > 0}
             />
           </div>
         </div>
@@ -341,15 +364,15 @@ export default async function CourseLearnPage({ params, searchParams }: CourseLe
         {tab === 'foundations' ? (
           <FoundationsTab 
             skills={foundationSkills}
-            isComplete={foundationsComplete}
+            isComplete={progress.foundations_total > 0 && progress.foundations_mastered === progress.foundations_total}
             courseSlug={slug}
+            hasSubscription={subscriptionTier !== 'free'}
           />
         ) : (
           <SkillsTab 
             skillsByCategory={skillsByCategory}
-            foundationsComplete={foundationsComplete}
-            totalFoundations={progress.foundations_total}
             courseSlug={slug}
+            hasSubscription={subscriptionTier !== 'free'}
           />
         )}
       </div>
@@ -365,7 +388,6 @@ function TabLink({
   count,
   completed,
   color,
-  locked = false,
 }: {
   href: string;
   active: boolean;
@@ -374,7 +396,6 @@ function TabLink({
   count: number;
   completed: number;
   color: 'amber' | 'blue';
-  locked?: boolean;
 }) {
   const colorClasses = {
     amber: active 
@@ -390,7 +411,7 @@ function TabLink({
       href={href}
       className={`flex items-center gap-2 px-4 py-3 border-b-2 font-medium transition-colors ${colorClasses[color]}`}
     >
-      {locked ? <Lock className="w-4 h-4" /> : <Icon className="w-4 h-4" />}
+      <Icon className="w-4 h-4" />
       <span>{label}</span>
       <span className="text-xs text-[var(--foreground-muted)]">
         {completed}/{count}
@@ -403,10 +424,12 @@ function FoundationsTab({
   skills,
   isComplete,
   courseSlug,
+  hasSubscription,
 }: {
   skills: SkillData[];
   isComplete: boolean;
   courseSlug: string;
+  hasSubscription: boolean;
 }) {
   if (skills.length === 0) {
     return (
@@ -473,6 +496,8 @@ function FoundationsTab({
               skill={skill}
               index={index + 1}
               color="amber"
+              hasSubscription={hasSubscription}
+              courseSlug={courseSlug}
             />
           ))}
         </div>
@@ -483,37 +508,14 @@ function FoundationsTab({
 
 function SkillsTab({
   skillsByCategory,
-  foundationsComplete,
-  totalFoundations,
   courseSlug,
+  hasSubscription,
 }: {
   skillsByCategory: Record<string, SkillData[]>;
-  foundationsComplete: boolean;
-  totalFoundations: number;
   courseSlug: string;
+  hasSubscription: boolean;
 }) {
   const categories = Object.keys(skillsByCategory);
-
-  // If foundations not complete, show locked message
-  if (!foundationsComplete && totalFoundations > 0) {
-    return (
-      <div className="text-center py-16">
-        <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-slate-100 flex items-center justify-center">
-          <Lock className="w-8 h-8 text-slate-400" />
-        </div>
-        <h3 className="text-lg font-semibold text-[var(--foreground)] mb-2">Complete Foundations First</h3>
-        <p className="text-[var(--foreground-muted)] mb-6 max-w-md mx-auto">
-          Master all foundation skills before unlocking the practical skills section.
-        </p>
-        <Link href={`/courses/${courseSlug}/learn?tab=foundations`}>
-          <Button className="bg-amber-600 hover:bg-amber-700 text-white">
-            <Sparkles className="w-4 h-4 mr-2" />
-            Go to Foundations
-          </Button>
-        </Link>
-      </div>
-    );
-  }
 
   if (categories.length === 0) {
     return (
@@ -575,6 +577,8 @@ function SkillsTab({
                   skill={skill}
                   color={color}
                   compact
+                  hasSubscription={hasSubscription}
+                  courseSlug={courseSlug}
                 />
               ))}
             </div>
@@ -590,18 +594,24 @@ function SkillCard({
   index,
   color,
   compact = false,
+  hasSubscription = true,
+  courseSlug = '',
 }: {
   skill: SkillData;
   index?: number;
   color: 'amber' | 'blue' | 'violet' | 'emerald' | 'rose' | 'cyan';
   compact?: boolean;
+  hasSubscription?: boolean;
+  courseSlug?: string;
 }) {
   const isCompleted = skill.mastery_level >= 70;
   const isInProgress = skill.mastery_level > 0 && skill.mastery_level < 70;
-  const isLocked = !skill.is_available;
   const progress = skill.total_activities > 0 
     ? Math.round((skill.completed_activities / skill.total_activities) * 100)
     : 0;
+  
+  // Skill is locked if user doesn't have subscription and hasn't started/completed it
+  const isLocked = !hasSubscription && !isCompleted && !isInProgress;
 
   const colorClasses = {
     amber: { bg: 'bg-amber-100', border: 'border-amber-200', text: 'text-amber-600', progress: 'bg-amber-500' },
@@ -614,6 +624,73 @@ function SkillCard({
 
   const colors = colorClasses[color];
 
+  // Locked skill card with hover animation
+  if (isLocked) {
+    return (
+      <Link href={`/pricing?course=${courseSlug}`} className="block group">
+        <div className={`
+          relative bg-white rounded-xl border-2 p-4 transition-all overflow-hidden
+          ${compact ? '' : 'ml-12'}
+          border-slate-200 hover:border-amber-300 hover:shadow-md hover:bg-slate-100 cursor-pointer
+        `}>
+          {/* Lock Overlay - appears on hover */}
+          <div className="absolute inset-0 bg-transparent group-hover:bg-slate-200/40 transition-colors duration-300 pointer-events-none" />
+          
+          {/* Lock Icon Badge with text - animates on hover */}
+          <div className="absolute top-3 right-3 z-10 flex items-center gap-2">
+            {/* Subscribe text - hidden by default, appears on hover */}
+            <span className="text-xs font-medium text-amber-600 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+              Subscribe to unlock
+            </span>
+            <div className="relative w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center shadow-sm border border-amber-200 transition-all duration-300 group-hover:bg-amber-50 group-hover:scale-110">
+              {/* Closed lock - visible by default, fades on hover */}
+              <Lock className="w-4 h-4 text-amber-600 absolute transition-all duration-300 group-hover:opacity-0 group-hover:rotate-[-15deg] group-hover:translate-y-[-2px]" />
+              {/* Open lock - hidden by default, appears on hover */}
+              <LockOpen className="w-4 h-4 text-amber-500 absolute opacity-0 transition-all duration-300 group-hover:opacity-100" />
+            </div>
+          </div>
+
+          {/* Status Node (for non-compact) */}
+          {!compact && (
+            <div className={`absolute -left-12 top-4 w-10 h-10 rounded-full flex items-center justify-center z-10 ${colors.bg} ${colors.text}`}>
+              <span className="font-bold text-sm">{index}</span>
+            </div>
+          )}
+
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                {compact && (
+                  <div className={`w-8 h-8 rounded-lg ${colors.bg} flex items-center justify-center flex-shrink-0`}>
+                    <Target className={`w-4 h-4 ${colors.text}`} />
+                  </div>
+                )}
+                <h3 
+                  className="font-semibold text-[var(--foreground)] truncate"
+                  style={{ fontFamily: 'var(--font-heading)' }}
+                >
+                  {skill.skill_name}
+                </h3>
+              </div>
+              
+              {!compact && (
+                <p className="text-sm text-[var(--foreground-muted)] mb-3 line-clamp-2">
+                  {skill.skill_description}
+                </p>
+              )}
+
+              {/* Meta info */}
+              <div className="flex items-center gap-3 text-xs text-[var(--foreground-muted)]">
+                <span>{skill.total_activities} activities</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Link>
+    );
+  }
+
+  // Unlocked/In progress/Completed skill card
   const content = (
     <div className={`
       relative bg-white rounded-xl border-2 p-4 transition-all
@@ -622,9 +699,7 @@ function SkillCard({
         ? 'border-emerald-200 shadow-sm' 
         : isInProgress 
           ? `${colors.border} shadow-md` 
-          : isLocked 
-            ? 'border-slate-200 opacity-60' 
-            : `border-slate-200 hover:${colors.border} hover:shadow-md cursor-pointer`
+          : `border-slate-200 hover:${colors.border} hover:shadow-md cursor-pointer`
       }
     `}>
       {/* Status Node (for non-compact) */}
@@ -635,15 +710,11 @@ function SkillCard({
             ? 'bg-emerald-500 text-white' 
             : isInProgress 
               ? `${colors.bg} ${colors.text}` 
-              : isLocked 
-                ? 'bg-slate-200 text-slate-400' 
-                : `${colors.bg} ${colors.text}`
+              : `${colors.bg} ${colors.text}`
           }
         `}>
           {isCompleted ? (
             <CheckCircle2 className="w-5 h-5" />
-          ) : isLocked ? (
-            <Lock className="w-4 h-4" />
           ) : (
             <span className="font-bold text-sm">{index}</span>
           )}
@@ -657,8 +728,6 @@ function SkillCard({
               <div className={`w-8 h-8 rounded-lg ${isCompleted ? 'bg-emerald-100' : colors.bg} flex items-center justify-center flex-shrink-0`}>
                 {isCompleted ? (
                   <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                ) : isLocked ? (
-                  <Lock className="w-4 h-4 text-slate-400" />
                 ) : (
                   <Target className={`w-4 h-4 ${colors.text}`} />
                 )}
@@ -679,7 +748,7 @@ function SkillCard({
           )}
 
           {/* Progress bar */}
-          {skill.total_activities > 0 && !isLocked && (
+          {skill.total_activities > 0 && (
             <div className="mb-2">
               <div className="flex items-center justify-between text-xs text-[var(--foreground-muted)] mb-1">
                 <span>{skill.completed_activities}/{skill.total_activities} activities</span>
@@ -710,17 +779,11 @@ function SkillCard({
                 In Progress
               </span>
             )}
-            {isLocked && (
-              <span className="flex items-center gap-1 text-slate-400">
-                <Lock className="w-3 h-3" />
-                Complete prerequisites
-              </span>
-            )}
           </div>
         </div>
 
         {/* Action */}
-        {!isLocked && !isCompleted && (
+        {!isCompleted && (
           <div className="flex-shrink-0">
             <div className={`w-8 h-8 rounded-full ${colors.bg} flex items-center justify-center ${colors.text}`}>
               <Play className="w-4 h-4 ml-0.5" />
@@ -730,10 +793,6 @@ function SkillCard({
       </div>
     </div>
   );
-
-  if (isLocked) {
-    return content;
-  }
 
   return (
     <Link href={`/skills/${skill.skill_slug}`}>

@@ -6,6 +6,7 @@ import {
   ChevronRight,
   CheckCircle2, 
   Lock,
+  LockOpen,
   Play,
   Clock,
   Target,
@@ -19,6 +20,13 @@ import { Button } from "@/components/ui/button";
 
 interface SkillPageProps {
   params: Promise<{ skillSlug: string }>;
+}
+
+interface CourseSubscription {
+  subscription_id: string;
+  tier_name: string;
+  tier_slug: string;
+  status: string;
 }
 
 export async function generateMetadata({ params }: SkillPageProps) {
@@ -110,35 +118,36 @@ export default async function SkillDetailPage({ params }: SkillPageProps) {
     masteryLevel = userProgress?.mastery_level || 0;
   }
 
-  // Check prerequisites
-  const { data: prereqsData } = await supabase
-    .rpc("get_skill_prerequisites_status", {
-      p_user_id: user?.id || null,
-      p_skill_id: skill.id
-    });
-
-  const prerequisites = prereqsData || [];
-  const unmetPrereqs = prerequisites.filter((p: { is_required: boolean; is_mastered: boolean }) => 
-    p.is_required && !p.is_mastered
-  );
-
   // Find next activity to continue
   const nextActivity = activities.find(a => !a.is_completed);
-  const allCompleted = activities.length > 0 && activities.every(a => a.is_completed);
   const isMastered = masteryLevel >= 70;
 
-  // Get course info for back link
+  // Get course info for back link and demo activity count
   const { data: courseData } = await supabase
     .from("courses")
-    .select("slug, title")
+    .select("id, slug, title, demo_activity_count")
     .eq("id", skill.course_id)
     .single();
   
   const isFoundation = skill.category === 'ct_foundations';
   const courseSlug = courseData?.slug || 'computational-thinking';
   const courseTitle = courseData?.title || 'Course';
+  const demoActivityCount = courseData?.demo_activity_count || 5;
   const backLink = `/courses/${courseSlug}/learn?tab=${isFoundation ? 'foundations' : 'skills'}`;
   const backLabel = `${courseTitle} - ${isFoundation ? 'Foundations' : 'Skills'}`;
+
+  // Check user's subscription for this course
+  let hasSubscription = false;
+  if (user && courseData?.id) {
+    const { data: subscriptionData } = await supabase
+      .rpc("get_user_course_subscription", {
+        p_user_id: user.id,
+        p_course_id: courseData.id
+      });
+    
+    const subscription = subscriptionData?.[0] as CourseSubscription | undefined;
+    hasSubscription = subscription?.status === 'active' || subscription?.status === 'trialing';
+  }
 
   // Category colors
   const categoryColors: Record<string, { bg: string; border: string; text: string; gradient: string }> = {
@@ -234,17 +243,7 @@ export default async function SkillDetailPage({ params }: SkillPageProps) {
                 <span>{progress.earned_xp}/{progress.total_xp} XP</span>
               </div>
 
-              {unmetPrereqs.length > 0 ? (
-                <div className="text-center">
-                  <div className="flex items-center justify-center gap-2 text-amber-600 mb-2">
-                    <Lock className="w-4 h-4" />
-                    <span className="text-sm font-medium">Prerequisites needed</span>
-                  </div>
-                  <p className="text-xs text-slate-500">
-                    Complete {unmetPrereqs.length} prerequisite{unmetPrereqs.length > 1 ? 's' : ''} first
-                  </p>
-                </div>
-              ) : nextActivity ? (
+              {nextActivity ? (
                 <Link href={`/skills/${skillSlug}/${nextActivity.activity_slug}`}>
                   <Button className={`w-full ${colors.bg} text-white hover:opacity-90`}>
                     <Play className="w-4 h-4 mr-2" />
@@ -265,35 +264,6 @@ export default async function SkillDetailPage({ params }: SkillPageProps) {
         </div>
       </div>
 
-      {/* Prerequisites Warning */}
-      {unmetPrereqs.length > 0 && (
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pt-6">
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
-            <div className="flex items-start gap-3">
-              <Lock className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-              <div>
-                <h3 className="font-semibold text-amber-800">Prerequisites Required</h3>
-                <p className="text-sm text-amber-700 mt-1 mb-3">
-                  Master these skills before starting this one:
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {unmetPrereqs.map((prereq: { prerequisite_skill_id: string; skill_name: string; skill_slug: string; mastery_level: number }) => (
-                    <Link
-                      key={prereq.prerequisite_skill_id}
-                      href={`/skills/${prereq.skill_slug}`}
-                      className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white border border-amber-200 text-sm hover:bg-amber-100 transition-colors"
-                    >
-                      <span className="font-medium text-amber-800">{prereq.skill_name}</span>
-                      <span className="text-amber-600">{prereq.mastery_level}%</span>
-                    </Link>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Activities List */}
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <h2 
@@ -306,26 +276,10 @@ export default async function SkillDetailPage({ params }: SkillPageProps) {
         {activities.length > 0 ? (
           <div className="space-y-3">
             {activities.map((activity, index) => {
-              // Completed activities are always accessible
-              if (activity.is_completed) {
-                return (
-                  <ActivityCard
-                    key={activity.activity_id}
-                    activity={activity}
-                    index={index + 1}
-                    skillSlug={skillSlug}
-                    isLocked={false}
-                    colors={colors}
-                  />
-                );
-              }
-              
-              // For incomplete activities, check if locked:
-              // 1. Skill has unmet prerequisites, OR
-              // 2. Previous activity in the sequence is not completed (sequential unlock)
-              const previousActivity = index > 0 ? activities[index - 1] : null;
-              const isPreviousCompleted = previousActivity ? previousActivity.is_completed : true;
-              const isActivityLocked = unmetPrereqs.length > 0 || !isPreviousCompleted;
+              // Demo activities (first N activities) are always unlocked
+              // Activities are locked if user has no subscription and it's not a demo activity
+              const isDemoActivity = activity.order_index < demoActivityCount;
+              const isActivityLocked = !hasSubscription && !isDemoActivity && !activity.is_completed;
               
               return (
                 <ActivityCard
@@ -335,6 +289,7 @@ export default async function SkillDetailPage({ params }: SkillPageProps) {
                   skillSlug={skillSlug}
                   isLocked={isActivityLocked}
                   colors={colors}
+                  courseSlug={courseSlug}
                 />
               );
             })}
@@ -359,12 +314,14 @@ function ActivityCard({
   skillSlug,
   isLocked,
   colors,
+  courseSlug,
 }: {
   activity: SkillActivity;
   index: number;
   skillSlug: string;
   isLocked: boolean;
   colors: { bg: string; border: string; text: string };
+  courseSlug: string;
 }) {
   const typeIcons: Record<string, React.ComponentType<{ className?: string }>> = {
     lesson: BookOpen,
@@ -389,14 +346,71 @@ function ActivityCard({
   const Icon = typeIcons[activity.activity_type] || BookOpen;
   const typeLabel = typeLabels[activity.activity_type] || activity.activity_type;
 
+  // Locked card content - visible but with lock overlay
+  if (isLocked) {
+    return (
+      <Link href={`/pricing?course=${courseSlug}`} className="block group">
+        <div className="relative bg-white rounded-xl border border-slate-200 p-4 transition-all hover:border-amber-300 hover:shadow-md hover:bg-slate-100 cursor-pointer overflow-hidden">
+          {/* Lock Overlay - appears on hover */}
+          <div className="absolute inset-0 bg-transparent group-hover:bg-slate-200/40 transition-colors duration-300 pointer-events-none" />
+          
+          {/* Lock Icon Badge with text - animates on hover */}
+          <div className="absolute top-3 right-3 z-10 flex items-center gap-2">
+            {/* Subscribe text - hidden by default, appears on hover */}
+            <span className="text-xs font-medium text-amber-600 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+              Subscribe to unlock
+            </span>
+            <div className="relative w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center shadow-sm border border-amber-200 transition-all duration-300 group-hover:bg-amber-50 group-hover:scale-110">
+              {/* Closed lock - visible by default, fades on hover */}
+              <Lock className="w-4 h-4 text-amber-600 absolute transition-all duration-300 group-hover:opacity-0 group-hover:rotate-[-15deg] group-hover:translate-y-[-2px]" />
+              {/* Open lock - hidden by default, appears on hover */}
+              <LockOpen className="w-4 h-4 text-amber-500 absolute opacity-0 transition-all duration-300 group-hover:opacity-100" />
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4">
+            {/* Status Icon */}
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 bg-slate-100 ${colors.text}`}>
+              <span className="font-semibold text-sm">{index}</span>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 min-w-0">
+              <h3 className="font-medium text-slate-900 truncate">
+                {activity.activity_title}
+              </h3>
+              <div className="flex items-center gap-3 mt-1 text-xs text-slate-500">
+                <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100">
+                  <Icon className="w-3 h-3" />
+                  {typeLabel}
+                </span>
+                {activity.minutes && (
+                  <span className="flex items-center gap-1">
+                    <Clock className="w-3 h-3" />
+                    {activity.minutes} min
+                  </span>
+                )}
+                {activity.xp && (
+                  <span className="flex items-center gap-1">
+                    <Zap className="w-3 h-3" />
+                    {activity.xp} XP
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </Link>
+    );
+  }
+
+  // Unlocked/Completed card content
   const content = (
     <div className={`
       bg-white rounded-xl border p-4 transition-all flex items-center gap-4
       ${activity.is_completed 
         ? 'border-emerald-200' 
-        : isLocked 
-          ? 'border-slate-200 opacity-60' 
-          : 'border-slate-200 hover:border-slate-300 hover:shadow-sm cursor-pointer'
+        : 'border-slate-200 hover:border-slate-300 hover:shadow-sm cursor-pointer'
       }
     `}>
       {/* Status Icon */}
@@ -404,15 +418,11 @@ function ActivityCard({
         w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0
         ${activity.is_completed 
           ? 'bg-emerald-100 text-emerald-600' 
-          : isLocked 
-            ? 'bg-slate-100 text-slate-400' 
-            : `bg-slate-100 ${colors.text}`
+          : `bg-slate-100 ${colors.text}`
         }
       `}>
         {activity.is_completed ? (
           <CheckCircle2 className="w-5 h-5" />
-        ) : isLocked ? (
-          <Lock className="w-4 h-4" />
         ) : (
           <span className="font-semibold text-sm">{index}</span>
         )}
@@ -424,7 +434,7 @@ function ActivityCard({
           {activity.activity_title}
         </h3>
         <div className="flex items-center gap-3 mt-1 text-xs text-slate-500">
-          <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100`}>
+          <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100">
             <Icon className="w-3 h-3" />
             {typeLabel}
           </span>
@@ -452,16 +462,12 @@ function ActivityCard({
             )}
             <div className="text-xs text-slate-500">{activity.attempts} attempt{activity.attempts !== 1 ? 's' : ''}</div>
           </div>
-        ) : !isLocked && (
+        ) : (
           <ChevronRight className="w-5 h-5 text-slate-400" />
         )}
       </div>
     </div>
   );
-
-  if (isLocked) {
-    return content;
-  }
 
   return (
     <Link href={`/skills/${skillSlug}/${activity.activity_slug}`}>

@@ -1,4 +1,5 @@
 import { createClient } from "@/utils/supabase/server";
+import { createClient as createServiceClient } from "@supabase/supabase-js";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
@@ -12,11 +13,145 @@ import {
 } from "lucide-react";
 import type { SubscriptionTier, Course, UserCourseSubscription } from "@/lib/database.types";
 import { PricingError, FlipPricingCard } from "@/components/stripe";
+import Stripe from "stripe";
+import { STRIPE_API_VERSION } from "@/lib/stripe/types";
+import { logger } from "@/lib/logging";
+
+const log = logger.child({ module: "pricing/page" });
 
 export const metadata = {
   title: "Pricing | Tutorio",
   description: "Choose the plan that's right for you",
 };
+
+/**
+ * Sync any Stripe subscriptions that may not be in the database
+ * This handles cases where webhooks failed but the user paid
+ */
+async function syncStripeSubscriptions(
+  userId: string,
+  courseId: string,
+  userEmail: string | undefined
+): Promise<boolean> {
+  const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  
+  if (!stripeSecretKey || !supabaseServiceKey || !userEmail) {
+    return false;
+  }
+
+  const stripe = new Stripe(stripeSecretKey, { apiVersion: STRIPE_API_VERSION });
+  const serviceClient = createServiceClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    supabaseServiceKey
+  );
+
+  try {
+    // First check if user has any existing customer ID
+    const { data: existingCustomerSub } = await serviceClient
+      .from("subscriptions")
+      .select("stripe_customer_id")
+      .eq("user_id", userId)
+      .not("stripe_customer_id", "is", null)
+      .limit(1)
+      .single();
+
+    // Try to find customer by existing ID or by email
+    let customerId = existingCustomerSub?.stripe_customer_id;
+    
+    if (!customerId) {
+      // Search for customer by email
+      const customers = await stripe.customers.list({
+        email: userEmail,
+        limit: 1,
+      });
+      
+      if (customers.data.length === 0) {
+        return false; // No customer found
+      }
+      
+      customerId = customers.data[0].id;
+    }
+
+    // Get active subscriptions for this customer
+    const subscriptions = await stripe.subscriptions.list({
+      customer: customerId,
+      status: "active",
+      limit: 100,
+    });
+
+    // Find subscription for this specific course
+    const courseSubscription = subscriptions.data.find(
+      sub => sub.metadata?.course_id === courseId
+    );
+
+    if (!courseSubscription) {
+      return false; // No Stripe subscription for this course
+    }
+
+    const tier = courseSubscription.metadata?.tier;
+    if (!tier) {
+      return false;
+    }
+
+    // Get tier ID
+    const { data: tierData } = await serviceClient
+      .from("subscription_tiers")
+      .select("id")
+      .eq("slug", tier)
+      .single();
+
+    if (!tierData) {
+      return false;
+    }
+
+    // Get period timestamps
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const subAny = courseSubscription as any;
+    const periodStart = subAny.current_period_start;
+    const periodEnd = subAny.current_period_end;
+
+    const currentPeriodStart = typeof periodStart === 'number'
+      ? new Date(periodStart * 1000).toISOString()
+      : new Date().toISOString();
+    const currentPeriodEnd = typeof periodEnd === 'number'
+      ? new Date(periodEnd * 1000).toISOString()
+      : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
+    // Upsert the subscription
+    const { error } = await serviceClient
+      .from("subscriptions")
+      .upsert({
+        user_id: userId,
+        course_id: courseId,
+        tier_id: tierData.id,
+        status: courseSubscription.status === "active" ? "active" : "trialing",
+        current_period_start: currentPeriodStart,
+        current_period_end: currentPeriodEnd,
+        stripe_subscription_id: courseSubscription.id,
+        stripe_customer_id: customerId,
+        cancel_at_period_end: courseSubscription.cancel_at_period_end,
+      }, {
+        onConflict: "user_id,course_id",
+      });
+
+    if (error) {
+      log.error("Failed to sync Stripe subscription", error, { userId, courseId });
+      return false;
+    }
+
+    log.info("Synced Stripe subscription from pricing page", { 
+      userId, 
+      courseId, 
+      stripeSubscriptionId: courseSubscription.id 
+    });
+    return true;
+
+  } catch (error) {
+    log.error("Error syncing Stripe subscription", error);
+    return false;
+  }
+}
 
 
 export default async function PricingPage({
@@ -61,8 +196,20 @@ export default async function PricingPage({
     .order("sort_order");
 
   // Get user's current subscriptions
-  const { data: subscriptions } = await supabase
+  let { data: subscriptions } = await supabase
     .rpc("get_user_subscriptions", { p_user_id: user.id });
+
+  // If a course is selected and no subscription found, check Stripe directly
+  // This handles cases where webhook failed but user paid
+  if (selectedCourse && !subscriptions?.find((s: UserCourseSubscription) => s.course_id === selectedCourse!.id)) {
+    const synced = await syncStripeSubscriptions(user.id, selectedCourse.id, user.email);
+    if (synced) {
+      // Refresh subscriptions after sync
+      const { data: refreshedSubs } = await supabase
+        .rpc("get_user_subscriptions", { p_user_id: user.id });
+      subscriptions = refreshedSubs;
+    }
+  }
 
   // Check if Stripe is configured
   const stripeConfigured = !!process.env.STRIPE_SECRET_KEY;
