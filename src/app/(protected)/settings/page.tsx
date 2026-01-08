@@ -4,6 +4,7 @@ import { Bell, Shield, CreditCard, User, BookOpen, ArrowRight } from "lucide-rea
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { ActiveSessions } from "@/components/auth/active-sessions";
+import { EditableName, PasswordUpdate } from "@/components/settings/settings-forms";
 import type { UserCourseSubscription } from "@/lib/database.types";
 
 export const metadata = {
@@ -53,24 +54,8 @@ export default async function SettingsPage() {
                 </Button>
               }
             />
-            <SettingRow
-              label="Full Name"
-              value={profile?.full_name || "Not set"}
-              action={
-                <Button variant="outline" size="sm" disabled>
-                  Edit
-                </Button>
-              }
-            />
-            <SettingRow
-              label="Password"
-              value="Last changed: Unknown"
-              action={
-                <Button variant="outline" size="sm" disabled>
-                  Update
-                </Button>
-              }
-            />
+            <EditableName currentName={profile?.full_name || ""} userId={user!.id} />
+            <PasswordUpdate userEmail={user?.email || ""} />
           </div>
         </SettingsSection>
 

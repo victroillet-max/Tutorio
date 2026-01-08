@@ -30,6 +30,13 @@ export const metadata: Metadata = {
   title: "Tutorio | Master Your Business Courses",
   description: "The smart way to ace your business school exams. AI-powered summaries, exercises, and premium content tailored for Swiss business students.",
   keywords: ["tutoring", "business school", "Switzerland", "online learning", "HEC", "UNISG", "exam preparation"],
+  icons: {
+    icon: [
+      { url: "/logo-cropped.svg", type: "image/svg+xml" },
+    ],
+    shortcut: "/logo-cropped.svg",
+    apple: "/logo-cropped.svg",
+  },
 };
 
 export default function RootLayout({

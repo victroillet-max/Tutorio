@@ -222,7 +222,13 @@ export function buildCurrentQuestionContext(context: SkillContext): string {
   return `## CURRENT QUESTION (Student is viewing this RIGHT NOW)
 **Question ${context.currentQuestionNumber}:** ${context.currentQuestionText}
 
-IMPORTANT: When the student says "this question", "help me with this", or asks about the current question, they are referring to Question ${context.currentQuestionNumber} above. Provide guidance for THIS specific question without revealing the answer.`;
+IMPORTANT INSTRUCTIONS FOR HELPING WITH THIS QUESTION:
+1. When the student says they got this question wrong, IMMEDIATELY provide a clear explanation of the underlying concept
+2. Explain WHY the correct answer is correct (without just stating which answer is right)
+3. Use real-world examples or analogies to make the concept memorable
+4. Do NOT list all quiz questions - focus ONLY on THIS specific question
+5. Keep your response focused and helpful - explain the concept in 2-3 paragraphs maximum
+6. If the student's message includes an explanation from the quiz, build upon it to deepen their understanding`;
 }
 
 /**

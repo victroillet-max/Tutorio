@@ -5,7 +5,6 @@ import {
   ArrowRight,
   Sparkles,
   Clock,
-  Star,
   Zap,
   Target,
   GraduationCap,
@@ -427,13 +426,8 @@ function CourseCard({ course, index }: { course: CourseData; index: number }) {
         )}
       </div>
 
-      {/* Rating & Arrow */}
-      <div className="flex items-center justify-between mt-5">
-        <div className="flex items-center gap-1.5">
-          <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
-          <span className="font-semibold text-[var(--foreground)]">4.8</span>
-          <span className="text-[var(--foreground-muted)]">(New)</span>
-        </div>
+      {/* Arrow */}
+      <div className="flex items-center justify-end mt-5">
         <div className="w-10 h-10 rounded-full bg-[var(--background)] flex items-center justify-center text-[var(--foreground-muted)] group-hover:bg-[var(--primary)] group-hover:text-white group-hover:translate-x-1 transition-all">
           <ArrowRight className="w-[18px] h-[18px]" />
         </div>

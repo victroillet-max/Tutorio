@@ -454,19 +454,47 @@ function getMockResponse(message: string, context: SkillContext): string {
   const lowerMessage = message.toLowerCase();
   const courseMaterial = context.courseMaterial;
 
+  // Check if user is asking about a specific question they got wrong
+  const gotWrongPattern = lowerMessage.includes("got") && (lowerMessage.includes("wrong") || lowerMessage.includes("incorrect"));
+  const needHelpPattern = lowerMessage.includes("need help understanding") || lowerMessage.includes("help me understand");
+  const hasExplanation = lowerMessage.includes("explanation says");
+  
+  // If user got a question wrong and is asking for help - provide direct explanation
+  if ((gotWrongPattern || needHelpPattern || hasExplanation) && context.currentQuestionText) {
+    return `I see you're struggling with this question. Let me help you understand the concept!
+
+**The Question:** "${context.currentQuestionText}"
+
+Let me break this down for you:
+
+This question is testing your understanding of how to categorize different types of business activities. Here's the key concept:
+
+**Understanding the Categories:**
+- **Operating activities** relate to day-to-day business operations (sales, expenses, working capital changes)
+- **Investing activities** involve buying or selling long-term assets (equipment, buildings, investments)
+- **Financing activities** deal with how the business is funded (debt, equity, dividends)
+
+**A helpful tip:** Ask yourself - "Is this about running the business (operating), buying/selling long-term stuff (investing), or getting/returning money to investors/lenders (financing)?"
+
+Would you like me to walk through some examples to help solidify this concept?`;
+  }
+
   // If asking about the current question/problem and we have context
   if ((lowerMessage.includes("question") || lowerMessage.includes("problem") || lowerMessage.includes("this") || lowerMessage.includes("understand")) && courseMaterial) {
-    // For quiz/checkpoint activities
-    if (courseMaterial.quizQuestions) {
-      return `I can see you're working on **${courseMaterial.activityTitle}** in the ${courseMaterial.moduleName || "current module"}.
+    // For quiz/checkpoint activities - provide guidance, not a list of all questions
+    if (courseMaterial.quizQuestions && context.currentQuestionText) {
+      return `I can see you're working on **${courseMaterial.activityTitle}**.
 
-Here's what this activity is about:
-${courseMaterial.activityType === 'checkpoint' ? "This is a checkpoint assessment to test your understanding." : ""}
+You're currently on a question about: "${context.currentQuestionText}"
 
-**The questions in this activity:**
-${courseMaterial.quizQuestions}
+Let me help you think through this:
 
-I can help you understand any of these questions! Which one would you like help with? I'll guide you through the concept without giving away the answer.`;
+**Key concepts to consider:**
+- What category or classification is being asked about?
+- What are the defining characteristics of each option?
+- Can you eliminate any obviously wrong answers?
+
+Think about what makes each option distinct. Would you like me to explain any specific concept related to this question?`;
     }
 
     // For code activities

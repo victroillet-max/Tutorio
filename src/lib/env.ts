@@ -87,8 +87,11 @@ export function getClientEnv(): ClientEnv {
 }
 
 /**
- * Get the site URL for redirects
+ * Get the site URL for redirects and emails
  * Falls back to localhost in development
+ * 
+ * IMPORTANT: Set NEXT_PUBLIC_SITE_URL=https://tutorio.education in production
+ * This is used in email templates for links
  */
 export function getSiteUrl(): string {
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
@@ -97,6 +100,11 @@ export function getSiteUrl(): string {
   // Fallback for development
   if (process.env.NODE_ENV === "development") {
     return "http://localhost:3000";
+  }
+  
+  // Production fallback - Tutorio's production domain
+  if (process.env.NODE_ENV === "production") {
+    return "https://tutorio.education";
   }
   
   // Vercel deployment

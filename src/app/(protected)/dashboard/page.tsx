@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { QuickStartButton } from "@/components/dashboard/quick-start-button";
+import type { UserCourseSubscription } from "@/lib/database.types";
 
 export const metadata = {
   title: "Dashboard | Tutorio",
@@ -67,11 +68,22 @@ export default async function DashboardPage() {
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
 
-  // Get user's enrolled courses with progress
-  const { data: enrolledCoursesData } = await supabase
-    .rpc("get_user_enrolled_courses", { p_user_id: user!.id });
+  // Get user's enrolled courses with progress and subscriptions in parallel
+  const [coursesResult, subsResult] = await Promise.all([
+    supabase.rpc("get_user_enrolled_courses", { p_user_id: user!.id }),
+    supabase.rpc("get_user_subscriptions", { p_user_id: user!.id }),
+  ]);
 
-  const enrolledCourses: CourseWithProgress[] = enrolledCoursesData || [];
+  const enrolledCourses: CourseWithProgress[] = coursesResult.data || [];
+  const subscriptions: UserCourseSubscription[] = subsResult.data || [];
+
+  // Create a map of course subscriptions for quick lookup
+  const subscriptionMap = new Map<string, UserCourseSubscription>();
+  subscriptions.forEach(sub => {
+    if (sub.status === 'active' || sub.status === 'trialing') {
+      subscriptionMap.set(sub.course_id, sub);
+    }
+  });
 
   // Get user's skills with progress - find in-progress skills
   const { data: skillProgress } = await supabase
@@ -240,8 +252,12 @@ export default async function DashboardPage() {
           </div>
 
           <div className="grid sm:grid-cols-2 gap-6">
-            {enrolledCourses.slice(0, 2).map((course, index) => (
-              <CourseHeroCard key={course.course_id} course={course} index={index} />
+            {enrolledCourses.slice(0, 2).map((course) => (
+              <CourseHeroCard 
+                key={course.course_id} 
+                course={course} 
+                subscription={subscriptionMap.get(course.course_id) || null}
+              />
             ))}
           </div>
         </div>
@@ -565,43 +581,69 @@ const categoryColors: Record<string, { bg: string; icon: string }> = {
 };
 
 const categoryLabels: Record<string, string> = {
+  // Python Programming categories
   ct_foundations: 'Foundations',
   python_basics: 'Python Basics',
   control_flow: 'Control Flow',
   data_structures: 'Data Structures',
   functions: 'Functions',
   advanced_topics: 'Advanced Topics',
+  // Financial Accounting categories
+  fa_foundations: 'FA Foundations',
+  financial_statements: 'Financial Statements',
+  accounting_equation: 'Accounting Equation',
+  journal_entries: 'Journal Entries',
+  trial_balance: 'Trial Balance',
+  adjusting_entries: 'Adjusting Entries',
+  cash_flow_statement: 'Cash Flow Statement',
+  inventory: 'Inventory',
+  // Managerial Accounting categories
+  ma_foundations: 'MA Foundations',
+  cost_behavior: 'Cost Behavior',
+  cost_volume_profit: 'Cost-Volume-Profit',
+  budgeting: 'Budgeting',
+  variance_analysis: 'Variance Analysis',
+  decision_making: 'Decision Making',
 };
 
-function CourseHeroCard({ course, index }: { course: CourseWithProgress; index: number }) {
+function CourseHeroCard({ course, subscription }: { course: CourseWithProgress; subscription: UserCourseSubscription | null }) {
   // Calculate the SVG stroke offset for the progress ring
   const circumference = 2 * Math.PI * 40; // radius = 40
   const strokeDashoffset = circumference - (course.overall_progress_percent / 100) * circumference;
   
-  // Alternate plan types for visual variety
-  const planType = index === 0 ? 'free' : 'basic';
-  const planLabel = index === 0 ? 'Free Plan' : 'Basic Plan';
-  const planColors = {
+  // Determine plan type from subscription
+  const tierSlug = subscription?.tier_slug || 'free';
+  const tierName = subscription?.tier_name || 'Free';
+  const planLabel = `${tierName} Plan`;
+  
+  // Color scheme based on subscription tier
+  const planColors: Record<string, { badge: string; icon: string; label: string }> = {
     free: { badge: 'bg-slate-100', icon: 'text-slate-500', label: 'text-slate-600' },
     basic: { badge: 'bg-blue-50', icon: 'text-blue-500', label: 'text-blue-600' },
+    advanced: { badge: 'bg-purple-50', icon: 'text-purple-500', label: 'text-purple-600' },
   };
-  const colors = planColors[planType];
+  const colors = planColors[tierSlug] || planColors.free;
 
   // Total lessons (foundations + skills activities)
   const totalLessons = course.foundations_total + course.skills_total;
   const completedLessons = course.foundations_mastered + course.skills_mastered;
 
+  // Check if user has the highest tier (advanced) - no upgrade available
+  const hasMaxTier = tierSlug === 'advanced';
+
   return (
     <div className="card-elevated p-5 sm:p-6 relative hover:shadow-lg transition-all group">
-      {/* Upgrade Button - Top Right */}
-      <Link 
-        href={`/pricing?course=${course.course_slug}`}
-        className="absolute top-3 right-3 sm:top-4 sm:right-4 z-10 flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 border border-[var(--accent)] rounded-lg bg-transparent text-[var(--accent)] text-xs font-semibold hover:bg-[var(--accent)] hover:text-white transition-all"
-      >
-        <Zap className="w-3 h-3" />
-        <span>Upgrade</span>
-        <ChevronRight className="w-3 h-3 opacity-0 -ml-1 group-hover:opacity-100 group-hover:ml-0 transition-all hidden sm:block" />
-      </Link>
+      {/* Upgrade Button - Top Right (only show if not on advanced plan) */}
+      {!hasMaxTier && (
+        <Link 
+          href={`/pricing?course=${course.course_slug}`}
+          className="absolute top-3 right-3 sm:top-4 sm:right-4 z-10 flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1 sm:py-1.5 border border-[var(--accent)] rounded-lg bg-transparent text-[var(--accent)] text-xs font-semibold hover:bg-[var(--accent)] hover:text-white transition-all"
+        >
+          <Zap className="w-3 h-3" />
+          <span>Upgrade</span>
+          <ChevronRight className="w-3 h-3 opacity-0 -ml-1 group-hover:opacity-100 group-hover:ml-0 transition-all hidden sm:block" />
+        </Link>
+      )}
 
       <div className="flex gap-4 sm:gap-6">
         {/* Progress Ring */}

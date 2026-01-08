@@ -14,7 +14,11 @@ import {
   BookOpen,
   Trophy,
   TrendingUp,
-  Zap
+  Zap,
+  Crown,
+  ArrowRight,
+  Check,
+  MessageCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SubscriptionSuccessPopup } from "@/components/stripe";
@@ -129,6 +133,39 @@ export default async function CourseLearnPage({ params, searchParams }: CourseLe
   const foundationsComplete = progress.foundations_total > 0 && 
     progress.foundations_mastered === progress.foundations_total;
 
+  // Get user's subscription for this course
+  let subscriptionTier: 'free' | 'basic' | 'advanced' = 'free';
+  let lockedActivitiesCount = 0;
+  
+  if (user) {
+    const { data: subscription } = await supabase
+      .from("subscriptions")
+      .select("tier:subscription_tiers(slug)")
+      .eq("user_id", user.id)
+      .eq("course_id", course.id)
+      .in("status", ["active", "trialing"])
+      .single();
+    
+    if (subscription?.tier) {
+      const tier = subscription.tier as unknown as { slug: string }[] | { slug: string };
+      const tierSlug = Array.isArray(tier) ? tier[0]?.slug : tier.slug;
+      if (tierSlug === 'free' || tierSlug === 'basic' || tierSlug === 'advanced') {
+        subscriptionTier = tierSlug;
+      }
+    }
+    
+    // Count locked activities for free users
+    if (subscriptionTier === 'free') {
+      const { count } = await supabase
+        .from("activities")
+        .select("id", { count: "exact", head: true })
+        .eq("is_published", true)
+        .neq("required_plan", "free");
+      
+      lockedActivitiesCount = count || 0;
+    }
+  }
+
   return (
     <div className="min-h-screen bg-[var(--background-secondary)]">
       {/* Subscription Success Popup */}
@@ -204,7 +241,7 @@ export default async function CourseLearnPage({ params, searchParams }: CourseLe
                 <Link href={`/skills/${nextSkill.skill_slug}`}>
                   <Button className="w-full bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white">
                     <Play className="w-4 h-4 mr-2" />
-                    Continue Learning
+                    {progress.overall_progress_percent > 0 ? 'Continue Learning' : 'Start Learning'}
                   </Button>
                 </Link>
               )}
@@ -212,6 +249,65 @@ export default async function CourseLearnPage({ params, searchParams }: CourseLe
           </div>
         </div>
       </div>
+
+      {/* Upgrade Banner for Free Users */}
+      {subscriptionTier === 'free' && lockedActivitiesCount > 0 && (
+        <div className="bg-gradient-to-r from-[var(--accent)]/10 via-[var(--accent)]/5 to-transparent border-b border-[var(--accent)]/20">
+          <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-[var(--accent)]/10 flex items-center justify-center flex-shrink-0">
+                  <Crown className="w-6 h-6 text-[var(--accent)]" />
+                </div>
+                <div>
+                  <p className="font-semibold text-[var(--foreground)]">
+                    Unlock {lockedActivitiesCount}+ premium activities
+                  </p>
+                  <div className="flex items-center gap-4 text-sm text-[var(--foreground-muted)] mt-1">
+                    <span className="flex items-center gap-1">
+                      <Check className="w-3.5 h-3.5 text-emerald-500" />
+                      Full course access
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <MessageCircle className="w-3.5 h-3.5 text-emerald-500" />
+                      AI tutor
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <Link
+                href={`/pricing?course=${slug}`}
+                className="flex items-center gap-2 px-5 py-2.5 bg-[var(--accent)] text-white font-semibold rounded-lg hover:bg-[var(--accent-dark)] transition-colors shadow-sm"
+              >
+                Subscribe - CHF 8/mo
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Upgrade to Advanced Banner for Basic Users */}
+      {subscriptionTier === 'basic' && (
+        <div className="bg-gradient-to-r from-purple-500/10 via-purple-500/5 to-transparent border-b border-purple-500/20">
+          <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <Zap className="w-5 h-5 text-purple-600" />
+                <span className="text-sm text-[var(--foreground)]">
+                  <span className="font-medium">Basic Plan</span> - Upgrade to Advanced for unlimited AI tutor access
+                </span>
+              </div>
+              <Link
+                href={`/pricing?course=${slug}`}
+                className="text-sm font-semibold text-purple-600 hover:text-purple-700 hover:underline"
+              >
+                Upgrade
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Tab Navigation */}
       <div className="sticky top-16 z-30 border-b border-[var(--border)] bg-white shadow-sm">

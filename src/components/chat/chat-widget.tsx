@@ -1,16 +1,25 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { BobPopup } from "./bob-popup";
 import { useChatContext } from "./chat-context";
+import { Zap, Crown } from "lucide-react";
 
 interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
   timestamp: Date;
+}
+
+interface RateLimitInfo {
+  tier: string;
+  messagesPerDay: number;
+  messagesUsedToday: number;
+  messagesRemaining: number;
 }
 
 interface ChatWidgetProps {
@@ -42,6 +51,7 @@ export function ChatWidget({
   const [isLoading, setIsLoading] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [rateLimit, setRateLimit] = useState<RateLimitInfo | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   
@@ -54,6 +64,26 @@ export function ChatWidget({
     shouldOpenChat, 
     setShouldOpenChat 
   } = useChatContext();
+
+  // Fetch rate limit info
+  const fetchRateLimit = useCallback(async () => {
+    try {
+      const response = await fetch("/api/chat/rate-limit");
+      if (response.ok) {
+        const data = await response.json();
+        setRateLimit(data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch rate limit:", err);
+    }
+  }, []);
+
+  // Fetch rate limit when chat opens
+  useEffect(() => {
+    if (isOpen) {
+      fetchRateLimit();
+    }
+  }, [isOpen, fetchRateLimit]);
   
   // Track the skillId for persistence
   const [currentSkillId, setCurrentSkillId] = useState<string | undefined>(skillId);
@@ -205,6 +235,8 @@ export function ChatWidget({
       };
 
       setMessages(prev => [...prev, assistantMessage]);
+      // Refresh rate limit after successful message
+      fetchRateLimit();
     } catch (err) {
       console.error("Failed to send message:", err);
       setError("Failed to send message. Please try again.");
@@ -282,6 +314,8 @@ export function ChatWidget({
       };
 
       setMessages(prev => [...prev, assistantMessage]);
+      // Refresh rate limit after successful message
+      fetchRateLimit();
     } catch (err) {
       console.error("Failed to send message:", err);
       setError("Failed to send message. Please try again.");
@@ -359,47 +393,57 @@ export function ChatWidget({
           )}
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800 bg-zinc-900/80 backdrop-blur-sm">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[var(--primary)] to-[var(--primary-light)] flex items-center justify-center">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="3" />
-                  <path d="M12 2v2" />
-                  <path d="M12 20v2" />
-                  <path d="m4.93 4.93 1.41 1.41" />
-                  <path d="m17.66 17.66 1.41 1.41" />
-                  <path d="M2 12h2" />
-                  <path d="M20 12h2" />
-                  <path d="m6.34 17.66-1.41 1.41" />
-                  <path d="m19.07 4.93-1.41 1.41" />
-                </svg>
+          <div className="border-b border-zinc-800 bg-zinc-900/80 backdrop-blur-sm">
+            <div className="flex items-center justify-between px-4 py-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[var(--primary)] to-[var(--primary-light)] flex items-center justify-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="3" />
+                    <path d="M12 2v2" />
+                    <path d="M12 20v2" />
+                    <path d="m4.93 4.93 1.41 1.41" />
+                    <path d="m17.66 17.66 1.41 1.41" />
+                    <path d="M2 12h2" />
+                    <path d="M20 12h2" />
+                    <path d="m6.34 17.66-1.41 1.41" />
+                    <path d="m19.07 4.93-1.41 1.41" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-white">Bob</h3>
+                  <p className="text-xs text-zinc-400">Your AI Tutor</p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-sm font-semibold text-white">Bob</h3>
-                <p className="text-xs text-zinc-400">Your AI Tutor</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              {messages.length > 0 && (
+              <div className="flex items-center gap-2">
+                {messages.length > 0 && (
+                  <button
+                    onClick={clearChatHistory}
+                    className="text-zinc-500 hover:text-zinc-300 transition-colors text-xs px-2 py-1 rounded hover:bg-zinc-800"
+                    aria-label="Clear chat history"
+                  >
+                    Clear
+                  </button>
+                )}
                 <button
-                  onClick={clearChatHistory}
-                  className="text-zinc-500 hover:text-zinc-300 transition-colors text-xs px-2 py-1 rounded hover:bg-zinc-800"
-                  aria-label="Clear chat history"
+                  onClick={() => setIsOpen(false)}
+                  className="text-zinc-400 hover:text-white transition-colors"
+                  aria-label="Close chat"
                 >
-                  Clear
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
                 </button>
-              )}
-              <button
-                onClick={() => setIsOpen(false)}
-                className="text-zinc-400 hover:text-white transition-colors"
-                aria-label="Close chat"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
-              </button>
+              </div>
             </div>
+            
+            {/* Usage Indicator */}
+            {rateLimit && (
+              <ChatUsageIndicator 
+                rateLimit={rateLimit} 
+                courseSlug={courseId ? undefined : undefined}
+              />
+            )}
           </div>
 
           {/* Messages */}
@@ -546,6 +590,82 @@ function MessageContent({ content }: { content: string }) {
           </div>
         );
       })}
+    </div>
+  );
+}
+
+/**
+ * Chat usage indicator showing remaining messages and tier
+ */
+function ChatUsageIndicator({ 
+  rateLimit,
+  courseSlug,
+}: { 
+  rateLimit: RateLimitInfo;
+  courseSlug?: string;
+}) {
+  const { tier, messagesPerDay, messagesUsedToday, messagesRemaining } = rateLimit;
+  const usagePercent = messagesPerDay > 0 ? (messagesUsedToday / messagesPerDay) * 100 : 0;
+  const isLow = usagePercent >= 50;
+  const isVeryLow = usagePercent >= 80;
+  const isUnlimited = tier === 'advanced';
+  
+  // Tier display config
+  const tierConfig = {
+    free: { label: "Free", icon: null, color: "text-zinc-400" },
+    basic: { label: "Basic", icon: Zap, color: "text-blue-400" },
+    advanced: { label: "Advanced", icon: Crown, color: "text-[var(--accent)]" },
+  };
+  
+  const config = tierConfig[tier as keyof typeof tierConfig] || tierConfig.free;
+  const TierIcon = config.icon;
+
+  return (
+    <div className="px-4 py-2 bg-zinc-800/50">
+      <div className="flex items-center justify-between gap-3">
+        {/* Tier Badge */}
+        <div className={cn("flex items-center gap-1 text-xs font-medium", config.color)}>
+          {TierIcon && <TierIcon className="w-3 h-3" />}
+          <span>{config.label}</span>
+        </div>
+        
+        {/* Usage Info */}
+        {isUnlimited ? (
+          <span className="text-xs text-[var(--accent)]">Unlimited messages</span>
+        ) : (
+          <div className="flex items-center gap-2">
+            <span className={cn(
+              "text-xs",
+              isVeryLow ? "text-red-400" : isLow ? "text-amber-400" : "text-zinc-400"
+            )}>
+              {messagesRemaining}/{messagesPerDay} left today
+            </span>
+            
+            {/* Upgrade link when usage is high */}
+            {isLow && tier !== 'advanced' && (
+              <Link
+                href={courseSlug ? `/pricing?course=${courseSlug}` : "/pricing"}
+                className="text-xs font-medium text-[var(--accent)] hover:underline"
+              >
+                Upgrade
+              </Link>
+            )}
+          </div>
+        )}
+      </div>
+      
+      {/* Progress bar for non-unlimited tiers */}
+      {!isUnlimited && (
+        <div className="mt-1.5 h-1 bg-zinc-700 rounded-full overflow-hidden">
+          <div 
+            className={cn(
+              "h-full rounded-full transition-all",
+              isVeryLow ? "bg-red-500" : isLow ? "bg-amber-500" : "bg-blue-500"
+            )}
+            style={{ width: `${Math.min(100, usagePercent)}%` }}
+          />
+        </div>
+      )}
     </div>
   );
 }

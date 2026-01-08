@@ -1,7 +1,7 @@
 import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { BookOpen } from "lucide-react";
+import Image from "next/image";
 
 /**
  * Auth layout - wraps login, signup, forgot-password, reset-password
@@ -25,9 +25,13 @@ export default async function AuthLayout({
       {/* Header */}
       <header className="p-6">
         <Link href="/" className="inline-flex items-center gap-3 group">
-          <div className="w-11 h-11 rounded-xl bg-[var(--primary)] flex items-center justify-center transition-transform group-hover:rotate-[-5deg] group-hover:scale-105 shadow-md shadow-[var(--primary)]/25">
-            <BookOpen className="w-5 h-5 text-white" />
-          </div>
+          <Image 
+            src="/logo-cropped.svg" 
+            alt="Tutorio" 
+            width={44}
+            height={44}
+            className="transition-transform duration-300 group-hover:rotate-[-5deg] group-hover:scale-105"
+          />
           <span 
             className="text-xl font-bold tracking-tight text-[var(--foreground)]"
             style={{ fontFamily: 'var(--font-heading)' }}

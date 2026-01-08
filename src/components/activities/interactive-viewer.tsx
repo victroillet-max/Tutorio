@@ -951,10 +951,20 @@ interface ClassificationScenario {
 }
 
 function TimedClassification({ content, onComplete, completed }: TimedClassificationProps) {
-  // Parse scenarios - handle both array formats and different key names
-  const rawScenarios = content?.scenarios || content?.transactions || content?.questions;
-  const scenarios: ClassificationScenario[] = Array.isArray(rawScenarios) ? rawScenarios : [];
-  const instructions = (content?.instructions as string) || (content?.description as string) || "Identify the correct CT pillar for each scenario.";
+  // Parse scenarios - handle multiple possible key names and formats
+  const rawScenarios = content?.scenarios || content?.transactions || content?.questions || content?.items || content?.exercises;
+  let scenarios: ClassificationScenario[] = [];
+  
+  if (Array.isArray(rawScenarios)) {
+    // Map various possible field names to the expected format
+    scenarios = rawScenarios.map((item: Record<string, unknown>) => ({
+      scenario: (item.scenario || item.description || item.question || item.text || '') as string,
+      correctPillar: (item.correctPillar || item.correct_pillar || item.answer || item.correct || item.category || '') as string,
+      explanation: (item.explanation || item.feedback || item.hint || '') as string,
+    })).filter(s => s.scenario && s.correctPillar);
+  }
+  
+  const instructions = (content?.instructions as string) || (content?.description as string) || "Identify the correct classification for each scenario.";
   const timePerQuestion = (content?.timePerQuestion as number) || (content?.time_per_question as number) || 15;
   
   const pillars = ["Decomposition", "Pattern Recognition", "Abstraction", "Algorithm"];
@@ -1910,15 +1920,32 @@ interface EquationScenario {
 function EquationAnalyzer({ content, onComplete, completed }: EquationAnalyzerProps) {
   const instructions = (content?.instructions as string) || (content?.description as string) || "Analyze how each transaction affects the accounting equation.";
   
-  // Parse scenarios - handle both array and object formats
-  const rawScenarios = content?.scenarios;
-  const scenarios: EquationScenario[] = Array.isArray(rawScenarios) ? rawScenarios : [];
+  // Parse scenarios - handle multiple possible key names and formats
+  const rawScenarios = content?.scenarios || content?.items || content?.exercises;
+  let scenarios: EquationScenario[] = Array.isArray(rawScenarios) ? rawScenarios : [];
   
   // Parse questions - handle both array and object formats, and check nested content
   const rawQuestions = content?.questions;
   const questions: QuizQuestion[] = Array.isArray(rawQuestions) ? rawQuestions : [];
   
-  const transactions = (content?.transactions as { id: string; description: string }[]) || [];
+  // Parse transactions that might be usable as scenarios
+  const rawTransactions = content?.transactions;
+  const transactions = Array.isArray(rawTransactions) ? rawTransactions as { id?: string; description: string; effects?: { assets: number; liabilities: number; equity: number }; explanation?: string }[] : [];
+  
+  // If no scenarios but we have transactions with effects, convert them to scenarios
+  if (scenarios.length === 0 && transactions.length > 0) {
+    const convertedScenarios: EquationScenario[] = transactions
+      .filter(t => t.effects || t.description)
+      .map(t => ({
+        description: t.description || '',
+        effects: t.effects || { assets: 0, liabilities: 0, equity: 0 },
+        explanation: t.explanation || 'No explanation provided'
+      }));
+    if (convertedScenarios.length > 0) {
+      scenarios = convertedScenarios;
+    }
+  }
+  
   const companyBackground = (content?.company_background as string) || (content?.companyBackground as string) || "";
   const passingScore = (content?.passing_score as number) || (content?.passingScore as number) || 60;
   
@@ -1929,7 +1956,7 @@ function EquationAnalyzer({ content, onComplete, completed }: EquationAnalyzerPr
   // Debug logging for troubleshooting content issues
   useEffect(() => {
     if (!hasScenarios && !hasQuestions && content) {
-      console.warn('[EquationAnalyzer] No scenarios or questions found. Content keys:', Object.keys(content));
+      console.warn('[EquationAnalyzer] No scenarios or questions found. Content keys:', Object.keys(content), 'Content:', content);
     }
   }, [hasScenarios, hasQuestions, content]);
   
@@ -2068,7 +2095,7 @@ function EquationAnalyzer({ content, onComplete, completed }: EquationAnalyzerPr
     
     // Find corresponding transaction description if available
     const relatedTransaction = transactions.find(t => 
-      currentQuestion.question.includes(t.id) || currentQuestion.id.includes(t.id.toLowerCase())
+      t.id && (currentQuestion.question.includes(t.id) || currentQuestion.id.includes(t.id.toLowerCase()))
     );
 
     const checkQuizAnswer = () => {

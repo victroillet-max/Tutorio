@@ -1,16 +1,24 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { CheckCircle2, XCircle, HelpCircle, ChevronRight, BookOpen, Lightbulb, MessageCircle, Clock, AlertTriangle } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { CheckCircle2, XCircle, HelpCircle, ChevronRight, Lightbulb, MessageCircle, Clock, AlertTriangle } from "lucide-react";
 import type { Activity, QuizQuestion } from "@/lib/database.types";
 import { markActivityComplete, trackActivityView, updateActivityProgress } from "@/lib/activities/actions";
 import { useChatContext } from "@/components/chat";
 import { Confetti } from "@/components/ui/confetti";
 
+interface NextActivityInfo {
+  slug: string;
+  title: string;
+  skillSlug: string;
+}
+
 interface QuizViewerProps {
   activity: Activity;
   userId: string;
   isCompleted: boolean;
+  nextActivity?: NextActivityInfo;
 }
 
 interface QuizContent {
@@ -22,7 +30,8 @@ interface QuizContent {
   time_limit_seconds?: number;
 }
 
-export function QuizViewer({ activity, userId, isCompleted }: QuizViewerProps) {
+export function QuizViewer({ activity, userId, isCompleted, nextActivity }: QuizViewerProps) {
+  const router = useRouter();
   const content = activity.content as QuizContent | null;
   const originalQuestions = content?.questions || [];
   const passingScore = content?.passing_score || activity.passing_score || 70;
@@ -319,22 +328,37 @@ export function QuizViewer({ activity, userId, isCompleted }: QuizViewerProps) {
             }
           </p>
           
-          {/* Show retry button: always when failed, or when passed but below 75% (for improvement) */}
-          {!passed ? (
-            <button
-              onClick={handleRetry}
-              className="px-6 py-3 bg-[var(--primary)] text-white font-semibold rounded-xl hover:bg-[var(--primary-hover)] transition-colors"
-            >
-              Try Again
-            </button>
-          ) : score < 75 && (
-            <button
-              onClick={handleRetry}
-              className="px-6 py-3 bg-slate-600 text-white font-semibold rounded-xl hover:bg-slate-700 transition-colors"
-            >
-              Practice Again for a Better Score
-            </button>
-          )}
+          {/* Show appropriate action buttons based on pass/fail and next activity availability */}
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+            {!passed ? (
+              <button
+                onClick={handleRetry}
+                className="px-6 py-3 bg-[var(--primary)] text-white font-semibold rounded-xl hover:bg-[var(--primary-hover)] transition-colors"
+              >
+                Try Again
+              </button>
+            ) : (
+              <>
+                {nextActivity && (
+                  <button
+                    onClick={() => router.push(`/skills/${nextActivity.skillSlug}/${nextActivity.slug}`)}
+                    className="flex items-center gap-2 px-6 py-3 bg-[var(--primary)] text-white font-semibold rounded-xl hover:bg-[var(--primary-hover)] transition-colors"
+                  >
+                    Continue to Next
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                )}
+                {score < 75 && (
+                  <button
+                    onClick={handleRetry}
+                    className="px-6 py-3 bg-slate-600 text-white font-semibold rounded-xl hover:bg-slate-700 transition-colors"
+                  >
+                    Practice Again
+                  </button>
+                )}
+              </>
+            )}
+          </div>
         </div>
         
         {/* Review Answers */}
@@ -589,13 +613,6 @@ export function QuizViewer({ activity, userId, isCompleted }: QuizViewerProps) {
                   >
                     <MessageCircle className="w-4 h-4" />
                     Ask AI Tutor
-                  </button>
-                  <button
-                    onClick={() => window.history.back()}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white text-amber-700 text-sm font-medium rounded-lg border border-amber-300 hover:bg-amber-50 transition-colors"
-                  >
-                    <BookOpen className="w-4 h-4" />
-                    Go Back to Skill
                   </button>
                 </div>
               </div>
