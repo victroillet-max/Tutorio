@@ -22,6 +22,8 @@ interface RateLimitInfo {
   messagesRemaining: number;
 }
 
+import type { CurrentQuestionContext, CurrentScenario, ReferenceDataItem } from "./chat-context";
+
 interface ChatWidgetProps {
   activityId?: string;
   skillId?: string;
@@ -32,6 +34,13 @@ interface ChatWidgetProps {
   courseName?: string;
   courseId?: string;
   className?: string;
+  // Enhanced context fields
+  currentQuestion?: CurrentQuestionContext;
+  currentScenario?: CurrentScenario;
+  referenceData?: ReferenceDataItem[];
+  activityTitle?: string;
+  activityType?: string;
+  activityInstructions?: string;
 }
 
 export function ChatWidget({
@@ -44,6 +53,13 @@ export function ChatWidget({
   courseName,
   courseId,
   className,
+  // Enhanced context
+  currentQuestion,
+  currentScenario,
+  referenceData,
+  activityTitle,
+  activityType,
+  activityInstructions,
 }: ChatWidgetProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -206,6 +222,13 @@ export function ChatWidget({
           currentQuestionText,
           currentQuestionNumber,
           courseId,
+          // Enhanced context fields
+          currentQuestion,
+          currentScenario,
+          referenceData,
+          activityTitle,
+          activityType,
+          activityInstructions,
         }),
       });
 
@@ -274,6 +297,13 @@ export function ChatWidget({
           currentQuestionText,
           currentQuestionNumber,
           courseId,
+          // Enhanced context fields
+          currentQuestion,
+          currentScenario,
+          referenceData,
+          activityTitle,
+          activityType,
+          activityInstructions,
         }),
       });
 

@@ -4,12 +4,12 @@ import {
   BookOpen, 
   ChevronRight,
   Target,
-  GraduationCap,
   ArrowLeft,
   Sparkles,
   ArrowRight,
-  Star
+  Clock
 } from "lucide-react";
+import { CourseIcon } from "@/components/courses/course-icon";
 
 export const metadata = {
   title: "Explore Courses | Tutorio",
@@ -26,35 +26,6 @@ interface Course {
   total_skills: number;
   total_foundations: number;
 }
-
-// Accent colors for courses
-const courseAccents = ['coral', 'teal', 'gold', 'navy', 'purple', 'rose'];
-const accentClasses: Record<string, { icon: string; border: string }> = {
-  coral: { 
-    icon: "bg-gradient-to-br from-[#e76f51] to-[#f4a261] text-white", 
-    border: "hover:border-t-[#e76f51]"
-  },
-  teal: { 
-    icon: "bg-gradient-to-br from-[#2a9d8f] to-[#40c9b4] text-white", 
-    border: "hover:border-t-[#2a9d8f]"
-  },
-  gold: { 
-    icon: "bg-gradient-to-br from-[#e9c46a] to-[#f4d58d] text-[#8a6d2e]", 
-    border: "hover:border-t-[#e9c46a]"
-  },
-  navy: { 
-    icon: "bg-gradient-to-br from-[#1e3a5f] to-[#2d5a8b] text-white", 
-    border: "hover:border-t-[#1e3a5f]"
-  },
-  purple: { 
-    icon: "bg-gradient-to-br from-[#7c3aed] to-[#a78bfa] text-white", 
-    border: "hover:border-t-[#7c3aed]"
-  },
-  rose: { 
-    icon: "bg-gradient-to-br from-[#f43f5e] to-[#fb7185] text-white", 
-    border: "hover:border-t-[#f43f5e]"
-  },
-};
 
 export default async function ExplorePage() {
   const supabase = await createClient();
@@ -175,12 +146,11 @@ export default async function ExplorePage() {
         {/* Courses Grid */}
         {courses.length > 0 ? (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-7">
-            {courses.map((course, index) => (
+            {courses.map((course) => (
               <CourseCard 
                 key={course.id} 
                 course={course} 
                 isLoggedIn={!!user} 
-                accent={courseAccents[index % courseAccents.length]}
               />
             ))}
           </div>
@@ -229,30 +199,28 @@ export default async function ExplorePage() {
   );
 }
 
-function CourseCard({ course, isLoggedIn, accent }: { course: Course; isLoggedIn: boolean; accent: string }) {
+function CourseCard({ course, isLoggedIn }: { course: Course; isLoggedIn: boolean }) {
   const totalContent = course.total_skills + course.total_foundations;
-  const colors = accentClasses[accent] || accentClasses.coral;
+  // Estimate hours based on content (roughly 45 min per skill)
+  const estimatedHours = Math.max(Math.round(totalContent * 0.75), 10);
   
   return (
-    <div className={`group bg-white rounded-2xl border border-[var(--card-border)] p-7 hover:shadow-xl transition-all duration-300 border-t-4 border-t-transparent ${colors.border}`}>
-      <div className="flex items-center gap-2 mb-4">
-        <span className={`px-3 py-1 text-xs font-semibold rounded-full capitalize
-          ${course.difficulty === 'beginner' ? 'bg-[var(--success-light)] text-[var(--success)]' :
-            course.difficulty === 'intermediate' ? 'bg-amber-100 text-amber-700' :
-            'bg-rose-100 text-rose-700'
-          }
-        `}>
-          {course.difficulty}
+    <div className="group bg-white rounded-2xl border border-[var(--card-border)] p-7 hover:shadow-xl transition-all duration-300 relative">
+      {/* Free Preview Badge */}
+      <div className="absolute top-5 right-5">
+        <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-full bg-[var(--success-light)] text-[var(--success)]">
+          <Sparkles className="w-3 h-3" />
+          Free Preview
         </span>
       </div>
 
-      <div className={`w-14 h-14 rounded-2xl ${colors.icon} flex items-center justify-center mb-5 relative`}>
-        <GraduationCap className="w-7 h-7" />
-        <div className={`absolute inset-[-4px] rounded-[18px] ${colors.icon} opacity-20 -z-10`} />
+      {/* Course Icon */}
+      <div className="mb-5">
+        <CourseIcon courseSlug={course.slug} size="lg" />
       </div>
 
       <h3 
-        className="text-xl font-bold text-[var(--foreground)] mb-3 group-hover:text-[var(--primary)] transition-colors"
+        className="text-xl font-bold text-[var(--foreground)] mb-3 group-hover:text-[var(--primary)] transition-colors pr-16"
         style={{ fontFamily: 'var(--font-heading)', letterSpacing: '-0.01em' }}
       >
         {course.title}
@@ -264,22 +232,20 @@ function CourseCard({ course, isLoggedIn, accent }: { course: Course; isLoggedIn
 
       {/* Course Stats */}
       <div className="flex items-center gap-4 text-xs text-[var(--foreground-muted)] mb-5 pb-5 border-b border-[var(--card-border)]">
-        {course.total_foundations > 0 && (
-          <span className="flex items-center gap-1.5">
-            <Sparkles className="w-4 h-4 text-amber-500" />
-            {course.total_foundations} foundations
-          </span>
-        )}
         <span className="flex items-center gap-1.5">
           <Target className="w-4 h-4 text-[var(--primary)]" />
-          {course.total_skills} skills
+          {totalContent} skills
+        </span>
+        <span className="flex items-center gap-1.5">
+          <Clock className="w-4 h-4 text-[var(--foreground-muted)]" />
+          {estimatedHours} hours
         </span>
       </div>
 
       {/* CTA */}
       <Link
         href={isLoggedIn ? `/courses/${course.slug}/learn` : `/explore/${course.slug}`}
-        className="flex items-center justify-between w-full px-5 py-3 bg-[var(--background)] rounded-xl text-sm font-semibold text-[var(--foreground)] group-hover:bg-[var(--primary)] group-hover:text-white transition-all"
+        className="flex items-center justify-between w-full px-5 py-3 bg-[var(--background)] rounded-xl text-sm font-semibold text-[var(--foreground)] group-hover:bg-[var(--accent)] group-hover:text-white transition-all"
       >
         <span>{isLoggedIn ? 'Start Learning' : 'View Course'}</span>
         <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />

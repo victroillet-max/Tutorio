@@ -7,7 +7,14 @@
 // Enums
 // ============================================
 
-export type UserRole = 'user' | 'admin';
+export type UserRole = 'user' | 'admin' | 'contentadmin';
+
+// Content management enums
+export type ContentChangeStatus = 'pending' | 'approved' | 'rejected';
+
+export type ContentChangeType = 'create' | 'update' | 'delete' | 'reorder';
+
+export type ContentEntityType = 'activity' | 'module' | 'course';
 
 export type SubscriptionStatus = 'trialing' | 'active' | 'cancelled' | 'expired' | 'past_due';
 
@@ -375,6 +382,38 @@ export interface SheetGradingCriteria {
   created_at: string;
   updated_at: string;
 }
+
+// ============================================
+// Content Management Tables
+// ============================================
+
+export interface PendingContentChange {
+  id: string;
+  entity_type: ContentEntityType;
+  entity_id: string | null;
+  parent_id: string | null;
+  change_type: ContentChangeType;
+  current_data: Record<string, unknown> | null;
+  proposed_data: Record<string, unknown>;
+  submitted_by: string;
+  submitted_at: string;
+  title: string;
+  description: string | null;
+  status: ContentChangeStatus;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  review_notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PendingContentChangeWithSubmitter extends PendingContentChange {
+  submitter: Pick<Profile, 'id' | 'email' | 'full_name' | 'avatar_url'>;
+  reviewer?: Pick<Profile, 'id' | 'email' | 'full_name'> | null;
+}
+
+export type PendingContentChangeInsert = Omit<PendingContentChange, 'id' | 'created_at' | 'updated_at' | 'status' | 'reviewed_by' | 'reviewed_at' | 'review_notes'>;
+export type PendingContentChangeUpdate = Partial<Omit<PendingContentChange, 'id' | 'submitted_by' | 'submitted_at' | 'created_at' | 'updated_at'>>;
 
 // ============================================
 // Extended Types with Relations

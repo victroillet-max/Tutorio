@@ -5,16 +5,9 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
-  Zap,
-  Lock,
-  Check,
-  Sparkles,
-  Crown,
-  BookOpen,
-  MessageCircle,
-  ArrowRight
+  Zap
 } from "lucide-react";
-import type { Activity, PlanTier } from "@/lib/database.types";
+import type { Activity } from "@/lib/database.types";
 import { LessonViewer } from "@/components/activities/lesson-viewer";
 import { QuizViewer } from "@/components/activities/quiz-viewer";
 import { CodeEditor } from "@/components/activities/code-editor";
@@ -52,28 +45,6 @@ export default async function SkillActivityPage({ params }: SkillActivityPagePro
     redirect("/login");
   }
   
-  // Get user's profile (for admin check) and subscription tier
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-  
-  const isAdmin = profile?.role === 'admin';
-  
-  let userPlan: PlanTier = 'free';
-  const { data: subscription } = await supabase
-    .from("subscriptions")
-    .select("tier:subscription_tiers(slug)")
-    .eq("user_id", user.id)
-    .in("status", ["active", "trialing"])
-    .single();
-  
-  if (subscription?.tier) {
-    const tier = subscription.tier as unknown as { slug: string }[] | { slug: string };
-    userPlan = (Array.isArray(tier) ? tier[0]?.slug : tier.slug) as PlanTier;
-  }
-  
   // Get the skill
   const { data: skill, error: skillError } = await supabase
     .from("skills")
@@ -105,157 +76,6 @@ export default async function SkillActivityPage({ params }: SkillActivityPagePro
   }
 
   const activity = activitySkillData.activities as Activity;
-  const activitySkill = activitySkillData;
-
-  // Check access (admins have full access)
-  const hasAccess = isAdmin || checkAccess(activity.required_plan as PlanTier, userPlan);
-  
-  if (!hasAccess) {
-    // Get course info for the paywall
-    const { data: courseData } = await supabase
-      .from("skills")
-      .select("course:courses(id, slug, title)")
-      .eq("id", skill.id)
-      .single();
-    
-    const courseRaw = courseData?.course as unknown;
-    const course = (Array.isArray(courseRaw) ? courseRaw[0] : courseRaw) as { id: string; slug: string; title: string } | null;
-    
-    // Count total and locked activities for this course
-    let totalActivities = 0;
-    let lockedActivities = 0;
-    
-    if (course?.id) {
-      const { count: total } = await supabase
-        .from("activities")
-        .select("id", { count: "exact", head: true })
-        .eq("is_published", true);
-      
-      const { count: locked } = await supabase
-        .from("activities")
-        .select("id", { count: "exact", head: true })
-        .eq("is_published", true)
-        .neq("required_plan", "free");
-      
-      totalActivities = total || 0;
-      lockedActivities = locked || 0;
-    }
-
-    const isAdvancedRequired = activity.required_plan === 'advanced';
-    const Icon = isAdvancedRequired ? Crown : Zap;
-    const planPrice = isAdvancedRequired ? 15 : 8;
-    const planName = isAdvancedRequired ? "Advanced" : "Basic";
-
-    const features = isAdvancedRequired ? [
-      { icon: BookOpen, text: "Full course access" },
-      { icon: Sparkles, text: "All activities & challenges" },
-      { icon: MessageCircle, text: "Unlimited AI tutor" },
-      { icon: Check, text: "Priority support" },
-    ] : [
-      { icon: BookOpen, text: "Full course access" },
-      { icon: Sparkles, text: "All activities & challenges" },
-      { icon: MessageCircle, text: "AI tutor (25 messages/day)" },
-      { icon: Check, text: "Progress tracking" },
-    ];
-
-    return (
-      <div className="min-h-screen bg-[var(--background-secondary)] flex items-center justify-center p-4">
-        <div className="max-w-lg w-full overflow-hidden">
-          {/* Header with gradient */}
-          <div className="bg-gradient-to-br from-[var(--accent)] to-[var(--accent-dark)] rounded-t-2xl px-8 py-8 text-white text-center">
-            <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
-              <Icon className="w-8 h-8" />
-            </div>
-            <h1 
-              className="text-2xl font-bold mb-2"
-              style={{ fontFamily: 'var(--font-heading)' }}
-            >
-              Unlock This Activity
-            </h1>
-            <p className="text-white/80">
-              {course?.title ? `Continue your ${course.title} journey` : "Subscribe to access premium content"}
-            </p>
-          </div>
-          
-          {/* Content */}
-          <div className="bg-white rounded-b-2xl p-8 shadow-lg">
-            {/* Activity preview */}
-            <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-xl mb-6">
-              <Lock className="w-5 h-5 text-slate-400" />
-              <div>
-                <p className="font-medium text-[var(--foreground)]">{activity.title}</p>
-                <p className="text-sm text-[var(--foreground-muted)]">
-                  Requires {planName} plan
-                </p>
-              </div>
-            </div>
-
-            {/* Stats */}
-            {lockedActivities > 0 && (
-              <div className="flex items-center justify-center gap-6 mb-6 py-3 border-y border-[var(--border)]">
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-[var(--accent)]">{lockedActivities}+</p>
-                  <p className="text-xs text-[var(--foreground-muted)]">Activities to unlock</p>
-                </div>
-                <div className="w-px h-10 bg-[var(--border)]" />
-                <div className="text-center">
-                  <p className="text-2xl font-bold text-[var(--accent)]">24/7</p>
-                  <p className="text-xs text-[var(--foreground-muted)]">AI tutor access</p>
-                </div>
-              </div>
-            )}
-            
-            {/* Features */}
-            <div className="mb-6">
-              <p className="text-sm font-medium text-[var(--foreground-muted)] mb-3">
-                What you&apos;ll get with {planName}:
-              </p>
-              <ul className="space-y-2.5">
-                {features.map(({ icon: FeatureIcon, text }) => (
-                  <li key={text} className="flex items-center gap-2.5 text-sm">
-                    <div className="w-5 h-5 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
-                      <FeatureIcon className="w-3 h-3 text-emerald-600" />
-                    </div>
-                    <span className="text-[var(--foreground)]">{text}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-            
-            {/* Pricing */}
-            <div className="text-center mb-6">
-              <span className="text-3xl font-bold text-[var(--foreground)]">CHF {planPrice}</span>
-              <span className="text-[var(--foreground-muted)]">/month</span>
-              <p className="text-xs text-[var(--foreground-muted)] mt-1">Cancel anytime</p>
-            </div>
-            
-            {/* CTAs */}
-            <div className="space-y-3">
-              <Link
-                href={course?.slug ? `/pricing?course=${course.slug}` : "/pricing"}
-                className="flex items-center justify-center gap-2 w-full py-3.5 bg-[var(--accent)] text-white font-semibold rounded-xl hover:bg-[var(--accent-dark)] transition-colors"
-              >
-                Subscribe to {planName}
-                <ArrowRight className="w-4 h-4" />
-              </Link>
-              <Link
-                href={course?.slug ? `/pricing?course=${course.slug}` : "/pricing"}
-                className="block w-full py-3 text-center text-[var(--foreground-muted)] font-medium hover:text-[var(--foreground)] transition-colors"
-              >
-                View all plans
-              </Link>
-              <Link
-                href={`/skills/${skillSlug}`}
-                className="block w-full py-2 text-center text-sm text-[var(--foreground-muted)] hover:underline transition-colors"
-              >
-                Back to skill
-              </Link>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   // Get all activities for this skill in order
   const { data: skillActivitiesData } = await supabase
@@ -297,45 +117,6 @@ export default async function SkillActivityPage({ params }: SkillActivityPagePro
   
   // Use much wider max-width for spreadsheet exercises (7xl = 80rem = 1280px)
   const containerClass = isWideLayout ? 'max-w-7xl' : 'max-w-4xl';
-
-  // Get demo info for upgrade prompts (only for free users)
-  let demoInfo = undefined;
-  if (userPlan === 'free' && activity.required_plan === 'free') {
-    // Get course info
-    const { data: courseData } = await supabase
-      .from("skills")
-      .select("course:courses(id, slug, title)")
-      .eq("id", skill.id)
-      .single();
-    
-    const courseRaw2 = courseData?.course as unknown;
-    const course = (Array.isArray(courseRaw2) ? courseRaw2[0] : courseRaw2) as { id: string; slug: string; title: string } | null;
-    
-    if (course) {
-      // Count demo (free) activities completed by user in this course
-      const { count: demoActivitiesRemaining } = await supabase
-        .from("activities")
-        .select("id", { count: "exact", head: true })
-        .eq("required_plan", "free")
-        .eq("is_published", true)
-        .not("id", "in", `(SELECT activity_id FROM activity_progress WHERE user_id = '${user.id}' AND completed = true)`);
-      
-      // Count locked activities
-      const { count: lockedCount } = await supabase
-        .from("activities")
-        .select("id", { count: "exact", head: true })
-        .eq("is_published", true)
-        .neq("required_plan", "free");
-      
-      demoInfo = {
-        isDemoActivity: true,
-        demoActivitiesRemaining: demoActivitiesRemaining || 0,
-        totalLockedActivities: lockedCount || 0,
-        courseSlug: course.slug,
-        courseName: course.title,
-      };
-    }
-  }
 
   return (
     <div className="min-h-screen bg-[var(--background-secondary)]">
@@ -409,7 +190,6 @@ export default async function SkillActivityPage({ params }: SkillActivityPagePro
             title: nextActivity.activity_title,
             skillSlug: skillSlug
           } : undefined}
-          demoInfo={demoInfo}
         />
       </div>
 
@@ -479,23 +259,10 @@ export default async function SkillActivityPage({ params }: SkillActivityPagePro
   );
 }
 
-function checkAccess(required: PlanTier, userPlan: PlanTier): boolean {
-  const tierOrder: Record<PlanTier, number> = { free: 0, basic: 1, advanced: 2 };
-  return tierOrder[userPlan] >= tierOrder[required];
-}
-
 interface NextActivityInfo {
   slug: string;
   title: string;
   skillSlug: string;
-}
-
-interface DemoInfo {
-  isDemoActivity: boolean;
-  demoActivitiesRemaining: number;
-  totalLockedActivities: number;
-  courseSlug: string;
-  courseName: string;
 }
 
 interface ActivityRendererProps {
@@ -503,10 +270,9 @@ interface ActivityRendererProps {
   userId: string;
   isCompleted: boolean;
   nextActivity?: NextActivityInfo;
-  demoInfo?: DemoInfo;
 }
 
-function ActivityRenderer({ activity, userId, isCompleted, nextActivity, demoInfo }: ActivityRendererProps) {
+function ActivityRenderer({ activity, userId, isCompleted, nextActivity }: ActivityRendererProps) {
   switch (activity.type) {
     case 'lesson':
       return (
@@ -515,7 +281,6 @@ function ActivityRenderer({ activity, userId, isCompleted, nextActivity, demoInf
           userId={userId}
           isCompleted={isCompleted}
           nextActivity={nextActivity}
-          demoInfo={demoInfo}
         />
       );
     

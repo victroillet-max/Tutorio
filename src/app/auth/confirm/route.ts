@@ -1,10 +1,15 @@
 import { createClient } from "@/utils/supabase/server";
+import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { type EmailOtpType } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { logger } from "@/lib/logging";
 import { sendWelcomeEmail } from "@/lib/email/actions";
 
 const log = logger.child({ module: "auth/confirm" });
+
+// Service client for operations that bypass RLS
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 /**
  * Email confirmation handler for Supabase email verification
@@ -48,17 +53,46 @@ export async function GET(request: Request) {
     // Get the current user to send welcome email
     const { data: { user } } = await supabase.auth.getUser();
     
-    if (user?.email) {
-      // Send welcome email asynchronously (don't block the redirect)
-      sendWelcomeEmail({
-        to: user.email,
-        email: user.email,
-        userName: user.user_metadata?.full_name || "",
-      }).catch((err) => {
-        log.error("Failed to send welcome email", err, { userId: user.id });
-      });
-      
-      log.info("Welcome email triggered", { userId: user.id, email: user.email });
+    if (user?.email && supabaseServiceKey) {
+      try {
+        const serviceClient = createServiceClient(supabaseUrl, supabaseServiceKey);
+        
+        // Check if welcome email was already sent
+        const { data: profile } = await serviceClient
+          .from("profiles")
+          .select("welcome_email_sent_at")
+          .eq("id", user.id)
+          .single();
+
+        if (profile && !profile.welcome_email_sent_at) {
+          // Send welcome email
+          const emailResult = await sendWelcomeEmail({
+            to: user.email,
+            email: user.email,
+            userName: user.user_metadata?.full_name || "",
+          });
+
+          if (emailResult.success) {
+            // Mark welcome email as sent
+            await serviceClient
+              .from("profiles")
+              .update({ welcome_email_sent_at: new Date().toISOString() })
+              .eq("id", user.id);
+
+            log.info("Welcome email sent successfully", { 
+              userId: user.id, 
+              email: user.email,
+              emailId: emailResult.id,
+            });
+          } else {
+            log.error("Failed to send welcome email", new Error(emailResult.error), { 
+              userId: user.id 
+            });
+          }
+        }
+      } catch (err) {
+        log.error("Error in welcome email flow", err, { userId: user.id });
+      }
     }
   }
 

@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none">
+  <!-- Chart/Analytics icon for Managerial Accounting -->
+  <rect width="40" height="40" rx="10" fill="#E0E7FF"/>
+  <g transform="translate(8, 8)">
+    <!-- Pie chart background -->
+    <circle cx="12" cy="11" r="9" fill="#4F46E5"/>
+    <!-- Pie slice 1 (larger) -->
+    <path d="M12 11 L12 2 A9 9 0 0 1 20.5 7.5 Z" fill="#818CF8"/>
+    <!-- Pie slice 2 -->
+    <path d="M12 11 L20.5 7.5 A9 9 0 0 1 17 18.5 Z" fill="#6366F1"/>
+    <!-- Center highlight -->
+    <circle cx="12" cy="11" r="3" fill="#E0E7FF"/>
+    <!-- Bar chart below -->
+    <rect x="3" y="18" width="3" height="4" rx="0.5" fill="#4F46E5"/>
+    <rect x="8" y="16" width="3" height="6" rx="0.5" fill="#6366F1"/>
+    <rect x="13" y="14" width="3" height="8" rx="0.5" fill="#818CF8"/>
+    <rect x="18" y="17" width="3" height="5" rx="0.5" fill="#4F46E5"/>
+  </g>
+</svg>
+

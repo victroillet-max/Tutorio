@@ -32,6 +32,19 @@ const protectedRoutes = ["/dashboard", "/courses", "/profile", "/settings", "/su
 const authRoutes = ["/login", "/signup", "/forgot-password"];
 
 export async function middleware(request: NextRequest) {
+  const { pathname, searchParams } = request.nextUrl;
+  
+  // Handle auth code redirect: if a code is present in the URL (from Supabase email confirmation),
+  // redirect to /auth/callback to properly exchange it for a session
+  // This handles the case where Supabase redirects to the root URL instead of /auth/callback
+  const code = searchParams.get("code");
+  if (code && pathname === "/") {
+    const callbackUrl = new URL("/auth/callback", request.url);
+    callbackUrl.searchParams.set("code", code);
+    callbackUrl.searchParams.set("next", "/dashboard");
+    return NextResponse.redirect(callbackUrl);
+  }
+
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
@@ -85,8 +98,6 @@ export async function middleware(request: NextRequest) {
     log.error("Failed to get user", err);
     return NextResponse.next({ request });
   }
-
-  const { pathname } = request.nextUrl;
 
   // Check if current path matches any protected routes
   const isProtectedRoute = protectedRoutes.some(

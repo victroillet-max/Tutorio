@@ -9,6 +9,8 @@ import {
   Settings,
   BarChart3,
   CreditCard,
+  FileEdit,
+  ClipboardCheck,
   LucideIcon
 } from "lucide-react";
 
@@ -19,6 +21,8 @@ const iconMap: Record<string, LucideIcon> = {
   Settings,
   BarChart3,
   CreditCard,
+  FileEdit,
+  ClipboardCheck,
 };
 
 interface AdminSidebarLinkProps {

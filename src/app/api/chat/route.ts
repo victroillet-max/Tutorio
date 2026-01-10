@@ -91,6 +91,13 @@ export async function POST(request: NextRequest) {
       errorMessage,
       currentQuestionText,
       currentQuestionNumber,
+      // Enhanced context fields
+      currentQuestion,
+      currentScenario,
+      referenceData,
+      activityTitle,
+      activityType,
+      activityInstructions,
     } = validation.data;
 
     // If courseId not provided but skillId is, get course from skill
@@ -211,6 +218,7 @@ export async function POST(request: NextRequest) {
 
     // Get current skill if available
     let currentSkill = null;
+    let currentSkillName = null;
     if (skillId) {
       const { data } = await supabase
         .from("skills")
@@ -218,6 +226,39 @@ export async function POST(request: NextRequest) {
         .eq("id", skillId)
         .single();
       currentSkill = data?.slug;
+      currentSkillName = data?.name;
+    }
+
+    // Fetch course-wide context: related lessons from the same skill for curriculum alignment
+    let relatedLessons: Array<{ title: string; type: string; summary?: string }> = [];
+    if (skillId) {
+      // Get lessons from the same skill to understand broader context
+      const { data: skillActivities } = await supabase
+        .from("activities")
+        .select("title, type, content")
+        .eq("skill_id", skillId)
+        .eq("type", "lesson")
+        .order("order_index", { ascending: true })
+        .limit(5);
+      
+      if (skillActivities) {
+        relatedLessons = skillActivities.map(activity => {
+          const content = activity.content as Record<string, unknown> | null;
+          // Extract a brief summary from lesson content (first ~200 chars)
+          let summary: string | undefined;
+          const body = (content?.body as string) || (content?.content as string);
+          if (body) {
+            // Strip markdown and get first meaningful paragraph
+            const cleanText = body.replace(/[#*`\[\]]/g, '').replace(/\n+/g, ' ').trim();
+            summary = cleanText.slice(0, 200) + (cleanText.length > 200 ? '...' : '');
+          }
+          return {
+            title: activity.title,
+            type: activity.type,
+            summary,
+          };
+        });
+      }
     }
 
     // Build course material context from activity data
@@ -248,16 +289,27 @@ export async function POST(request: NextRequest) {
       masteredSkills: skillContext?.[0]?.mastered_skills || [],
       strugglingSkills: skillContext?.[0]?.struggling_skills || [],
       currentSkill: currentSkill || undefined,
+      currentSkillName: currentSkillName || undefined,
       masteryLevels: skillContext?.[0]?.mastery_levels || {},
       currentActivity: activityWithContext ? {
         title: activityWithContext.title,
         type: activityWithContext.type,
-      } : undefined,
+      } : (activityTitle ? {
+        title: activityTitle,
+        type: activityType || 'unknown',
+      } : undefined),
       studentCode: studentCode || undefined,
       errorMessage: errorMessage || undefined,
       courseMaterial: courseMaterialContext,
-      currentQuestionText: currentQuestionText || undefined,
-      currentQuestionNumber: currentQuestionNumber || undefined,
+      currentQuestionText: currentQuestionText || currentQuestion?.text || undefined,
+      currentQuestionNumber: currentQuestionNumber || currentQuestion?.number || undefined,
+      // Enhanced context from frontend
+      enhancedQuestion: currentQuestion || undefined,
+      currentScenario: currentScenario || undefined,
+      referenceData: referenceData || undefined,
+      activityInstructions: activityInstructions || undefined,
+      // Course-wide context
+      relatedLessons: relatedLessons.length > 0 ? relatedLessons : undefined,
     };
 
     // Build system prompt

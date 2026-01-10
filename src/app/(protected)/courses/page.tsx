@@ -7,12 +7,13 @@ import {
   Sparkles,
   Trophy,
   Play,
-  GraduationCap,
   Zap,
-  Crown
+  Crown,
+  Clock
 } from "lucide-react";
 import type { UserCourseSubscription } from "@/lib/database.types";
 import { UpgradeButton } from "@/components/courses/upgrade-button";
+import { CourseIcon } from "@/components/courses/course-icon";
 
 // Force dynamic rendering to ensure subscription data is always fresh
 export const dynamic = "force-dynamic";
@@ -220,9 +221,7 @@ function EnrolledCourseCard({
     >
       <div className="flex flex-col lg:flex-row lg:items-center gap-6">
         {/* Course Icon */}
-        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[var(--primary)]/10 to-blue-500/10 flex items-center justify-center flex-shrink-0">
-          <GraduationCap className="w-8 h-8 text-[var(--primary)]" />
-        </div>
+        <CourseIcon courseSlug={course.course_slug} size="xl" />
 
         {/* Course Info */}
         <div className="flex-1 min-w-0">
@@ -320,23 +319,29 @@ function EnrolledCourseCard({
 }
 
 function AvailableCourseCard({ course }: { course: AvailableCourse }) {
+  // Estimate hours based on skills (roughly 1 hour per skill)
+  const estimatedHours = Math.max(Math.round(course.total_skills * 1.2), 10);
+  
   return (
     <Link
       href={`/courses/${course.slug}/learn`}
-      className="group block card-elevated p-6 hover:shadow-lg transition-all"
+      className="group block card-elevated p-6 hover:shadow-lg transition-all relative"
     >
-      <div className="flex items-center gap-2 mb-3">
-        <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-emerald-100 text-emerald-700">
+      {/* Free Preview Badge - positioned top right */}
+      <div className="absolute top-4 right-4">
+        <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-full bg-[var(--success-light)] text-[var(--success)]">
+          <Sparkles className="w-3 h-3" />
           Free Preview
         </span>
       </div>
 
-      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[var(--primary)]/10 to-blue-500/10 flex items-center justify-center mb-4">
-        <GraduationCap className="w-6 h-6 text-[var(--primary)]" />
+      {/* Course Icon */}
+      <div className="mb-4">
+        <CourseIcon courseSlug={course.slug} size="lg" />
       </div>
 
       <h3 
-        className="text-lg font-bold text-[var(--foreground)] mb-2 group-hover:text-[var(--primary)] transition-colors"
+        className="text-lg font-bold text-[var(--foreground)] mb-2 group-hover:text-[var(--primary)] transition-colors pr-20"
         style={{ fontFamily: 'var(--font-heading)' }}
       >
         {course.title}
@@ -346,15 +351,22 @@ function AvailableCourseCard({ course }: { course: AvailableCourse }) {
         {course.short_description || course.description}
       </p>
 
-      <div className="flex items-center justify-between text-sm text-[var(--foreground-muted)]">
+      {/* Stats row */}
+      <div className="flex items-center gap-4 text-xs text-[var(--foreground-muted)] mb-4">
         <span className="flex items-center gap-1">
-          <Target className="w-4 h-4" />
+          <Target className="w-3.5 h-3.5" />
           {course.total_skills} skills
         </span>
-        <span className="flex items-center gap-1 text-[var(--primary)] group-hover:translate-x-1 transition-transform">
-          Start Free Trial
-          <ChevronRight className="w-4 h-4" />
+        <span className="flex items-center gap-1">
+          <Clock className="w-3.5 h-3.5" />
+          {estimatedHours} hours
         </span>
+      </div>
+
+      {/* CTA */}
+      <div className="flex items-center gap-1 text-sm font-semibold text-[var(--accent)] group-hover:text-[var(--accent-dark)] transition-colors">
+        <span>Start Learning</span>
+        <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
       </div>
     </Link>
   );

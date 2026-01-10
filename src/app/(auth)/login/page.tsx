@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { signIn } from "@/lib/auth/actions";
 import { AuthForm, EmailInput, PasswordInput } from "@/components/auth/auth-form";
+import { GoogleButton } from "@/components/auth/oauth-buttons";
 import { AlertCircle, LogOut } from "lucide-react";
 
 export const metadata = {
@@ -58,6 +59,19 @@ export default async function LoginPage({
 
       {/* Form Card */}
       <div className="card-elevated p-8">
+        {/* Google OAuth */}
+        <GoogleButton />
+
+        {/* Divider */}
+        <div className="relative my-6">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-[var(--border)]" />
+          </div>
+          <div className="relative flex justify-center text-sm">
+            <span className="px-4 bg-white text-[var(--foreground-muted)]">or</span>
+          </div>
+        </div>
+
         <AuthForm 
           action={signIn} 
           submitText="Sign In"

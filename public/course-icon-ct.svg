@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" fill="none">
+  <!-- Brain icon for Computational Thinking -->
+  <rect width="40" height="40" rx="10" fill="#FEE2D5"/>
+  <g transform="translate(8, 8)" fill="#E76F51" stroke="#E76F51" stroke-width="0.5">
+    <!-- Left hemisphere -->
+    <path d="M12 4C9.5 4 7.5 5.5 7 8C6.5 7.8 6 7.7 5.5 7.8C4.1 8.1 3 9.3 3 10.8C3 11.4 3.2 12 3.5 12.5C2.6 13.2 2 14.3 2 15.5C2 16.9 2.8 18.1 4 18.7C4 19.6 4.5 20.4 5.3 20.8C5.7 21.5 6.4 22 7.2 22.2C7.8 22.9 8.7 23.3 9.7 23.3C10.7 23.3 11.5 22.9 12 22.3V4Z"/>
+    <!-- Right hemisphere -->
+    <path d="M12 4C14.5 4 16.5 5.5 17 8C17.5 7.8 18 7.7 18.5 7.8C19.9 8.1 21 9.3 21 10.8C21 11.4 20.8 12 20.5 12.5C21.4 13.2 22 14.3 22 15.5C22 16.9 21.2 18.1 20 18.7C20 19.6 19.5 20.4 18.7 20.8C18.3 21.5 17.6 22 16.8 22.2C16.2 22.9 15.3 23.3 14.3 23.3C13.3 23.3 12.5 22.9 12 22.3V4Z"/>
+    <!-- Center divider line -->
+    <line x1="12" y1="5" x2="12" y2="22" stroke="#FEE2D5" stroke-width="1.5"/>
+    <!-- Neural connections left -->
+    <path d="M5 11C7 11 8 13 8 15" fill="none" stroke="#FEE2D5" stroke-width="1" stroke-linecap="round"/>
+    <path d="M6 16C7.5 16 9 17 10 18" fill="none" stroke="#FEE2D5" stroke-width="1" stroke-linecap="round"/>
+    <!-- Neural connections right -->
+    <path d="M19 11C17 11 16 13 16 15" fill="none" stroke="#FEE2D5" stroke-width="1" stroke-linecap="round"/>
+    <path d="M18 16C16.5 16 15 17 14 18" fill="none" stroke="#FEE2D5" stroke-width="1" stroke-linecap="round"/>
+  </g>
+</svg>
+

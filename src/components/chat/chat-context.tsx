@@ -2,6 +2,28 @@
 
 import React, { createContext, useContext, useState, useCallback } from "react";
 
+// Reference data item (e.g., financial table, formula reference)
+export interface ReferenceDataItem {
+  title: string;
+  content: string; // Formatted text representation
+}
+
+// Current scenario/context the student is viewing
+export interface CurrentScenario {
+  title?: string;
+  description: string;
+  companyName?: string;
+}
+
+// Enhanced context for the current question
+export interface CurrentQuestionContext {
+  number: number;
+  text: string;
+  type?: string; // 'mcq', 'numeric', 'choice', etc.
+  options?: string[];
+  hint?: string;
+}
+
 interface ChatActivityContext {
   activityId?: string;
   skillId?: string;
@@ -11,6 +33,13 @@ interface ChatActivityContext {
   currentQuestionNumber?: number;
   courseName?: string;
   courseId?: string;
+  // Enhanced context fields
+  currentQuestion?: CurrentQuestionContext;
+  currentScenario?: CurrentScenario;
+  referenceData?: ReferenceDataItem[];
+  activityTitle?: string;
+  activityType?: string;
+  activityInstructions?: string;
 }
 
 export type PopupType = 'welcome' | 'help' | 'struggling';
@@ -27,6 +56,11 @@ interface ChatContextValue {
   updateStudentCode: (code: string) => void;
   updateErrorMessage: (error: string | undefined) => void;
   updateCurrentQuestion: (questionText: string, questionNumber: number) => void;
+  // Enhanced context update functions
+  updateEnhancedQuestion: (question: CurrentQuestionContext) => void;
+  updateScenario: (scenario: CurrentScenario) => void;
+  updateReferenceData: (data: ReferenceDataItem[]) => void;
+  updateActivityInfo: (info: { title?: string; type?: string; instructions?: string }) => void;
   clearContext: () => void;
   // Popup state and functions
   popup: PopupState;
@@ -79,6 +113,34 @@ export function ChatContextProvider({ children }: { children: React.ReactNode })
     setContext(prev => ({ ...prev, currentQuestionText: questionText, currentQuestionNumber: questionNumber }));
   }, []);
 
+  // Enhanced context update functions
+  const updateEnhancedQuestion = useCallback((question: CurrentQuestionContext) => {
+    setContext(prev => ({ 
+      ...prev, 
+      currentQuestion: question,
+      // Also update legacy fields for backward compatibility
+      currentQuestionText: question.text,
+      currentQuestionNumber: question.number,
+    }));
+  }, []);
+
+  const updateScenario = useCallback((scenario: CurrentScenario) => {
+    setContext(prev => ({ ...prev, currentScenario: scenario }));
+  }, []);
+
+  const updateReferenceData = useCallback((data: ReferenceDataItem[]) => {
+    setContext(prev => ({ ...prev, referenceData: data }));
+  }, []);
+
+  const updateActivityInfo = useCallback((info: { title?: string; type?: string; instructions?: string }) => {
+    setContext(prev => ({ 
+      ...prev, 
+      activityTitle: info.title,
+      activityType: info.type,
+      activityInstructions: info.instructions,
+    }));
+  }, []);
+
   const clearContext = useCallback(() => {
     setContext({});
   }, []);
@@ -128,6 +190,10 @@ export function ChatContextProvider({ children }: { children: React.ReactNode })
         updateStudentCode,
         updateErrorMessage,
         updateCurrentQuestion,
+        updateEnhancedQuestion,
+        updateScenario,
+        updateReferenceData,
+        updateActivityInfo,
         clearContext,
         popup,
         hasSeenWelcome,

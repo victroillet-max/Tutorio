@@ -1,4 +1,5 @@
 import { createClient } from "@/utils/supabase/server";
+import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { logger } from "@/lib/logging";
@@ -6,6 +7,10 @@ import { registerSession } from "@/lib/auth/session-manager";
 import { sendWelcomeEmail } from "@/lib/email/actions";
 
 const log = logger.child({ module: "auth/callback" });
+
+// Service client for operations that bypass RLS
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 /**
  * Get the client IP from headers
@@ -74,25 +79,47 @@ export async function GET(request: Request) {
         });
       }
 
-      // Check if this is a new user (created within the last minute) to send welcome email
-      const userCreatedAt = new Date(data.user.created_at);
-      const now = new Date();
-      const isNewUser = (now.getTime() - userCreatedAt.getTime()) < 60000; // Within 1 minute
+      // Check if we need to send welcome email (only once per user)
+      if (data.user.email && supabaseServiceKey) {
+        try {
+          const serviceClient = createServiceClient(supabaseUrl, supabaseServiceKey);
+          
+          // Check if welcome email was already sent
+          const { data: profile } = await serviceClient
+            .from("profiles")
+            .select("welcome_email_sent_at")
+            .eq("id", data.user.id)
+            .single();
 
-      if (isNewUser && data.user.email) {
-        // Send welcome email for new OAuth users
-        sendWelcomeEmail({
-          to: data.user.email,
-          email: data.user.email,
-          userName: data.user.user_metadata?.full_name || data.user.user_metadata?.name || "",
-        }).catch((err) => {
-          log.error("Failed to send welcome email for OAuth user", err, { userId: data.user.id });
-        });
+          if (profile && !profile.welcome_email_sent_at) {
+            // Send welcome email
+            const emailResult = await sendWelcomeEmail({
+              to: data.user.email,
+              email: data.user.email,
+              userName: data.user.user_metadata?.full_name || data.user.user_metadata?.name || "",
+            });
 
-        log.info("Welcome email triggered for OAuth user", { 
-          userId: data.user.id, 
-          email: data.user.email,
-        });
+            if (emailResult.success) {
+              // Mark welcome email as sent
+              await serviceClient
+                .from("profiles")
+                .update({ welcome_email_sent_at: new Date().toISOString() })
+                .eq("id", data.user.id);
+
+              log.info("Welcome email sent successfully", { 
+                userId: data.user.id, 
+                email: data.user.email,
+                emailId: emailResult.id,
+              });
+            } else {
+              log.error("Failed to send welcome email", new Error(emailResult.error), { 
+                userId: data.user.id 
+              });
+            }
+          }
+        } catch (err) {
+          log.error("Error in welcome email flow", err, { userId: data.user.id });
+        }
       }
     }
 

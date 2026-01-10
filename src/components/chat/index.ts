@@ -7,5 +7,10 @@ export {
   useChatContext, 
   useSetActivityContext 
 } from "./chat-context";
-export type { PopupType } from "./chat-context";
+export type { 
+  PopupType,
+  ReferenceDataItem,
+  CurrentScenario,
+  CurrentQuestionContext,
+} from "./chat-context";
 

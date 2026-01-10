@@ -19,10 +19,40 @@ export interface CourseMaterialContext {
   lessonContent?: string;
 }
 
+// Enhanced question context from frontend
+export interface EnhancedQuestionContext {
+  number: number;
+  text: string;
+  type?: string;
+  options?: string[];
+  hint?: string;
+}
+
+// Scenario context from frontend
+export interface ScenarioContext {
+  title?: string;
+  description: string;
+  companyName?: string;
+}
+
+// Reference data item from frontend
+export interface ReferenceDataItem {
+  title: string;
+  content: string;
+}
+
+// Related lesson for course-wide context
+export interface RelatedLesson {
+  title: string;
+  type: string;
+  summary?: string;
+}
+
 export interface SkillContext {
   masteredSkills: string[];
   strugglingSkills: string[];
   currentSkill?: string;
+  currentSkillName?: string;
   masteryLevels: Record<string, number>;
   currentActivity?: {
     title: string;
@@ -33,6 +63,13 @@ export interface SkillContext {
   courseMaterial?: CourseMaterialContext;
   currentQuestionText?: string;
   currentQuestionNumber?: number;
+  // Enhanced context from frontend
+  enhancedQuestion?: EnhancedQuestionContext;
+  currentScenario?: ScenarioContext;
+  referenceData?: ReferenceDataItem[];
+  activityInstructions?: string;
+  // Course-wide context
+  relatedLessons?: RelatedLesson[];
 }
 
 /**
@@ -217,10 +254,29 @@ ${material.hints.map((hint, i) => `${i + 1}. ${hint}`).join('\n')}`);
  * Build current question context section
  */
 export function buildCurrentQuestionContext(context: SkillContext): string {
-  if (!context.currentQuestionText || !context.currentQuestionNumber) return '';
+  // Use enhanced question context if available, fall back to legacy fields
+  const questionText = context.enhancedQuestion?.text || context.currentQuestionText;
+  const questionNumber = context.enhancedQuestion?.number || context.currentQuestionNumber;
   
-  return `## CURRENT QUESTION (Student is viewing this RIGHT NOW)
-**Question ${context.currentQuestionNumber}:** ${context.currentQuestionText}
+  if (!questionText || !questionNumber) return '';
+  
+  let questionSection = `## CURRENT QUESTION (Student is viewing this RIGHT NOW)
+**Question ${questionNumber}:** ${questionText}`;
+
+  // Add question type and options if available
+  if (context.enhancedQuestion) {
+    if (context.enhancedQuestion.type) {
+      questionSection += `\n**Type:** ${context.enhancedQuestion.type}`;
+    }
+    if (context.enhancedQuestion.options && context.enhancedQuestion.options.length > 0) {
+      questionSection += `\n**Options:**\n${context.enhancedQuestion.options.map((opt, i) => `  ${String.fromCharCode(65 + i)}. ${opt}`).join('\n')}`;
+    }
+    if (context.enhancedQuestion.hint) {
+      questionSection += `\n**Available Hint:** ${context.enhancedQuestion.hint}`;
+    }
+  }
+
+  questionSection += `
 
 IMPORTANT INSTRUCTIONS FOR HELPING WITH THIS QUESTION:
 1. When the student says they got this question wrong, IMMEDIATELY provide a clear explanation of the underlying concept
@@ -229,6 +285,81 @@ IMPORTANT INSTRUCTIONS FOR HELPING WITH THIS QUESTION:
 4. Do NOT list all quiz questions - focus ONLY on THIS specific question
 5. Keep your response focused and helpful - explain the concept in 2-3 paragraphs maximum
 6. If the student's message includes an explanation from the quiz, build upon it to deepen their understanding`;
+  
+  return questionSection;
+}
+
+/**
+ * Build scenario and reference data context section
+ * This is the PRIMARY source of context when student asks "help me on this"
+ */
+export function buildViewingContext(context: SkillContext): string {
+  const sections: string[] = [];
+  
+  // Scenario/background context
+  if (context.currentScenario) {
+    let scenarioText = `## CURRENT SCENARIO (What the student is working on)`;
+    if (context.currentScenario.title || context.currentScenario.companyName) {
+      scenarioText += `\n**${context.currentScenario.companyName || context.currentScenario.title}**`;
+    }
+    scenarioText += `\n${context.currentScenario.description}`;
+    sections.push(scenarioText);
+  }
+  
+  // Activity instructions if available
+  if (context.activityInstructions) {
+    sections.push(`## ACTIVITY INSTRUCTIONS
+${context.activityInstructions}`);
+  }
+  
+  // Reference data (financial tables, formulas, etc.)
+  if (context.referenceData && context.referenceData.length > 0) {
+    let refDataText = `## REFERENCE DATA (Available to the student)
+The student can see the following data while working on this exercise:`;
+    
+    for (const item of context.referenceData) {
+      refDataText += `\n\n### ${item.title}\n${item.content}`;
+    }
+    
+    refDataText += `\n\n**IMPORTANT:** When the student asks about "this problem" or needs help, USE THIS DATA in your explanations. Show them how to apply the values from the reference data.`;
+    
+    sections.push(refDataText);
+  }
+  
+  if (sections.length === 0) return '';
+  
+  return sections.join('\n\n');
+}
+
+/**
+ * Build course-wide context section
+ * Provides background on related lessons for curriculum-aligned explanations
+ */
+export function buildCourseWideContext(context: SkillContext): string {
+  if (!context.relatedLessons || context.relatedLessons.length === 0) return '';
+  
+  let courseContext = `## COURSE CONTEXT (For curriculum-aligned explanations)`;
+  
+  if (context.currentSkillName) {
+    courseContext += `\n**Current Skill:** ${context.currentSkillName}`;
+  }
+  
+  courseContext += `\n\n**Related Lessons in this Skill:**`;
+  
+  for (const lesson of context.relatedLessons) {
+    courseContext += `\n- **${lesson.title}**`;
+    if (lesson.summary) {
+      courseContext += `: ${lesson.summary}`;
+    }
+  }
+  
+  courseContext += `\n\n**How to use this context:**
+- When explaining concepts, relate them to what the student has learned in these lessons
+- Use consistent terminology from the course material
+- Build on foundational concepts they should already know
+- Connect new ideas to previously covered material`;
+  
+  return courseContext;
 }
 
 /**
@@ -246,21 +377,46 @@ export function buildSystemPrompt(context: SkillContext): string {
     sections.push(buildCourseMaterialContext(context.courseMaterial));
   }
   
+  // Add course-wide context for curriculum alignment
+  const courseWideContext = buildCourseWideContext(context);
+  if (courseWideContext) {
+    sections.push(courseWideContext);
+  }
+  
+  // Add viewing context (scenario, reference data) - HIGH PRIORITY
+  const viewingContext = buildViewingContext(context);
+  if (viewingContext) {
+    sections.push(viewingContext);
+  }
+  
   // Add current question context if available (high priority)
   const currentQuestionSection = buildCurrentQuestionContext(context);
   if (currentQuestionSection) {
     sections.push(currentQuestionSection);
   }
 
-  sections.push(`## Important Guidelines
-1. If the student lacks prerequisites for a topic, gently suggest reviewing those first
-2. If they're working on an exercise, provide hints not answers - NEVER reveal quiz answers
-3. Use relevant real-world examples that connect to the course material
-4. Celebrate their progress when they get something right
-5. If you notice a pattern of mistakes, address the underlying concept
-6. When the student asks about the current problem, refer to the activity instructions and context above
-7. For coding problems, guide the student based on the test cases and expected outputs
-8. Always introduce yourself as "Bob" when appropriate`);
+  sections.push(`## Important Guidelines for Answering
+
+### When Student Says "Help me on this" or Similar
+1. IMMEDIATELY refer to the CURRENT QUESTION, SCENARIO, and REFERENCE DATA sections above
+2. Use specific values from the reference data to illustrate your explanation
+3. Guide them through the problem step-by-step using the actual numbers provided
+4. Don't just give the answer - explain the concept using the specific context
+
+### Teaching Approach (Hints First, Then More Direct Help)
+1. Start with guiding hints that point toward the solution
+2. If the student is clearly stuck after one attempt, provide more direct explanation
+3. When they explicitly ask for help understanding something, give a clear conceptual explanation
+4. For quiz questions: explain WHY an answer is correct without directly stating which option it is
+5. For calculation exercises: show the methodology using reference data, let them compute the final answer
+
+### General Guidelines
+1. If the student lacks prerequisites, gently suggest reviewing those first
+2. Use real-world examples that connect to the course material
+3. Celebrate progress when they get something right
+4. If you notice a pattern of mistakes, address the underlying concept
+5. For coding problems, guide based on test cases and expected outputs
+6. Always introduce yourself as "Bob" when appropriate`);
 
   return sections.join('\n\n');
 }

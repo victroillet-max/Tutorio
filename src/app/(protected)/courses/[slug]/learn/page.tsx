@@ -131,6 +131,7 @@ export default async function CourseLearnPage({ params, searchParams }: CourseLe
 
   // Get user's subscription for this course
   let subscriptionTier: 'free' | 'basic' | 'advanced' = 'free';
+  let isAdmin = false;
   let lockedActivitiesCount = 0;
   let basicTierPrice = 8; // Default fallback
   
@@ -146,24 +147,36 @@ export default async function CourseLearnPage({ params, searchParams }: CourseLe
   }
   
   if (user) {
-    const { data: subscription } = await supabase
-      .from("subscriptions")
-      .select("tier:subscription_tiers(slug)")
-      .eq("user_id", user.id)
-      .eq("course_id", course.id)
-      .in("status", ["active", "trialing"])
+    // Check if user is admin - admins get full access
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
       .single();
     
-    if (subscription?.tier) {
-      const tier = subscription.tier as unknown as { slug: string }[] | { slug: string };
-      const tierSlug = Array.isArray(tier) ? tier[0]?.slug : tier.slug;
-      if (tierSlug === 'free' || tierSlug === 'basic' || tierSlug === 'advanced') {
-        subscriptionTier = tierSlug;
+    if (profile?.role === "admin") {
+      isAdmin = true;
+      subscriptionTier = 'advanced'; // Admins get full access
+    } else {
+      const { data: subscription } = await supabase
+        .from("subscriptions")
+        .select("tier:subscription_tiers(slug)")
+        .eq("user_id", user.id)
+        .eq("course_id", course.id)
+        .in("status", ["active", "trialing"])
+        .single();
+      
+      if (subscription?.tier) {
+        const tier = subscription.tier as unknown as { slug: string }[] | { slug: string };
+        const tierSlug = Array.isArray(tier) ? tier[0]?.slug : tier.slug;
+        if (tierSlug === 'free' || tierSlug === 'basic' || tierSlug === 'advanced') {
+          subscriptionTier = tierSlug;
+        }
       }
     }
     
     // Count locked activities for this specific course
-    if (subscriptionTier === 'free') {
+    if (subscriptionTier === 'free' && !isAdmin) {
       // First get all skill IDs for this course
       const { data: courseSkills } = await supabase
         .from("skills")

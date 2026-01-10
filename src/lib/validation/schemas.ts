@@ -75,6 +75,34 @@ const optionalNumber = z.preprocess(
 );
 
 /**
+ * Enhanced question context schema
+ */
+const currentQuestionSchema = z.object({
+  number: z.number().int().min(1).max(1000),
+  text: z.string().max(5000),
+  type: z.string().max(50).optional(),
+  options: z.array(z.string().max(1000)).max(20).optional(),
+  hint: z.string().max(2000).optional(),
+}).optional();
+
+/**
+ * Scenario context schema
+ */
+const currentScenarioSchema = z.object({
+  title: z.string().max(500).optional(),
+  description: z.string().max(5000),
+  companyName: z.string().max(200).optional(),
+}).optional();
+
+/**
+ * Reference data item schema
+ */
+const referenceDataItemSchema = z.object({
+  title: z.string().max(200),
+  content: z.string().max(10000),
+});
+
+/**
  * Chat message request schema
  */
 export const chatMessageSchema = z.object({
@@ -90,6 +118,13 @@ export const chatMessageSchema = z.object({
   errorMessage: optionalString(5000),
   currentQuestionText: optionalString(2000),
   currentQuestionNumber: optionalNumber,
+  // Enhanced context fields
+  currentQuestion: currentQuestionSchema,
+  currentScenario: currentScenarioSchema,
+  referenceData: z.array(referenceDataItemSchema).max(20).optional(),
+  activityTitle: optionalString(500),
+  activityType: optionalString(100),
+  activityInstructions: optionalString(5000),
 });
 
 export type ChatMessageInput = z.infer<typeof chatMessageSchema>;

@@ -25,6 +25,13 @@ export function ChatWidgetWithContext() {
       currentQuestionNumber={context.currentQuestionNumber}
       courseName={context.courseName}
       courseId={context.courseId}
+      // Enhanced context fields
+      currentQuestion={context.currentQuestion}
+      currentScenario={context.currentScenario}
+      referenceData={context.referenceData}
+      activityTitle={context.activityTitle}
+      activityType={context.activityType}
+      activityInstructions={context.activityInstructions}
     />
   );
 }

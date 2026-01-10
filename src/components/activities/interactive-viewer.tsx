@@ -7,6 +7,7 @@ import { markActivityComplete, trackActivityView } from "@/lib/activities/action
 import { SpreadsheetExerciseViewer } from "./spreadsheet-exercise-viewer";
 import { InteractiveErrorBoundary } from "./interactive-error-boundary";
 import { InterestCalculator, PercentageCalculator, EquationSolver, GraphInterpretation } from "./math-interactives";
+import { useChatContext, type ReferenceDataItem, type CurrentScenario } from "@/components/chat";
 
 interface InteractiveViewerProps {
   activity: Activity;
@@ -84,6 +85,56 @@ export function InteractiveViewer({ activity, userId, isCompleted }: Interactive
         return <EquationSolver content={content} onComplete={handleComplete} completed={completed} />;
       case 'graph-interpretation':
         return <GraphInterpretation content={content} onComplete={handleComplete} completed={completed} />;
+      // New interactive types
+      case 'sequence-order':
+      case 'sequence-ordering':
+        return <SequenceOrder content={content} onComplete={handleComplete} completed={completed} />;
+      case 'category-sort':
+      case 'classification-practice':
+        return <CategorySort content={content} onComplete={handleComplete} completed={completed} />;
+      case 'ratio-calculator':
+      case 'income-calculator':
+      case 'bond-calculator':
+      case 'bad-debt-calculator':
+      case 'adjustment-calculator':
+      case 'depreciation-calculator':
+      case 'aging-calculator':
+      case 'receivables-calculator':
+      case 'liability-calculator':
+      case 'equity-calculator':
+      case 'disposal-calculator':
+      case 't-account-calculator':
+      case 'cfo-calculator':
+      case 'cfi-calculator':
+      case 'cff-calculator':
+      case 'capital-structure-analyzer':
+      case 'contingency-analyzer':
+      case 'expense-classifier':
+        return <GenericCalculator content={content} onComplete={handleComplete} completed={completed} calculatorType={interactiveType} />;
+      case 'income-statement-builder':
+      case 'balance-sheet-builder':
+      case 'adjustment-worksheet':
+      case 'adjustment-review':
+      case 'financial-linkage':
+        return <GenericBuilder content={content} onComplete={handleComplete} completed={completed} builderType={interactiveType} />;
+      // Code visualization types - use existing code editor patterns
+      case 'code-trace':
+      case 'step-debugger':
+      case 'function-trace':
+      case 'output-prediction':
+      case 'memory-visualizer':
+      case 'list-visualizer':
+      case 'dict-visualizer':
+      case 'condition-constructor':
+      case 'truth-table':
+      case 'planning-challenge':
+        return <CodeVisualizer content={content} onComplete={handleComplete} completed={completed} visualizerType={interactiveType} />;
+      case 'flowchart-builder':
+        return <FlowchartBuilder content={content} onComplete={handleComplete} completed={completed} />;
+      case 'type-game':
+        return <TypeGame content={content} onComplete={handleComplete} completed={completed} />;
+      case 'exam':
+        return <MockExamViewer content={content} onComplete={handleComplete} completed={completed} />;
       default:
         return <PlaceholderInteractive type={interactiveType} onComplete={handleComplete} completed={completed} />;
     }
@@ -3995,6 +4046,1276 @@ function ReviewCalculator({ content, onComplete, completed }: ReviewCalculatorPr
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ============================================
+// Sequence Order Component
+// For activities where items need to be put in correct order
+// ============================================
+
+interface SequenceOrderProps {
+  content: Record<string, unknown> | null;
+  onComplete: () => void;
+  completed: boolean;
+}
+
+function SequenceOrder({ content, onComplete, completed }: SequenceOrderProps) {
+  const correctSequence = (content?.sequence as string[]) || [];
+  const instructions = (content?.instructions as string) || "Arrange these items in the correct order.";
+  
+  const [items, setItems] = useState<{ text: string; originalIndex: number }[]>([]);
+  const [isClient, setIsClient] = useState(false);
+  const [showResults, setShowResults] = useState(false);
+  const [score, setScore] = useState<number | null>(null);
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  
+  // Shuffle on client side only to avoid hydration mismatch
+  useEffect(() => {
+    setIsClient(true);
+    if (correctSequence.length > 0) {
+      const shuffled = correctSequence
+        .map((text, index) => ({ text, originalIndex: index }))
+        .sort(() => Math.random() - 0.5);
+      setItems(shuffled);
+    }
+  }, []);
+  
+  const handleDragStart = (index: number) => {
+    if (completed || showResults) return;
+    setDraggedIndex(index);
+  };
+  
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === index) return;
+    
+    const newItems = [...items];
+    const draggedItem = newItems[draggedIndex];
+    newItems.splice(draggedIndex, 1);
+    newItems.splice(index, 0, draggedItem);
+    setItems(newItems);
+    setDraggedIndex(index);
+  };
+  
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+  };
+  
+  const handleCheckOrder = () => {
+    let correctCount = 0;
+    items.forEach((item, index) => {
+      if (item.originalIndex === index) {
+        correctCount++;
+      }
+    });
+    
+    const scorePercent = Math.round((correctCount / items.length) * 100);
+    setScore(scorePercent);
+    setShowResults(true);
+    
+    if (scorePercent >= 70) {
+      onComplete();
+    }
+  };
+  
+  const handleReset = () => {
+    const shuffled = correctSequence
+      .map((text, index) => ({ text, originalIndex: index }))
+      .sort(() => Math.random() - 0.5);
+    setItems(shuffled);
+    setShowResults(false);
+    setScore(null);
+  };
+  
+  if (!isClient || items.length === 0) {
+    return (
+      <div className="text-center py-8">
+        <div className="animate-pulse">
+          <div className="h-4 bg-slate-200 rounded w-3/4 mx-auto mb-4"></div>
+          <div className="space-y-3">
+            {[1, 2, 3, 4].map(i => (
+              <div key={i} className="h-12 bg-slate-100 rounded"></div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+  
+  return (
+    <div>
+      <p className="text-[var(--foreground-muted)] mb-6">{instructions}</p>
+      
+      {!showResults && !completed && (
+        <div className="flex items-center gap-2 text-sm text-[var(--foreground-muted)] mb-4 p-3 bg-violet-50 border border-violet-100 rounded-lg">
+          <GripVertical className="w-4 h-4 text-violet-500" />
+          <span>Drag items up or down to arrange them in the correct order</span>
+        </div>
+      )}
+      
+      <div className="space-y-2">
+        {items.map((item, index) => {
+          const isCorrect = showResults && item.originalIndex === index;
+          const isIncorrect = showResults && item.originalIndex !== index;
+          
+          return (
+            <div
+              key={`${item.text}-${index}`}
+              draggable={!completed && !showResults}
+              onDragStart={() => handleDragStart(index)}
+              onDragOver={(e) => handleDragOver(e, index)}
+              onDragEnd={handleDragEnd}
+              className={`
+                flex items-center gap-3 p-4 rounded-lg border transition-all
+                ${draggedIndex === index ? 'opacity-50' : ''}
+                ${isCorrect ? 'bg-emerald-50 border-emerald-300' : ''}
+                ${isIncorrect ? 'bg-red-50 border-red-300' : ''}
+                ${!showResults ? 'bg-white border-slate-200 hover:border-violet-300 cursor-grab active:cursor-grabbing' : ''}
+              `}
+            >
+              <div className="flex items-center gap-3 flex-1">
+                <div className={`
+                  w-8 h-8 rounded-full flex items-center justify-center text-sm font-semibold
+                  ${isCorrect ? 'bg-emerald-200 text-emerald-700' : ''}
+                  ${isIncorrect ? 'bg-red-200 text-red-700' : ''}
+                  ${!showResults ? 'bg-slate-100 text-slate-600' : ''}
+                `}>
+                  {index + 1}
+                </div>
+                <span className={`
+                  ${isCorrect ? 'text-emerald-800' : ''}
+                  ${isIncorrect ? 'text-red-800' : ''}
+                `}>
+                  {item.text}
+                </span>
+              </div>
+              
+              {!showResults && !completed && (
+                <GripVertical className="w-5 h-5 text-slate-400" />
+              )}
+              
+              {isCorrect && <CheckCircle2 className="w-5 h-5 text-emerald-600" />}
+              {isIncorrect && <X className="w-5 h-5 text-red-600" />}
+            </div>
+          );
+        })}
+      </div>
+      
+      {/* Results */}
+      {showResults && score !== null && (
+        <div className={`mt-6 p-4 rounded-lg ${
+          score >= 70 ? 'bg-emerald-50 border border-emerald-200' : 'bg-amber-50 border border-amber-200'
+        }`}>
+          <div className="flex items-center gap-2 mb-2">
+            {score >= 70 ? (
+              <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+            ) : (
+              <RotateCcw className="w-5 h-5 text-amber-600" />
+            )}
+            <span className={`font-semibold ${score >= 70 ? 'text-emerald-800' : 'text-amber-800'}`}>
+              Score: {score}%
+            </span>
+          </div>
+          <p className={`text-sm ${score >= 70 ? 'text-emerald-700' : 'text-amber-700'}`}>
+            {score >= 70 
+              ? "Great job! You've arranged the items correctly."
+              : "Not quite right. Try again to get the correct order."
+            }
+          </p>
+        </div>
+      )}
+      
+      {/* Action Buttons */}
+      <div className="flex justify-end gap-3 mt-6">
+        {showResults && score !== null && score < 70 && (
+          <button
+            onClick={handleReset}
+            className="flex items-center gap-2 px-4 py-2 text-slate-600 hover:text-slate-800 transition-colors"
+          >
+            <RotateCcw className="w-4 h-4" />
+            Try Again
+          </button>
+        )}
+        
+        {!showResults && !completed && (
+          <button
+            onClick={handleCheckOrder}
+            className="flex items-center gap-2 px-6 py-2 bg-violet-600 text-white font-medium rounded-lg hover:bg-violet-700 transition-colors"
+          >
+            Check Order
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ============================================
+// Category Sort Component
+// For sorting items into categories
+// ============================================
+
+interface CategorySortProps {
+  content: Record<string, unknown> | null;
+  onComplete: () => void;
+  completed: boolean;
+}
+
+interface CategoryItem {
+  text: string;
+  category: string;
+}
+
+function CategorySort({ content, onComplete, completed }: CategorySortProps) {
+  const categories = (content?.categories as string[]) || [];
+  const allItems = (content?.items as CategoryItem[]) || [];
+  const instructions = (content?.instructions as string) || "Sort each item into the correct category.";
+  
+  const [unassignedItems, setUnassignedItems] = useState<CategoryItem[]>([]);
+  const [categoryAssignments, setCategoryAssignments] = useState<Record<string, CategoryItem[]>>({});
+  const [isClient, setIsClient] = useState(false);
+  const [showResults, setShowResults] = useState(false);
+  const [score, setScore] = useState<number | null>(null);
+  const [draggedItem, setDraggedItem] = useState<CategoryItem | null>(null);
+  
+  // Shuffle items on client side
+  useEffect(() => {
+    setIsClient(true);
+    if (allItems.length > 0) {
+      const shuffled = [...allItems].sort(() => Math.random() - 0.5);
+      setUnassignedItems(shuffled);
+      
+      // Initialize empty category assignments
+      const initial: Record<string, CategoryItem[]> = {};
+      categories.forEach(cat => {
+        initial[cat] = [];
+      });
+      setCategoryAssignments(initial);
+    }
+  }, []);
+  
+  const handleDragStart = (item: CategoryItem) => {
+    if (completed || showResults) return;
+    setDraggedItem(item);
+  };
+  
+  const handleDrop = (category: string) => {
+    if (!draggedItem || completed || showResults) return;
+    
+    // Remove from unassigned
+    setUnassignedItems(prev => prev.filter(i => i.text !== draggedItem.text));
+    
+    // Remove from any other category
+    const newAssignments = { ...categoryAssignments };
+    categories.forEach(cat => {
+      newAssignments[cat] = newAssignments[cat].filter(i => i.text !== draggedItem.text);
+    });
+    
+    // Add to target category
+    newAssignments[category] = [...newAssignments[category], draggedItem];
+    setCategoryAssignments(newAssignments);
+    setDraggedItem(null);
+  };
+  
+  const handleRemoveFromCategory = (item: CategoryItem, category: string) => {
+    if (completed || showResults) return;
+    
+    setCategoryAssignments(prev => ({
+      ...prev,
+      [category]: prev[category].filter(i => i.text !== item.text)
+    }));
+    setUnassignedItems(prev => [...prev, item]);
+  };
+  
+  const handleCheckAnswers = () => {
+    let correctCount = 0;
+    let totalAssigned = 0;
+    
+    categories.forEach(category => {
+      categoryAssignments[category].forEach(item => {
+        totalAssigned++;
+        if (item.category === category) {
+          correctCount++;
+        }
+      });
+    });
+    
+    const scorePercent = allItems.length > 0 
+      ? Math.round((correctCount / allItems.length) * 100)
+      : 0;
+    
+    setScore(scorePercent);
+    setShowResults(true);
+    
+    if (scorePercent >= 70) {
+      onComplete();
+    }
+  };
+  
+  const handleReset = () => {
+    const shuffled = [...allItems].sort(() => Math.random() - 0.5);
+    setUnassignedItems(shuffled);
+    
+    const initial: Record<string, CategoryItem[]> = {};
+    categories.forEach(cat => {
+      initial[cat] = [];
+    });
+    setCategoryAssignments(initial);
+    setShowResults(false);
+    setScore(null);
+  };
+  
+  const allSorted = unassignedItems.length === 0;
+  
+  if (!isClient) {
+    return (
+      <div className="text-center py-8">
+        <div className="animate-pulse">
+          <div className="h-4 bg-slate-200 rounded w-3/4 mx-auto mb-4"></div>
+          <div className="grid grid-cols-2 gap-4">
+            {[1, 2].map(i => (
+              <div key={i} className="h-32 bg-slate-100 rounded"></div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+  
+  return (
+    <div>
+      <p className="text-[var(--foreground-muted)] mb-6">{instructions}</p>
+      
+      {/* Unassigned Items */}
+      {unassignedItems.length > 0 && !showResults && (
+        <div className="mb-6">
+          <p className="text-sm font-medium text-slate-600 mb-3">Items to sort:</p>
+          <div className="flex flex-wrap gap-2">
+            {unassignedItems.map((item) => (
+              <div
+                key={item.text}
+                draggable={!completed}
+                onDragStart={() => handleDragStart(item)}
+                className="px-4 py-2 bg-white border border-slate-200 rounded-lg cursor-grab active:cursor-grabbing hover:border-violet-300 transition-colors"
+              >
+                {item.text}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      
+      {/* Category Drop Zones */}
+      <div className={`grid gap-4 ${categories.length === 2 ? 'md:grid-cols-2' : categories.length === 3 ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}>
+        {categories.map((category) => (
+          <div
+            key={category}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={() => handleDrop(category)}
+            className={`
+              p-4 rounded-lg border-2 border-dashed min-h-[150px] transition-all
+              ${showResults ? 'border-slate-200' : 'border-slate-300 hover:border-violet-400 hover:bg-violet-50/50'}
+            `}
+          >
+            <h4 className="font-semibold text-slate-800 mb-3 text-center">{category}</h4>
+            
+            <div className="space-y-2">
+              {categoryAssignments[category]?.map((item) => {
+                const isCorrect = showResults && item.category === category;
+                const isIncorrect = showResults && item.category !== category;
+                
+                return (
+                  <div
+                    key={item.text}
+                    className={`
+                      flex items-center justify-between px-3 py-2 rounded-lg text-sm
+                      ${isCorrect ? 'bg-emerald-100 border border-emerald-300' : ''}
+                      ${isIncorrect ? 'bg-red-100 border border-red-300' : ''}
+                      ${!showResults ? 'bg-violet-100 border border-violet-200' : ''}
+                    `}
+                  >
+                    <span className={`
+                      ${isCorrect ? 'text-emerald-800' : ''}
+                      ${isIncorrect ? 'text-red-800' : ''}
+                    `}>
+                      {item.text}
+                    </span>
+                    
+                    {!showResults && !completed && (
+                      <button
+                        onClick={() => handleRemoveFromCategory(item, category)}
+                        className="text-slate-400 hover:text-slate-600"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                    
+                    {isCorrect && <CheckCircle2 className="w-4 h-4 text-emerald-600" />}
+                    {isIncorrect && <X className="w-4 h-4 text-red-600" />}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+      
+      {/* Results */}
+      {showResults && score !== null && (
+        <div className={`mt-6 p-4 rounded-lg ${
+          score >= 70 ? 'bg-emerald-50 border border-emerald-200' : 'bg-amber-50 border border-amber-200'
+        }`}>
+          <div className="flex items-center gap-2 mb-2">
+            {score >= 70 ? (
+              <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+            ) : (
+              <RotateCcw className="w-5 h-5 text-amber-600" />
+            )}
+            <span className={`font-semibold ${score >= 70 ? 'text-emerald-800' : 'text-amber-800'}`}>
+              Score: {score}%
+            </span>
+          </div>
+          <p className={`text-sm ${score >= 70 ? 'text-emerald-700' : 'text-amber-700'}`}>
+            {score >= 70 
+              ? "Excellent! You've sorted the items correctly."
+              : "Some items are in the wrong category. Try again!"
+            }
+          </p>
+        </div>
+      )}
+      
+      {/* Action Buttons */}
+      <div className="flex justify-end gap-3 mt-6">
+        {showResults && score !== null && score < 70 && (
+          <button
+            onClick={handleReset}
+            className="flex items-center gap-2 px-4 py-2 text-slate-600 hover:text-slate-800 transition-colors"
+          >
+            <RotateCcw className="w-4 h-4" />
+            Try Again
+          </button>
+        )}
+        
+        {!showResults && !completed && (
+          <button
+            onClick={handleCheckAnswers}
+            disabled={!allSorted}
+            className="flex items-center gap-2 px-6 py-2 bg-violet-600 text-white font-medium rounded-lg hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            Check Answers
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ============================================
+// Generic Calculator Component
+// For various calculator-style interactives
+// ============================================
+
+interface GenericCalculatorProps {
+  content: Record<string, unknown> | null;
+  onComplete: () => void;
+  completed: boolean;
+  calculatorType: string | null;
+}
+
+interface CalculatorQuestion {
+  id: string;
+  question: string;
+  answer_type: 'numeric' | 'choice' | 'text';
+  correct_answer: string | number;
+  tolerance?: number;
+  options?: string[];
+  explanation?: string;
+  hint?: string;
+}
+
+// Helper function to format currency values
+function formatCurrency(value: number | string): string {
+  const num = typeof value === 'string' ? parseFloat(value) : value;
+  if (isNaN(num)) return String(value);
+  return new Intl.NumberFormat('en-CH', { 
+    minimumFractionDigits: 0, 
+    maximumFractionDigits: 2 
+  }).format(num);
+}
+
+// Helper function to format field names for display
+function formatFieldName(key: string): string {
+  return key
+    .replace(/_/g, ' ')
+    .replace(/([A-Z])/g, ' $1')
+    .replace(/^./, str => str.toUpperCase())
+    .trim();
+}
+
+// Helper function to format percentage values
+function formatPercentage(value: number): string {
+  return `${(value * 100).toFixed(1)}%`;
+}
+
+// Helper to check if value is a rate/percentage (0-1 range)
+function isPercentageValue(key: string, value: number): boolean {
+  const percentageKeys = ['rate', 'margin', 'ratio', 'coupon_rate', 'market_rate', 'tax_rate'];
+  return percentageKeys.some(k => key.toLowerCase().includes(k)) && value > 0 && value < 1;
+}
+
+// Component to render a data table from an object
+function DataTable({ data, title }: { data: Record<string, unknown>; title?: string }) {
+  const entries = Object.entries(data).filter(([, v]) => v !== null && v !== undefined);
+  
+  if (entries.length === 0) return null;
+  
+  return (
+    <div className="mb-4">
+      {title && <h4 className="font-medium text-slate-700 mb-2 text-sm">{formatFieldName(title)}</h4>}
+      <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
+        <table className="w-full text-sm">
+          <tbody>
+            {entries.map(([key, value]) => {
+              // Handle nested objects
+              if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+                return (
+                  <tr key={key} className="border-b border-slate-100 last:border-b-0">
+                    <td colSpan={2} className="p-0">
+                      <DataTable data={value as Record<string, unknown>} title={key} />
+                    </td>
+                  </tr>
+                );
+              }
+              
+              // Format the value
+              let displayValue: string;
+              if (typeof value === 'number') {
+                if (isPercentageValue(key, value)) {
+                  displayValue = formatPercentage(value);
+                } else {
+                  displayValue = formatCurrency(value);
+                }
+              } else {
+                displayValue = String(value);
+              }
+              
+              return (
+                <tr key={key} className="border-b border-slate-100 last:border-b-0">
+                  <td className="px-3 py-2 text-slate-600 font-medium">{formatFieldName(key)}</td>
+                  <td className="px-3 py-2 text-right font-mono text-slate-800">{displayValue}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// Component to render transactions list
+function TransactionsList({ transactions }: { transactions: Array<{ date?: string; description: string }> }) {
+  if (!transactions || transactions.length === 0) return null;
+  
+  return (
+    <div className="mb-4">
+      <h4 className="font-medium text-slate-700 mb-2 text-sm">Transactions</h4>
+      <div className="space-y-2">
+        {transactions.map((tx, idx) => (
+          <div key={idx} className="bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm">
+            {tx.date && <span className="font-medium text-slate-600 mr-2">{tx.date}:</span>}
+            <span className="text-slate-800">{tx.description}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Component to render scenarios list
+function ScenariosList({ scenarios }: { scenarios: Array<{ id?: string; description: string }> }) {
+  if (!scenarios || scenarios.length === 0) return null;
+  
+  return (
+    <div className="mb-4">
+      <h4 className="font-medium text-slate-700 mb-2 text-sm">Scenarios</h4>
+      <div className="space-y-2">
+        {scenarios.map((scenario, idx) => (
+          <div key={idx} className="bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm">
+            <span className="font-medium text-violet-600 mr-2">
+              {scenario.id || String.fromCharCode(65 + idx)}:
+            </span>
+            <span className="text-slate-800">{scenario.description}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function GenericCalculator({ content, onComplete, completed, calculatorType }: GenericCalculatorProps) {
+  const questions = (content?.questions as CalculatorQuestion[]) || [];
+  const title = (content?.title as string) || `${calculatorType?.replace(/-/g, ' ')} Practice`;
+  const description = (content?.description as string) || '';
+  const passingScore = (content?.passing_score as number) || 70;
+  
+  // Extract context data for display
+  const companyBackground = (content?.company_background as string) || '';
+  const companyName = (content?.company_name as string) || (content?.title as string) || '';
+  const financialData = content?.financial_data as Record<string, unknown> | undefined;
+  const bondData = content?.bond_data as Record<string, unknown> | undefined;
+  const beginningEquity = content?.beginning_equity as Record<string, unknown> | undefined;
+  const transactions = content?.transactions as Array<{ date?: string; description: string }> | undefined;
+  const scenarios = content?.scenarios as Array<{ id?: string; description: string }> | undefined;
+  
+  // Check if we have any context data to display
+  const hasContextData = companyBackground || financialData || bondData || beginningEquity || 
+    (transactions && transactions.length > 0) || (scenarios && scenarios.length > 0);
+  
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [results, setResults] = useState<Record<string, boolean>>({});
+  const [showResults, setShowResults] = useState(false);
+  const [submitted, setSubmitted] = useState<Record<string, boolean>>({});
+  const [showContextPanel, setShowContextPanel] = useState(true);
+  
+  const currentQuestion = questions[currentIndex];
+  
+  // Chat context for AI tutor awareness
+  const { updateEnhancedQuestion, updateScenario, updateReferenceData, updateActivityInfo } = useChatContext();
+  
+  // Helper to format object data as readable text for AI
+  const formatDataForAI = useCallback((data: Record<string, unknown>, prefix = ''): string => {
+    return Object.entries(data)
+      .filter(([, v]) => v !== null && v !== undefined)
+      .map(([key, value]) => {
+        const formattedKey = key.replace(/_/g, ' ').replace(/([A-Z])/g, ' $1').trim();
+        if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+          return formatDataForAI(value as Record<string, unknown>, `${prefix}${formattedKey}: `);
+        }
+        if (typeof value === 'number') {
+          // Format numbers nicely
+          const formatted = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 }).format(value);
+          return `${prefix}${formattedKey}: ${formatted}`;
+        }
+        return `${prefix}${formattedKey}: ${value}`;
+      })
+      .join('\n');
+  }, []);
+  
+  // Update activity info on mount
+  useEffect(() => {
+    updateActivityInfo({
+      title,
+      type: calculatorType || 'interactive',
+      instructions: description,
+    });
+  }, [title, calculatorType, description, updateActivityInfo]);
+  
+  // Update scenario/context when component mounts
+  useEffect(() => {
+    if (companyBackground || companyName) {
+      const scenario: CurrentScenario = {
+        title: companyName || title,
+        description: companyBackground || description,
+        companyName: companyName || undefined,
+      };
+      updateScenario(scenario);
+    }
+  }, [companyBackground, companyName, title, description, updateScenario]);
+  
+  // Update reference data when component mounts
+  useEffect(() => {
+    const refData: ReferenceDataItem[] = [];
+    
+    if (financialData) {
+      refData.push({
+        title: 'Financial Data',
+        content: formatDataForAI(financialData),
+      });
+    }
+    
+    if (bondData) {
+      refData.push({
+        title: 'Bond Information',
+        content: formatDataForAI(bondData),
+      });
+    }
+    
+    if (beginningEquity) {
+      refData.push({
+        title: 'Beginning Equity Position',
+        content: formatDataForAI(beginningEquity),
+      });
+    }
+    
+    if (transactions && transactions.length > 0) {
+      refData.push({
+        title: 'Transactions',
+        content: transactions.map((tx, i) => 
+          `${i + 1}. ${tx.date ? `${tx.date}: ` : ''}${tx.description}`
+        ).join('\n'),
+      });
+    }
+    
+    if (scenarios && scenarios.length > 0) {
+      refData.push({
+        title: 'Scenarios',
+        content: scenarios.map((s, i) => 
+          `${s.id || String.fromCharCode(65 + i)}: ${s.description}`
+        ).join('\n'),
+      });
+    }
+    
+    if (refData.length > 0) {
+      updateReferenceData(refData);
+    }
+  }, [financialData, bondData, beginningEquity, transactions, scenarios, formatDataForAI, updateReferenceData]);
+  
+  // Update current question in chat context when it changes
+  useEffect(() => {
+    if (currentQuestion) {
+      updateEnhancedQuestion({
+        number: currentIndex + 1,
+        text: currentQuestion.question,
+        type: currentQuestion.answer_type,
+        options: currentQuestion.options,
+        hint: currentQuestion.hint,
+      });
+    }
+  }, [currentIndex, currentQuestion, updateEnhancedQuestion]);
+  
+  const handleAnswer = (questionId: string, answer: string) => {
+    setAnswers(prev => ({ ...prev, [questionId]: answer }));
+  };
+  
+  const handleSubmitQuestion = () => {
+    if (!currentQuestion) return;
+    
+    const userAnswer = answers[currentQuestion.id];
+    let isCorrect = false;
+    
+    if (currentQuestion.answer_type === 'numeric') {
+      const numAnswer = parseFloat(userAnswer?.replace(/,/g, '') || '0');
+      const correctNum = typeof currentQuestion.correct_answer === 'number' 
+        ? currentQuestion.correct_answer 
+        : parseFloat(String(currentQuestion.correct_answer));
+      const tolerance = currentQuestion.tolerance || 0.01;
+      isCorrect = Math.abs(numAnswer - correctNum) <= Math.abs(correctNum * tolerance);
+    } else {
+      isCorrect = userAnswer === String(currentQuestion.correct_answer);
+    }
+    
+    setResults(prev => ({ ...prev, [currentQuestion.id]: isCorrect }));
+    setSubmitted(prev => ({ ...prev, [currentQuestion.id]: true }));
+  };
+  
+  const handleNext = () => {
+    if (currentIndex < questions.length - 1) {
+      setCurrentIndex(currentIndex + 1);
+    } else {
+      // Calculate final score
+      const correctCount = Object.values(results).filter(r => r).length;
+      const scorePercent = Math.round((correctCount / questions.length) * 100);
+      setShowResults(true);
+      
+      if (scorePercent >= passingScore) {
+        onComplete();
+      }
+    }
+  };
+  
+  const handlePrevious = () => {
+    if (currentIndex > 0) {
+      setCurrentIndex(currentIndex - 1);
+    }
+  };
+  
+  const handleReset = () => {
+    setCurrentIndex(0);
+    setAnswers({});
+    setResults({});
+    setSubmitted({});
+    setShowResults(false);
+  };
+  
+  if (questions.length === 0) {
+    return (
+      <div className="text-center py-8 text-[var(--foreground-muted)]">
+        <Calculator className="w-12 h-12 mx-auto mb-4 text-slate-300" />
+        <p>No questions available for this calculator.</p>
+      </div>
+    );
+  }
+  
+  // Show final results
+  if (showResults) {
+    const correctCount = Object.values(results).filter(r => r).length;
+    const scorePercent = Math.round((correctCount / questions.length) * 100);
+    const passed = scorePercent >= passingScore;
+    
+    return (
+      <div className="text-center py-8">
+        <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 ${
+          passed ? 'bg-emerald-100' : 'bg-amber-100'
+        }`}>
+          {passed ? (
+            <CheckCircle2 className="w-10 h-10 text-emerald-600" />
+          ) : (
+            <RotateCcw className="w-10 h-10 text-amber-600" />
+          )}
+        </div>
+        
+        <h3 className="text-2xl font-bold mb-2">{scorePercent}%</h3>
+        <p className="text-[var(--foreground-muted)] mb-4">
+          You got {correctCount} out of {questions.length} correct
+        </p>
+        
+        <p className={`font-medium ${passed ? 'text-emerald-600' : 'text-amber-600'}`}>
+          {passed ? 'Great work! Exercise complete.' : 'Keep practicing! Try again to improve.'}
+        </p>
+        
+        {!passed && (
+          <button
+            onClick={handleReset}
+            className="mt-6 flex items-center gap-2 px-6 py-2 bg-violet-600 text-white font-medium rounded-lg hover:bg-violet-700 mx-auto transition-colors"
+          >
+            <RotateCcw className="w-4 h-4" />
+            Try Again
+          </button>
+        )}
+      </div>
+    );
+  }
+  
+  const isSubmitted = submitted[currentQuestion?.id];
+  const isCorrect = results[currentQuestion?.id];
+  
+  return (
+    <div>
+      {title && <h3 className="text-lg font-semibold mb-2">{title}</h3>}
+      {description && <p className="text-[var(--foreground-muted)] mb-4">{description}</p>}
+      
+      {/* Context Data Panel */}
+      {hasContextData && (
+        <div className="mb-6">
+          {/* Toggle button for context panel */}
+          <button
+            onClick={() => setShowContextPanel(!showContextPanel)}
+            className="flex items-center gap-2 text-sm text-violet-600 hover:text-violet-700 mb-3 transition-colors"
+          >
+            <BookOpen className="w-4 h-4" />
+            {showContextPanel ? 'Hide' : 'Show'} Reference Data
+            <ChevronRight className={`w-4 h-4 transition-transform ${showContextPanel ? 'rotate-90' : ''}`} />
+          </button>
+          
+          {showContextPanel && (
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4">
+              {/* Company Background */}
+              {companyBackground && (
+                <div className="mb-4">
+                  <div className="flex items-start gap-3">
+                    <BookOpen className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      {companyName && <h4 className="font-semibold text-blue-800">{companyName}</h4>}
+                      <p className="text-sm text-blue-700 mt-1">{companyBackground}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {/* Financial Data */}
+              {financialData && (
+                <div className="mb-4">
+                  <h4 className="font-medium text-slate-700 mb-2 text-sm flex items-center gap-2">
+                    <Calculator className="w-4 h-4" />
+                    Financial Data
+                  </h4>
+                  <DataTable data={financialData} />
+                </div>
+              )}
+              
+              {/* Bond Data */}
+              {bondData && (
+                <div className="mb-4">
+                  <h4 className="font-medium text-slate-700 mb-2 text-sm flex items-center gap-2">
+                    <Calculator className="w-4 h-4" />
+                    Bond Information
+                  </h4>
+                  <DataTable data={bondData} />
+                </div>
+              )}
+              
+              {/* Beginning Equity */}
+              {beginningEquity && (
+                <div className="mb-4">
+                  <h4 className="font-medium text-slate-700 mb-2 text-sm flex items-center gap-2">
+                    <Calculator className="w-4 h-4" />
+                    Beginning Equity Position
+                  </h4>
+                  <DataTable data={beginningEquity} />
+                </div>
+              )}
+              
+              {/* Transactions */}
+              {transactions && transactions.length > 0 && (
+                <TransactionsList transactions={transactions} />
+              )}
+              
+              {/* Scenarios */}
+              {scenarios && scenarios.length > 0 && (
+                <ScenariosList scenarios={scenarios} />
+              )}
+            </div>
+          )}
+        </div>
+      )}
+      
+      {/* Progress */}
+      <div className="flex items-center gap-2 mb-6">
+        <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+          <div 
+            className="h-full bg-violet-500 transition-all"
+            style={{ width: `${((currentIndex + 1) / questions.length) * 100}%` }}
+          />
+        </div>
+        <span className="text-sm text-[var(--foreground-muted)]">
+          {currentIndex + 1} / {questions.length}
+        </span>
+      </div>
+      
+      {/* Current Question */}
+      {currentQuestion && (
+        <div className="bg-slate-50 rounded-xl p-6 mb-6">
+          <p className="font-medium text-slate-800 mb-4">{currentQuestion.question}</p>
+          
+          {currentQuestion.answer_type === 'choice' && currentQuestion.options && (
+            <div className="space-y-2">
+              {currentQuestion.options.map((option, i) => (
+                <button
+                  key={i}
+                  onClick={() => !isSubmitted && handleAnswer(currentQuestion.id, option)}
+                  disabled={isSubmitted}
+                  className={`
+                    w-full text-left px-4 py-3 rounded-lg border transition-all
+                    ${answers[currentQuestion.id] === option 
+                      ? isSubmitted
+                        ? isCorrect ? 'bg-emerald-100 border-emerald-300' : option === String(currentQuestion.correct_answer) ? 'bg-emerald-100 border-emerald-300' : 'bg-red-100 border-red-300'
+                        : 'bg-violet-100 border-violet-300'
+                      : isSubmitted && option === String(currentQuestion.correct_answer)
+                        ? 'bg-emerald-100 border-emerald-300'
+                        : 'bg-white border-slate-200 hover:border-violet-300'
+                    }
+                    ${isSubmitted ? 'cursor-default' : 'cursor-pointer'}
+                  `}
+                >
+                  {option}
+                </button>
+              ))}
+            </div>
+          )}
+          
+          {(currentQuestion.answer_type === 'numeric' || currentQuestion.answer_type === 'text') && (
+            <input
+              type={currentQuestion.answer_type === 'numeric' ? 'number' : 'text'}
+              value={answers[currentQuestion.id] || ''}
+              onChange={(e) => handleAnswer(currentQuestion.id, e.target.value)}
+              disabled={isSubmitted}
+              placeholder="Enter your answer"
+              className={`
+                w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-500
+                ${isSubmitted 
+                  ? isCorrect ? 'bg-emerald-50 border-emerald-300' : 'bg-red-50 border-red-300'
+                  : 'border-slate-200'
+                }
+              `}
+            />
+          )}
+          
+          {/* Explanation */}
+          {isSubmitted && currentQuestion.explanation && (
+            <div className={`mt-4 p-3 rounded-lg text-sm ${
+              isCorrect ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
+            }`}>
+              {currentQuestion.explanation}
+            </div>
+          )}
+        </div>
+      )}
+      
+      {/* Navigation */}
+      <div className="flex justify-between">
+        <button
+          onClick={handlePrevious}
+          disabled={currentIndex === 0}
+          className="px-4 py-2 text-slate-600 hover:text-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          Previous
+        </button>
+        
+        <div className="flex gap-3">
+          {!isSubmitted && (
+            <button
+              onClick={handleSubmitQuestion}
+              disabled={!answers[currentQuestion?.id]}
+              className="px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              Check Answer
+            </button>
+          )}
+          
+          {isSubmitted && (
+            <button
+              onClick={handleNext}
+              className="flex items-center gap-2 px-6 py-2 bg-violet-600 text-white font-medium rounded-lg hover:bg-violet-700 transition-colors"
+            >
+              {currentIndex === questions.length - 1 ? 'Finish' : 'Next'}
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================
+// Generic Builder Component
+// For statement/worksheet builder interactives
+// ============================================
+
+interface GenericBuilderProps {
+  content: Record<string, unknown> | null;
+  onComplete: () => void;
+  completed: boolean;
+  builderType: string | null;
+}
+
+function GenericBuilder({ content, onComplete, completed, builderType }: GenericBuilderProps) {
+  const title = (content?.title as string) || `${builderType?.replace(/-/g, ' ')} Exercise`;
+  const instructions = (content?.instructions as string) || '';
+  const questions = (content?.questions as CalculatorQuestion[]) || [];
+  
+  // If it has questions, use the calculator pattern
+  if (questions.length > 0) {
+    return <GenericCalculator content={content} onComplete={onComplete} completed={completed} calculatorType={builderType} />;
+  }
+  
+  // Otherwise show a structured builder interface
+  return (
+    <div>
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-10 h-10 rounded-lg bg-violet-100 flex items-center justify-center">
+          <BookOpen className="w-5 h-5 text-violet-600" />
+        </div>
+        <div>
+          <h3 className="font-semibold text-lg">{title}</h3>
+          {instructions && <p className="text-sm text-[var(--foreground-muted)]">{instructions}</p>}
+        </div>
+      </div>
+      
+      <div className="bg-slate-50 rounded-xl p-6 mb-6 text-center">
+        <p className="text-[var(--foreground-muted)]">
+          This {builderType?.replace(/-/g, ' ')} exercise is ready for practice.
+        </p>
+        <p className="text-sm text-[var(--foreground-muted)] mt-2">
+          Complete the exercise and click the button below when done.
+        </p>
+      </div>
+      
+      {!completed && (
+        <div className="flex justify-end">
+          <button
+            onClick={onComplete}
+            className="flex items-center gap-2 px-6 py-2 bg-violet-600 text-white font-medium rounded-lg hover:bg-violet-700 transition-colors"
+          >
+            Mark Complete
+            <CheckCircle2 className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================
+// Code Visualizer Component
+// For code tracing and debugging exercises
+// ============================================
+
+interface CodeVisualizerProps {
+  content: Record<string, unknown> | null;
+  onComplete: () => void;
+  completed: boolean;
+  visualizerType: string | null;
+}
+
+function CodeVisualizer({ content, onComplete, completed, visualizerType }: CodeVisualizerProps) {
+  const title = (content?.title as string) || visualizerType?.replace(/-/g, ' ');
+  const instructions = (content?.instructions as string) || '';
+  const code = (content?.code as string) || (content?.starterCode as string) || '';
+  const questions = (content?.questions as CalculatorQuestion[]) || [];
+  
+  // If it has questions, use the calculator pattern
+  if (questions.length > 0) {
+    return <GenericCalculator content={content} onComplete={onComplete} completed={completed} calculatorType={visualizerType} />;
+  }
+  
+  return (
+    <div>
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-10 h-10 rounded-lg bg-slate-800 flex items-center justify-center">
+          <Lightbulb className="w-5 h-5 text-emerald-400" />
+        </div>
+        <div>
+          <h3 className="font-semibold text-lg capitalize">{title}</h3>
+          {instructions && <p className="text-sm text-[var(--foreground-muted)]">{instructions}</p>}
+        </div>
+      </div>
+      
+      {code && (
+        <div className="bg-slate-900 rounded-xl p-4 mb-6 overflow-x-auto">
+          <pre className="text-sm text-slate-100 font-mono whitespace-pre-wrap">{code}</pre>
+        </div>
+      )}
+      
+      <div className="bg-slate-50 rounded-xl p-6 mb-6 text-center">
+        <p className="text-[var(--foreground-muted)]">
+          Study the code above and complete the exercise.
+        </p>
+        <p className="text-sm text-[var(--foreground-muted)] mt-2">
+          Click the button below when you&apos;re done.
+        </p>
+      </div>
+      
+      {!completed && (
+        <div className="flex justify-end">
+          <button
+            onClick={onComplete}
+            className="flex items-center gap-2 px-6 py-2 bg-violet-600 text-white font-medium rounded-lg hover:bg-violet-700 transition-colors"
+          >
+            Complete Exercise
+            <CheckCircle2 className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================
+// Flowchart Builder Component
+// ============================================
+
+interface FlowchartBuilderProps {
+  content: Record<string, unknown> | null;
+  onComplete: () => void;
+  completed: boolean;
+}
+
+function FlowchartBuilder({ content, onComplete, completed }: FlowchartBuilderProps) {
+  const title = (content?.title as string) || 'Flowchart Builder';
+  const instructions = (content?.instructions as string) || 'Build the flowchart by arranging the steps.';
+  const steps = (content?.steps as string[]) || (content?.sequence as string[]) || [];
+  
+  // If has steps/sequence, use SequenceOrder
+  if (steps.length > 0) {
+    return <SequenceOrder content={{ ...content, sequence: steps, instructions }} onComplete={onComplete} completed={completed} />;
+  }
+  
+  return (
+    <div>
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
+          <ArrowRight className="w-5 h-5 text-blue-600" />
+        </div>
+        <div>
+          <h3 className="font-semibold text-lg">{title}</h3>
+          <p className="text-sm text-[var(--foreground-muted)]">{instructions}</p>
+        </div>
+      </div>
+      
+      <div className="bg-slate-50 rounded-xl p-6 mb-6 text-center">
+        <p className="text-[var(--foreground-muted)]">
+          Complete the flowchart exercise and click the button below.
+        </p>
+      </div>
+      
+      {!completed && (
+        <div className="flex justify-end">
+          <button
+            onClick={onComplete}
+            className="flex items-center gap-2 px-6 py-2 bg-violet-600 text-white font-medium rounded-lg hover:bg-violet-700 transition-colors"
+          >
+            Mark Complete
+            <CheckCircle2 className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ============================================
+// Type Game Component
+// For data type identification exercises
+// ============================================
+
+interface TypeGameProps {
+  content: Record<string, unknown> | null;
+  onComplete: () => void;
+  completed: boolean;
+}
+
+function TypeGame({ content, onComplete, completed }: TypeGameProps) {
+  // If it has items with categories, use CategorySort
+  const items = content?.items as CategoryItem[];
+  if (items && items.length > 0) {
+    return <CategorySort content={content} onComplete={onComplete} completed={completed} />;
+  }
+  
+  // If it has questions, use GenericCalculator
+  const questions = content?.questions as CalculatorQuestion[];
+  if (questions && questions.length > 0) {
+    return <GenericCalculator content={content} onComplete={onComplete} completed={completed} calculatorType="type-game" />;
+  }
+  
+  const title = (content?.title as string) || 'Type Identification Game';
+  const instructions = (content?.instructions as string) || 'Identify the correct data types.';
+  
+  return (
+    <div>
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center">
+          <HelpCircle className="w-5 h-5 text-indigo-600" />
+        </div>
+        <div>
+          <h3 className="font-semibold text-lg">{title}</h3>
+          <p className="text-sm text-[var(--foreground-muted)]">{instructions}</p>
+        </div>
+      </div>
+      
+      <div className="bg-slate-50 rounded-xl p-6 mb-6 text-center">
+        <p className="text-[var(--foreground-muted)]">
+          Complete the type identification exercise.
+        </p>
+      </div>
+      
+      {!completed && (
+        <div className="flex justify-end">
+          <button
+            onClick={onComplete}
+            className="flex items-center gap-2 px-6 py-2 bg-violet-600 text-white font-medium rounded-lg hover:bg-violet-700 transition-colors"
+          >
+            Mark Complete
+            <CheckCircle2 className="w-4 h-4" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

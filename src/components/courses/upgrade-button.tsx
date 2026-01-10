@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ArrowUpRight } from "lucide-react";
 
 interface UpgradeButtonProps {
@@ -8,20 +8,23 @@ interface UpgradeButtonProps {
 }
 
 export function UpgradeButton({ courseSlug }: UpgradeButtonProps) {
+  const router = useRouter();
+
+  const handleClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    router.push(`/pricing?course=${courseSlug}`);
+  };
+
   return (
-    <span
-      onClick={(e) => e.stopPropagation()}
-      className="block"
+    <button
+      onClick={handleClick}
+      className="flex items-center justify-center gap-1 px-4 py-1.5 border border-[var(--accent)] text-[var(--accent)] text-sm font-medium rounded-lg hover:bg-[var(--accent)] hover:text-white transition-colors"
     >
-      <Link
-        href={`/pricing?course=${courseSlug}`}
-        className="flex items-center justify-center gap-1 px-4 py-1.5 border border-[var(--accent)] text-[var(--accent)] text-sm font-medium rounded-lg hover:bg-[var(--accent)] hover:text-white transition-colors"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <ArrowUpRight className="w-3 h-3" />
-        Upgrade
-      </Link>
-    </span>
+      <ArrowUpRight className="w-3 h-3" />
+      Upgrade
+    </button>
   );
 }
+
 

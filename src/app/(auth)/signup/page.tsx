@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { signUp } from "@/lib/auth/actions";
 import { AuthForm, EmailInput, PasswordInput, FullNameInput } from "@/components/auth/auth-form";
+import { GoogleButton } from "@/components/auth/oauth-buttons";
 import { CheckCircle2 } from "lucide-react";
 
 export const metadata = {
@@ -46,6 +47,19 @@ export default function SignupPage() {
 
       {/* Form Card */}
       <div className="card-elevated p-8">
+        {/* Google OAuth */}
+        <GoogleButton />
+
+        {/* Divider */}
+        <div className="relative my-6">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-[var(--border)]" />
+          </div>
+          <div className="relative flex justify-center text-sm">
+            <span className="px-4 bg-white text-[var(--foreground-muted)]">or</span>
+          </div>
+        </div>
+
         <AuthForm 
           action={signUp} 
           submitText="Create Account"

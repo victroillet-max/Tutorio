@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { QuickStartButton } from "@/components/dashboard/quick-start-button";
+import { CourseIcon } from "@/components/courses/course-icon";
 import type { UserCourseSubscription } from "@/lib/database.types";
 
 export const metadata = {
@@ -607,10 +608,6 @@ const categoryLabels: Record<string, string> = {
 };
 
 function CourseHeroCard({ course, subscription }: { course: CourseWithProgress; subscription: UserCourseSubscription | null }) {
-  // Calculate the SVG stroke offset for the progress ring
-  const circumference = 2 * Math.PI * 40; // radius = 40
-  const strokeDashoffset = circumference - (course.overall_progress_percent / 100) * circumference;
-  
   // Determine plan type from subscription
   const tierSlug = subscription?.tier_slug || 'free';
   const tierName = subscription?.tier_name || 'Free';
@@ -646,47 +643,9 @@ function CourseHeroCard({ course, subscription }: { course: CourseWithProgress; 
       )}
 
       <div className="flex gap-4 sm:gap-6">
-        {/* Progress Ring */}
-        <div className="flex-shrink-0 pt-6 sm:pt-0">
-          <div className="relative w-[88px] h-[88px] sm:w-[112px] sm:h-[112px]">
-            <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
-              <defs>
-                <linearGradient id={`progressGradient-${course.course_id}`} x1="0%" y1="0%" x2="100%" y2="0%">
-                  <stop offset="0%" stopColor="var(--accent)" />
-                  <stop offset="100%" stopColor="var(--accent-light)" />
-                </linearGradient>
-              </defs>
-              <circle
-                cx="50"
-                cy="50"
-                r="40"
-                fill="none"
-                stroke="var(--background-tertiary)"
-                strokeWidth="8"
-              />
-              <circle
-                cx="50"
-                cy="50"
-                r="40"
-                fill="none"
-                stroke={`url(#progressGradient-${course.course_id})`}
-                strokeWidth="8"
-                strokeLinecap="round"
-                strokeDasharray={circumference}
-                strokeDashoffset={strokeDashoffset}
-                className="transition-all duration-1000 ease-out drop-shadow-[0_0_6px_rgba(231,111,81,0.4)]"
-              />
-            </svg>
-            <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <span 
-                className="text-lg sm:text-2xl font-bold text-[var(--foreground)]"
-                style={{ fontFamily: 'var(--font-heading)', letterSpacing: '-0.02em' }}
-              >
-                {course.overall_progress_percent}%
-              </span>
-              <span className="text-[10px] sm:text-xs text-[var(--foreground-muted)]">complete</span>
-            </div>
-          </div>
+        {/* Course Icon */}
+        <div className="flex-shrink-0 pt-1 sm:pt-0">
+          <CourseIcon courseSlug={course.course_slug} size="xl" />
         </div>
 
         {/* Course Details */}
@@ -710,11 +669,21 @@ function CourseHeroCard({ course, subscription }: { course: CourseWithProgress; 
             {course.course_short_description || course.course_description}
           </p>
 
-          {/* Lesson Progress */}
-          <div className="flex items-center gap-1 text-xs sm:text-sm text-[var(--foreground-muted)] mb-3 sm:mb-4">
-            <BookOpen className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[var(--primary)]" />
-            <span className="font-medium">{completedLessons}</span>
-            <span>of {totalLessons} lessons completed</span>
+          {/* Progress Bar */}
+          <div className="mb-3 sm:mb-4">
+            <div className="flex items-center justify-between text-xs text-[var(--foreground-muted)] mb-1.5">
+              <span className="flex items-center gap-1">
+                <BookOpen className="w-3.5 h-3.5 text-[var(--primary)]" />
+                <span>{completedLessons} of {totalLessons} lessons</span>
+              </span>
+              <span className="font-semibold text-[var(--accent)]">{course.overall_progress_percent}%</span>
+            </div>
+            <div className="h-2 bg-[var(--background-tertiary)] rounded-full overflow-hidden">
+              <div 
+                className="h-full rounded-full bg-gradient-to-r from-[var(--accent)] to-[var(--accent-light)] transition-all duration-500"
+                style={{ width: `${course.overall_progress_percent}%` }}
+              />
+            </div>
           </div>
 
           {/* Continue Button */}

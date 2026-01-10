@@ -7,3 +7,4 @@ SET
   updated_at = NOW()
 WHERE slug = 'managerial-accounting';
 
+

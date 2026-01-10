@@ -25,7 +25,16 @@ export function CheckpointViewer({ activity, userId, isCompleted }: CheckpointVi
 
   // Chat context for struggling detection and current question tracking
   // Extract specific methods to avoid dependency on entire context object (prevents infinite re-renders)
-  const { updateCurrentQuestion, triggerPopup, hasDismissedHelp } = useChatContext();
+  const { updateCurrentQuestion, updateEnhancedQuestion, updateActivityInfo, triggerPopup, hasDismissedHelp } = useChatContext();
+  
+  // Update activity info on mount
+  useEffect(() => {
+    updateActivityInfo({
+      title: activity.title,
+      type: 'checkpoint',
+      instructions: `Checkpoint exam with ${questions.length} questions. Passing score: ${passingScore}%${timeLimit ? `. Time limit: ${timeLimit} minutes` : ''}`,
+    });
+  }, [activity.title, questions.length, passingScore, timeLimit, updateActivityInfo]);
 
   const [started, setStarted] = useState(false);
   const [currentQuestion, setCurrentQuestion] = useState(0);
@@ -81,9 +90,18 @@ export function CheckpointViewer({ activity, userId, isCompleted }: CheckpointVi
     if (!started) return; // Only track when exam has started
     const question = questions[currentQuestion];
     if (question?.question) {
+      // Update legacy context
       updateCurrentQuestion(question.question, currentQuestion + 1);
+      // Update enhanced context with more details
+      updateEnhancedQuestion({
+        number: currentQuestion + 1,
+        text: question.question,
+        type: question.type || 'mcq',
+        options: question.options,
+        hint: undefined,
+      });
     }
-  }, [currentQuestion, questions, updateCurrentQuestion, started]);
+  }, [currentQuestion, questions, updateCurrentQuestion, updateEnhancedQuestion, started]);
 
   const question = questions[currentQuestion];
   const totalQuestions = questions.length;
